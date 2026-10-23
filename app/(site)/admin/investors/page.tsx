@@ -13,7 +13,7 @@ export default async function Investors({ searchParams }: { searchParams: Promis
   const where: Prisma.InvestorWhereInput = {};
   if (sp.stage) where.stage = sp.stage;
   if (sp.type) where.investorType = sp.type;
-  if (sp.q) where.OR = [{ name: { contains: sp.q } }, { firm: { contains: sp.q } }, { email: { contains: sp.q } }, { tags: { contains: sp.q } }];
+  if (sp.q) where.OR = (["name", "firm", "email", "tags"] as const).map((k) => ({ [k]: { contains: sp.q, mode: "insensitive" } }));
   const investors = await db.investor.findMany({ where, orderBy: { updatedAt: "desc" }, include: { _count: { select: { lois: true } } } });
   return (
     <div>

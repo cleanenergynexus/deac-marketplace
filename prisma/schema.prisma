@@ -1,12 +1,12 @@
 // DEAC Marketplace data model.
-// SQLite in dev has no enums, so "enum-like" fields are strings; allowed values live in lib/constants.ts.
+// "Enum-like" fields are strings; allowed values live in lib/constants.ts.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

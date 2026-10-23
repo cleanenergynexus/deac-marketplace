@@ -4,13 +4,15 @@ Private, curated marketplace for data center opportunities (lease, financing, sa
 
 ## Run locally
 
+Needs a Postgres database (local Docker, or a free Neon/Supabase dev database).
+
 ```bash
 npm install
-cp .env.example .env
+cp .env.example .env   # set DATABASE_URL
 npx prisma db push
-npm run db:seed     # demo data
-npm run dev         # http://localhost:3000
-npm test            # calculator matches the Excel workbook
+npm run db:seed        # demo data — never run against production
+npm run dev            # http://localhost:3000
+npm test               # calculator matches the Excel workbook
 ```
 
 Demo logins (password `deac-demo-2026`): `admin@deacna.com`, `investor@deacna.com` (approved), `applicant@deacna.com` (pending).
@@ -41,10 +43,14 @@ Recommended: deploy this app at `marketplace.deacna.com` and on deacna.com embed
 
 Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Options: SAMEORIGIN`.
 
-## Production checklist
+## Going live (Vercel + Neon)
 
-- Switch `prisma/schema.prisma` provider to `postgresql` and set `DATABASE_URL` (Neon, Supabase, RDS…).
-- Set a long random `SESSION_SECRET`.
-- Set `RESEND_API_KEY` to actually send outreach and LOI-approval emails (otherwise they are logged to the CRM only).
-- Documents are links today (Drive / SharePoint / S3). Signed-URL uploads with view tracking are a natural next step.
-- Deploy on Vercel (or any Node host): `npm run build && npm start`.
+1. **Vercel:** Add New → Project → import `cleanenergynexus/deac-marketplace`.
+2. **Database:** in the Vercel project, Storage → add a Neon Postgres database. This sets `DATABASE_URL`.
+3. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
+4. **Deploy.** The build creates the database tables automatically.
+5. **First admin:** with the production `DATABASE_URL` in your local `.env`, run `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
+6. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
+7. **Embed on deacna.com (optional):** paste the iframe snippet above into any page.
+
+Documents are links today (Drive / SharePoint / S3). Signed-URL uploads with view tracking are a natural next step.
