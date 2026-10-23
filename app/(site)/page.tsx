@@ -27,7 +27,7 @@ export default async function Home() {
 
       <section>
         <h2 className="mb-1 text-xl font-bold">Featured opportunities</h2>
-        <p className="mb-5 text-sm text-slate-600">Project names, sponsors and economics are visible to approved members only.</p>
+        <p className="mb-5 text-sm text-slate-600">Live opportunities from the DEAC portfolio. Project names, sponsors and economics are visible to approved members only. Already a member? <Link href="/login" className="text-brand-600">Sign in</Link>.</p>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {teasers.map((p) => <ProjectTile key={p.id} p={p} href="/apply" hideTitle />)}
         </div>

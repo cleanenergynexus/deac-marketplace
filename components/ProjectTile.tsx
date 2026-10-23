@@ -25,6 +25,7 @@ export function ProjectTile({ p, href, hideTitle = false }: { p: P; href: string
           <div><dt className="text-xs text-slate-500">Funding needed</dt><dd className="font-medium">{p.fundingNeeded ? usd(p.fundingNeeded) : "—"}</dd></div>
           <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium">{p.projectStatus}</dd></div>
         </dl>
+        {hideTitle && <div className="mt-auto border-t border-slate-100 pt-3 text-sm font-semibold text-brand-600">🔒 Request access to view details →</div>}
       </div>
     </Link>
   );
