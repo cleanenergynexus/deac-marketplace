@@ -1,0 +1,220 @@
+// DEAC Marketplace data model.
+// SQLite in dev has no enums, so "enum-like" fields are strings; allowed values live in lib/constants.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String // ADMIN | INVESTOR | DEVELOPER
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  investorId   String?  @unique
+  investor     Investor? @relation(fields: [investorId], references: [id])
+  developerId  String?  @unique
+  developer    Developer? @relation(fields: [developerId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// ---------- Investor CRM ----------
+model Investor {
+  id              String   @id @default(cuid())
+  name            String
+  firm            String?
+  email           String   @unique
+  phone           String?
+  title           String?
+  investorType    String? // Family Office, Infrastructure Fund, PE, Strategic, Hyperscaler, Lender, HNWI
+  checkMin        Float?
+  checkMax        Float?
+  preferredStates String   @default("") // comma separated, e.g. "TX,VA,PR"
+  dealTypes       String   @default("") // comma separated: LEASE,FINANCING,SALE
+  facilityTypes   String   @default("")
+  mwMin           Float?
+  mwMax           Float?
+  accredited      Boolean  @default(false)
+  ndaSigned       Boolean  @default(false)
+  stage           String   @default("PROSPECT") // pipeline stage, see lib/constants.ts
+  source          String? // Referral, Conference, LinkedIn, Website, Import...
+  tags            String   @default("")
+  notes           String?
+  owner           String? // team member responsible
+  lastContactAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user             User?
+  lois             Loi[]
+  activities       Activity[]
+  analysisRequests AnalysisRequest[]
+  campaignSends    CampaignRecipient[]
+}
+
+// ---------- Developer CRM ----------
+model Developer {
+  id          String   @id @default(cuid())
+  company     String
+  contactName String
+  email       String
+  phone       String?
+  website     String?
+  hq          String?
+  experience  String? // track record narrative
+  mwDelivered Float?
+  stage       String   @default("LEAD") // see lib/constants.ts
+  source      String?
+  notes       String?
+  owner       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User?
+  team       TeamMember[]
+  projects   Project[]
+  activities Activity[]
+}
+
+model TeamMember {
+  id          String    @id @default(cuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  name        String
+  title       String
+  bio         String
+  photoUrl    String?
+  sortOrder   Int       @default(0)
+}
+
+// ---------- Listings ----------
+model Project {
+  id            String    @id @default(cuid())
+  code          String    @unique // public listing code, e.g. DEAC-TX-001
+  title         String
+  developerId   String
+  developer     Developer @relation(fields: [developerId], references: [id])
+  state         String // 2-letter
+  city          String?
+  mw            Float
+  facilityType  String // see lib/constants.ts
+  dealType      String // LEASE | FINANCING | SALE
+  fundingNeeded Float // USD
+  projectStatus String // development stage, e.g. "Site Control", "Permitting", "Under Construction", "Operating"
+  summary       String
+  highlights    String   @default("") // newline separated bullets
+  coverImageUrl String?
+
+  // Economics (shown after access is granted)
+  totalCapex      Float?
+  targetIrr       Float? // %
+  equityMultiple  Float?
+  leaseRateKwMo   Float? // $/kW/month
+  powerRateCents  Float? // ¢/kWh
+  powerStatus     String? // Live | Signed | Queued | Speculative
+  monthsToPower   Int?
+  codDate         String?
+  capitalStack    String? // free text: senior debt / pref / common
+  economicsNotes  String?
+
+  // Internal scoring (Excel bid calculator inputs + results). Never shown to investors.
+  valuationInputs String? // JSON
+  valueScore      Int?
+  adjustedValueMw Float?
+
+  visibility String   @default("DRAFT") // DRAFT | PRIVATE (approved investors) | TEASER (also on public embed)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  documents        Document[]
+  lois             Loi[]
+  analysisRequests AnalysisRequest[]
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  category  String // Teaser, Financial Model, Interconnection, Site Plan, Environmental, Legal, Other
+  url       String // link to file storage (S3, Drive, SharePoint...)
+  access    String   @default("DATAROOM") // SUMMARY (any approved investor) | DATAROOM (after approved LOI)
+  createdAt DateTime @default(now())
+}
+
+// Letter of interest. APPROVED unlocks that project's data room for that investor.
+model Loi {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id])
+  investorId String
+  investor   Investor @relation(fields: [investorId], references: [id])
+  amount     Float?
+  structure  String? // Lease / Debt / Equity / Acquisition
+  timeline   String?
+  message    String?
+  status     String   @default("PENDING") // PENDING | APPROVED | DECLINED
+  reviewedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, investorId])
+}
+
+// Investor intake: what they need to analyze a project. The team organizes the data room package around it.
+model AnalysisRequest {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id])
+  investorId    String
+  investor      Investor @relation(fields: [investorId], references: [id])
+  focusAreas    String // comma separated
+  returnMetric  String? // IRR, Cash yield, Cap rate, DSCR...
+  holdPeriod    String?
+  format        String? // Excel model, PDF memo, Call
+  questions     String?
+  status        String   @default("OPEN") // OPEN | IN_PROGRESS | DELIVERED
+  deliverableUrl String?
+  createdAt     DateTime @default(now())
+}
+
+model Activity {
+  id          String     @id @default(cuid())
+  investorId  String?
+  investor    Investor?  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  developerId String?
+  developer   Developer? @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  kind        String // NOTE | CALL | EMAIL | MEETING | STAGE | SYSTEM
+  body        String
+  by          String?
+  createdAt   DateTime   @default(now())
+}
+
+// ---------- Outreach ----------
+model Campaign {
+  id         String   @id @default(cuid())
+  name       String
+  subject    String
+  body       String // supports {{name}} and {{firm}}
+  segment    String // JSON filter: { stages, states, dealTypes, investorTypes }
+  status     String   @default("DRAFT") // DRAFT | SENT
+  sentAt     DateTime?
+  createdAt  DateTime @default(now())
+  recipients CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  investorId String
+  investor   Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  status     String // SENT | LOGGED | FAILED
+  error      String?
+  createdAt  DateTime @default(now())
+}

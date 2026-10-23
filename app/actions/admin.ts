@@ -1,0 +1,281 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
+import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
+import { sendEmail } from "@/lib/email";
+
+const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
+const n = (f: FormData, k: string) => { const v = s(f, k); return v ? Number(v.replace(/[$,%]/g, "")) : null; };
+const list = (f: FormData, k: string) => f.getAll(k).map(String).filter(Boolean).join(",");
+
+// ---------- Investors ----------
+function investorData(f: FormData) {
+  return {
+    name: s(f, "name") ?? "",
+    firm: s(f, "firm"),
+    title: s(f, "title"),
+    phone: s(f, "phone"),
+    investorType: s(f, "investorType"),
+    checkMin: n(f, "checkMin"),
+    checkMax: n(f, "checkMax"),
+    mwMin: n(f, "mwMin"),
+    mwMax: n(f, "mwMax"),
+    preferredStates: list(f, "states"),
+    dealTypes: list(f, "dealTypes"),
+    facilityTypes: list(f, "facilityTypes"),
+    accredited: f.get("accredited") === "on",
+    ndaSigned: f.get("ndaSigned") === "on",
+    source: s(f, "source"),
+    tags: s(f, "tags") ?? "",
+    owner: s(f, "owner"),
+    notes: s(f, "notes"),
+  };
+}
+
+export async function createInvestor(f: FormData) {
+  await requireAdmin();
+  const email = s(f, "email")!.toLowerCase();
+  const inv = await db.investor.create({ data: { email, stage: s(f, "stage") ?? "PROSPECT", ...investorData(f) } });
+  redirect(`/admin/investors/${inv.id}`);
+}
+
+export async function updateInvestor(f: FormData) {
+  await requireAdmin();
+  const id = String(f.get("id"));
+  await db.investor.update({ where: { id }, data: investorData(f) });
+  revalidatePath(`/admin/investors/${id}`);
+}
+
+export async function setInvestorStage(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const stage = String(f.get("stage"));
+  const inv = await db.investor.update({ where: { id }, data: { stage }, include: { user: true } });
+  await db.activity.create({ data: { investorId: id, kind: "STAGE", body: `Stage → ${stage}`, by: admin.name } });
+  // Approving the CRM record also approves their login (and declining revokes it).
+  if (inv.user && (stage === "APPROVED" || stage === "ACTIVE")) await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
+  if (inv.user && stage === "DECLINED") await db.user.update({ where: { id: inv.user.id }, data: { status: "REJECTED" } });
+  revalidatePath(`/admin/investors/${id}`);
+  revalidatePath("/admin/investors");
+}
+
+export async function logActivity(f: FormData) {
+  const admin = await requireAdmin();
+  const investorId = s(f, "investorId");
+  const developerId = s(f, "developerId");
+  const body = s(f, "body");
+  if (!body) return;
+  await db.activity.create({ data: { investorId, developerId, kind: s(f, "kind") ?? "NOTE", body, by: admin.name } });
+  if (investorId) {
+    await db.investor.update({ where: { id: investorId }, data: { lastContactAt: new Date() } });
+    revalidatePath(`/admin/investors/${investorId}`);
+  }
+  if (developerId) revalidatePath(`/admin/developers/${developerId}`);
+}
+
+/** CSV import: header row with any of name,email,firm,title,phone,investorType,states,source,tags */
+export async function importInvestors(f: FormData) {
+  await requireAdmin();
+  const file = f.get("file") as File | null;
+  const text = file && file.size ? await file.text() : String(f.get("csv") ?? "");
+  const rows = parseCsv(text);
+  if (rows.length < 2) return;
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const col = (r: string[], k: string) => { const i = header.indexOf(k.toLowerCase()); return i >= 0 ? r[i]?.trim() || null : null; };
+  let created = 0;
+  for (const r of rows.slice(1)) {
+    const email = col(r, "email")?.toLowerCase();
+    if (!email) continue;
+    const exists = await db.investor.findUnique({ where: { email } });
+    if (exists) continue;
+    await db.investor.create({ data: { email, name: col(r, "name") ?? email, firm: col(r, "firm"), title: col(r, "title"), phone: col(r, "phone"), investorType: col(r, "investorType"), preferredStates: (col(r, "states") ?? "").replace(/[;| ]+/g, ","), source: col(r, "source") ?? "CSV import", tags: col(r, "tags") ?? "" } });
+    created++;
+  }
+  redirect(`/admin/investors?imported=${created}`);
+}
+
+function parseCsv(text: string): string[][] {
+  const out: string[][] = [];
+  let row: string[] = [], cur = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; }
+    else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); out.push(row); }
+  return out.filter((r) => r.some((x) => x.trim()));
+}
+
+// ---------- Developers ----------
+function developerData(f: FormData) {
+  return { company: s(f, "company") ?? "", contactName: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: s(f, "phone"), website: s(f, "website"), hq: s(f, "hq"), experience: s(f, "experience"), mwDelivered: n(f, "mwDelivered"), source: s(f, "source"), owner: s(f, "owner"), notes: s(f, "notes") };
+}
+export async function createDeveloper(f: FormData) {
+  await requireAdmin();
+  const d = await db.developer.create({ data: { ...developerData(f), stage: s(f, "stage") ?? "LEAD" } });
+  redirect(`/admin/developers/${d.id}`);
+}
+export async function updateDeveloper(f: FormData) {
+  await requireAdmin();
+  const id = String(f.get("id"));
+  await db.developer.update({ where: { id }, data: developerData(f) });
+  revalidatePath(`/admin/developers/${id}`);
+}
+export async function setDeveloperStage(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const stage = String(f.get("stage"));
+  await db.developer.update({ where: { id }, data: { stage } });
+  await db.activity.create({ data: { developerId: id, kind: "STAGE", body: `Stage → ${stage}`, by: admin.name } });
+  revalidatePath(`/admin/developers/${id}`);
+  revalidatePath("/admin/developers");
+}
+export async function addTeamMember(f: FormData) {
+  await requireAdmin();
+  const developerId = String(f.get("developerId"));
+  await db.teamMember.create({ data: { developerId, name: s(f, "name") ?? "", title: s(f, "title") ?? "", bio: s(f, "bio") ?? "", photoUrl: s(f, "photoUrl") } });
+  revalidatePath(`/admin/developers/${developerId}`);
+}
+export async function deleteTeamMember(f: FormData) {
+  await requireAdmin();
+  const m = await db.teamMember.delete({ where: { id: String(f.get("id")) } });
+  revalidatePath(`/admin/developers/${m.developerId}`);
+}
+
+// ---------- Projects / listings ----------
+function projectData(f: FormData) {
+  return {
+    title: s(f, "title") ?? "",
+    developerId: String(f.get("developerId")),
+    state: (s(f, "state") ?? "").toUpperCase(),
+    city: s(f, "city"),
+    mw: n(f, "mw") ?? 0,
+    facilityType: s(f, "facilityType") ?? "",
+    dealType: s(f, "dealType") ?? "FINANCING",
+    fundingNeeded: n(f, "fundingNeeded") ?? 0,
+    projectStatus: s(f, "projectStatus") ?? "",
+    summary: s(f, "summary") ?? "",
+    highlights: s(f, "highlights") ?? "",
+    coverImageUrl: s(f, "coverImageUrl"),
+    totalCapex: n(f, "totalCapex"),
+    targetIrr: n(f, "targetIrr"),
+    equityMultiple: n(f, "equityMultiple"),
+    leaseRateKwMo: n(f, "leaseRateKwMo"),
+    powerRateCents: n(f, "powerRateCents"),
+    powerStatus: s(f, "powerStatus"),
+    monthsToPower: n(f, "monthsToPower") ?? null,
+    codDate: s(f, "codDate"),
+    capitalStack: s(f, "capitalStack"),
+    economicsNotes: s(f, "economicsNotes"),
+    visibility: s(f, "visibility") ?? "DRAFT",
+  };
+}
+export async function createProject(f: FormData) {
+  await requireAdmin();
+  const data = projectData(f);
+  const count = await db.project.count();
+  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  redirect(`/admin/projects/${p.id}`);
+}
+export async function updateProject(f: FormData) {
+  await requireAdmin();
+  const id = String(f.get("id"));
+  const data = projectData(f);
+  await db.project.update({ where: { id }, data: { ...data, monthsToPower: data.monthsToPower ?? undefined } });
+  revalidatePath(`/admin/projects/${id}`);
+  revalidatePath("/marketplace");
+}
+export async function addDocument(f: FormData) {
+  await requireAdmin();
+  const projectId = String(f.get("projectId"));
+  await db.document.create({ data: { projectId, name: s(f, "name") ?? "Document", category: s(f, "category") ?? "Other", url: s(f, "url") ?? "#", access: s(f, "access") ?? "DATAROOM" } });
+  revalidatePath(`/admin/projects/${projectId}`);
+}
+export async function deleteDocument(f: FormData) {
+  await requireAdmin();
+  const d = await db.document.delete({ where: { id: String(f.get("id")) } });
+  revalidatePath(`/admin/projects/${d.projectId}`);
+}
+
+/** Saves calculator inputs + score to a project (lead scoring). */
+export async function saveValuation(projectId: string, inputs: ValuationInputs) {
+  await requireAdmin();
+  const r = evaluate(inputs);
+  const p = await db.project.update({ where: { id: projectId }, data: { valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw } });
+  const dev = await db.developer.findUnique({ where: { id: p.developerId } });
+  if (dev && ["LEAD", "SCREENING"].includes(dev.stage)) await db.developer.update({ where: { id: dev.id }, data: { stage: "SCORED" } });
+  await db.activity.create({ data: { developerId: p.developerId, kind: "SYSTEM", body: `${p.code} scored ${r.score} (${r.recommendation.label}); market value $${Math.round(r.adjustedValueMw).toLocaleString()}/MW.` } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath("/admin/projects");
+  return { score: r.score };
+}
+export async function getSavedInputs(projectId: string) {
+  await requireAdmin();
+  const p = await db.project.findUnique({ where: { id: projectId } });
+  return parseInputs(p?.valuationInputs);
+}
+
+// ---------- LOIs & intake ----------
+export async function reviewLoi(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const status = String(f.get("status")); // APPROVED | DECLINED
+  const loi = await db.loi.update({ where: { id }, data: { status, reviewedAt: new Date() }, include: { project: true, investor: true } });
+  await db.activity.create({ data: { investorId: loi.investorId, kind: "SYSTEM", body: `LOI for ${loi.project.code} ${status.toLowerCase()}${status === "APPROVED" ? " — data room unlocked" : ""}.`, by: admin.name } });
+  if (status === "APPROVED") {
+    if (loi.investor.stage === "APPROVED") await db.investor.update({ where: { id: loi.investorId }, data: { stage: "ACTIVE" } });
+    await sendEmail({ to: loi.investor.email, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The data room is now available in your DEAC Marketplace portal.\n\n— DEAC Team` });
+  }
+  revalidatePath("/admin/lois");
+}
+
+export async function updateAnalysisRequest(f: FormData) {
+  await requireAdmin();
+  await db.analysisRequest.update({ where: { id: String(f.get("id")) }, data: { status: String(f.get("status")), deliverableUrl: s(f, "deliverableUrl") } });
+  revalidatePath("/admin/requests");
+}
+
+// ---------- Outreach ----------
+export type Segment = { stages?: string[]; states?: string[]; dealTypes?: string[]; investorTypes?: string[]; tags?: string };
+
+export async function segmentInvestors(seg: Segment) {
+  await requireAdmin();
+  const all = await db.investor.findMany({ where: seg.stages?.length ? { stage: { in: seg.stages } } : {} });
+  const has = (csvField: string, wanted?: string[]) => !wanted?.length || csvField.split(",").some((x) => wanted.includes(x.trim()));
+  return all.filter(
+    (i) =>
+      has(i.preferredStates, seg.states) &&
+      has(i.dealTypes, seg.dealTypes) &&
+      (!seg.investorTypes?.length || (i.investorType && seg.investorTypes.includes(i.investorType))) &&
+      (!seg.tags || i.tags.toLowerCase().includes(seg.tags.toLowerCase())),
+  );
+}
+
+export async function createCampaign(f: FormData) {
+  await requireAdmin();
+  const segment: Segment = { stages: f.getAll("stages").map(String), states: f.getAll("states").map(String), dealTypes: f.getAll("dealTypes").map(String), investorTypes: f.getAll("investorTypes").map(String), tags: s(f, "tags") ?? undefined };
+  const c = await db.campaign.create({ data: { name: s(f, "name") ?? "Campaign", subject: s(f, "subject") ?? "", body: s(f, "body") ?? "", segment: JSON.stringify(segment) } });
+  redirect(`/admin/outreach/${c.id}`);
+}
+
+export async function sendCampaign(f: FormData) {
+  const admin = await requireAdmin();
+  const c = await db.campaign.findUniqueOrThrow({ where: { id: String(f.get("id")) } });
+  if (c.status === "SENT") return;
+  const recipients = await segmentInvestors(JSON.parse(c.segment));
+  for (const inv of recipients) {
+    const fill = (t: string) => t.replaceAll("{{name}}", inv.name.split(" ")[0]).replaceAll("{{firm}}", inv.firm ?? "your firm");
+    const res = await sendEmail({ to: inv.email, subject: fill(c.subject), text: fill(c.body) });
+    await db.campaignRecipient.create({ data: { campaignId: c.id, investorId: inv.id, status: res.status, error: res.error } });
+    await db.activity.create({ data: { investorId: inv.id, kind: "EMAIL", body: `Campaign: ${c.subject}`, by: admin.name } });
+    await db.investor.update({ where: { id: inv.id }, data: { lastContactAt: new Date(), stage: inv.stage === "PROSPECT" ? "CONTACTED" : inv.stage } });
+  }
+  await db.campaign.update({ where: { id: c.id }, data: { status: "SENT", sentAt: new Date() } });
+  revalidatePath(`/admin/outreach/${c.id}`);
+}
