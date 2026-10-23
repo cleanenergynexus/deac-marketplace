@@ -47,9 +47,9 @@ Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Op
 
 1. **Vercel:** Add New → Project → import `cleanenergynexus/deac-marketplace`.
 2. **Database:** in the Vercel project, Storage → add a Neon Postgres database. This sets `DATABASE_URL`.
-3. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
+3. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
 4. **Deploy.** The build creates the database tables automatically.
-5. **First admin:** with the production `DATABASE_URL` in your local `.env`, run `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
+5. **First admin:** open `/setup` on the live site, enter the `SETUP_TOKEN`, and create your login (the page shuts off once an admin exists; then delete `SETUP_TOKEN`). Alternative from a terminal: `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
 6. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
 7. **Embed on deacna.com (optional):** paste the iframe snippet above into any page.
 

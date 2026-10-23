@@ -88,3 +88,16 @@ export async function submitProject(_: unknown, f: FormData) {
   await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? state}" via website.` } });
   redirect("/developers/thanks");
 }
+
+/** First-run admin creation; refuses once any admin exists or if the token is wrong. */
+export async function createFirstAdmin(_: unknown, f: FormData) {
+  const token = process.env.SETUP_TOKEN;
+  if (!token || String(f.get("token")) !== token) return { error: "Setup token is incorrect." };
+  if ((await db.user.count({ where: { role: "ADMIN" } })) > 0) return { error: "An admin already exists. Please sign in." };
+  const email = s(f, "email")?.toLowerCase();
+  const password = String(f.get("password") ?? "");
+  if (!email || password.length < 10) return { error: "Email and a password of at least 10 characters are required." };
+  const user = await db.user.create({ data: { email, name: s(f, "name") ?? email, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED" } });
+  await startSession({ uid: user.id, role: "ADMIN", status: "APPROVED", name: user.name });
+  redirect("/admin");
+}
