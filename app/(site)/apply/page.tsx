@@ -29,7 +29,7 @@ export default function Apply() {
         </div>
         <Field label="Deal types of interest"><Checks name="dealTypes" options={DEAL_TYPES} /></Field>
         <Field label="Facility types"><Checks name="facilityTypes" options={FACILITY_TYPES} /></Field>
-        <Field label="Markets of interest"><MarketPicker /></Field>
+        <Field label="Markets of interest" group><MarketPicker /></Field>
         <Field label="Anything else about your mandate?"><textarea name="notes" rows={3} className="input" /></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="accredited" /> I confirm I am an accredited / qualified institutional investor.</label>
       </ActionForm>
