@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Developer, Project } from "@prisma/client";
 import type { ListingDraft } from "@/lib/importer";
 import { Field, Select } from "@/components/ui";
-import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
+import { DEAL_STAGES, DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
 import { OPTIONS } from "@/lib/valuation";
 import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -46,9 +46,12 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
         <Field label="Deal type"><Select name="dealType" options={DEAL_TYPES} defaultValue={p ? p.dealType : d.dealType} {...pickFirst} /></Field>
         <Field label="Funding needed ($)"><MoneyInput name="fundingNeeded" defaultValue={p ? v(p.fundingNeeded) : d.fundingNeeded} required /></Field>
         <Field label="Project status"><Select name="projectStatus" options={PROJECT_STATUSES} defaultValue={p ? p.projectStatus : d.projectStatus} {...pickFirst} /></Field>
+        <Field label="Term"><input name="term" defaultValue={v(p?.term)} className="input" placeholder="e.g. 24 mo" /></Field>
+        <Field label="Deal stage (shown to investors)"><Select name="dealStage" options={DEAL_STAGES.map((x) => ({ value: x.value, label: `${x.label} (${x.status})` }))} defaultValue={p?.dealStage ?? "MARKETING"} /></Field>
         <Field label="Cover image URL"><input name="coverImageUrl" defaultValue={v(p?.coverImageUrl)} className="input" /></Field>
         <Field label="Summary" className="sm:col-span-3"><textarea name="summary" rows={4} defaultValue={p ? p.summary : d.summary} className="input" /></Field>
         <Field label="Highlights (one per line)" className="sm:col-span-3"><textarea name="highlights" rows={3} defaultValue={p ? p.highlights : d.highlights} className="input" /></Field>
+        <Field label="Use of funds (one per line, e.g. Equipment & EPC: $3.1M)" className="sm:col-span-3"><textarea name="useOfFunds" rows={3} defaultValue={v(p?.useOfFunds)} className="input" placeholder={"Equipment & EPC: $3.1M\nInterconnection: $0.4M\nSoft costs / contingency: $0.7M"} /></Field>
       </div>
       <h3 className="font-semibold">Economics</h3>
       <div className="grid gap-4 sm:grid-cols-3">
