@@ -66,7 +66,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
     <div className="grid gap-4 md:grid-cols-2">
       <div className="rounded-lg border border-slate-200 bg-white p-3">
         <label className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
-          <Box label="Select All Regions" checked={all} partial={picked.size > 0} onChange={(v) => setPicked(v ? new Set(ALL_LEAVES) : new Set())} />
+          <Box label="Select All Regions" checked={all} onChange={(v) => setPicked(v ? new Set(ALL_LEAVES) : new Set())} />
           Select All Regions
         </label>
         <ul className="mt-1">{REGIONS.map((r) => row(r, 0))}</ul>
