@@ -3,6 +3,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { Field, Select } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
 import { OPTIONS } from "@/lib/valuation";
+import { MoneyInput } from "@/components/MoneyInput";
 
 export default function SubmitProject() {
   return (
@@ -27,7 +28,7 @@ export default function SubmitProject() {
           <Field label="Capacity (MW)"><input name="mw" inputMode="decimal" required className="input" /></Field>
           <Field label="Facility type"><Select name="facilityType" options={FACILITY_TYPES} /></Field>
           <Field label="Seeking"><Select name="dealType" options={DEAL_TYPES} /></Field>
-          <Field label="Funding needed ($)"><input name="fundingNeeded" inputMode="numeric" className="input" /></Field>
+          <Field label="Funding needed ($)"><MoneyInput name="fundingNeeded" /></Field>
           <Field label="Project stage"><Select name="projectStatus" options={PROJECT_STATUSES} /></Field>
           <Field label="Power status"><Select name="powerStatus" options={OPTIONS.powerStatus} /></Field>
           <Field label="Months to power"><input name="monthsToPower" inputMode="numeric" className="input" /></Field>

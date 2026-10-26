@@ -5,6 +5,7 @@ import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_STAGES, INVESTOR_TYPES } from "@/l
 import { MarketPicker } from "@/components/MarketPicker";
 import { csv } from "@/lib/format";
 import { SaveButton } from "@/components/SaveButton";
+import { MoneyInput } from "@/components/MoneyInput";
 
 export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: FormData) => Promise<void> }) {
   return (
@@ -18,8 +19,8 @@ export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: Form
         <Field label="Phone"><input name="phone" defaultValue={inv?.phone ?? ""} className="input" /></Field>
         <Field label="Investor type"><Select name="investorType" options={INVESTOR_TYPES} defaultValue={inv?.investorType} placeholder="—" /></Field>
         {!inv && <Field label="Stage"><Select name="stage" options={INVESTOR_STAGES} /></Field>}
-        <Field label="Min check ($)"><input name="checkMin" defaultValue={inv?.checkMin ?? ""} className="input" /></Field>
-        <Field label="Max check ($)"><input name="checkMax" defaultValue={inv?.checkMax ?? ""} className="input" /></Field>
+        <Field label="Min check ($)"><MoneyInput name="checkMin" defaultValue={inv?.checkMin} /></Field>
+        <Field label="Max check ($)"><MoneyInput name="checkMax" defaultValue={inv?.checkMax} /></Field>
         <Field label="Source"><input name="source" defaultValue={inv?.source ?? ""} className="input" /></Field>
         <Field label="Min MW"><input name="mwMin" defaultValue={inv?.mwMin ?? ""} className="input" /></Field>
         <Field label="Max MW"><input name="mwMax" defaultValue={inv?.mwMax ?? ""} className="input" /></Field>

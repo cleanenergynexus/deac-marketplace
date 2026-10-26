@@ -4,6 +4,7 @@ import {
   ASSET_TYPES, DEFAULT_INPUTS, DEFAULT_OPERATING, FACTOR_LABELS, OPTIONS, TENANT_QUALITY,
   evaluate, evaluateOperating, type OperatingInputs, type ValuationInputs,
 } from "@/lib/valuation";
+import { MoneyInput } from "@/components/MoneyInput";
 
 const money = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }));
 const toneCls = { green: "bg-emerald-600", amber: "bg-amber-500", red: "bg-red-600" } as const;
@@ -52,7 +53,7 @@ function BidCalculator({ initial, onSave }: Props) {
           <Row label="Asset type"><select value={i.assetType} onChange={(e) => set("assetType", e.target.value)} className="input">{ASSET_TYPES.map((o) => <option key={o}>{o}</option>)}</select></Row>
           {numIn("mw", "MW available")}
           {numIn("acres", "Acres")}
-          {numIn("askingPrice", "Asking price ($)")}
+          <Row label="Asking price ($)"><MoneyInput defaultValue={i.askingPrice || ""} onValue={(v) => set("askingPrice", v ?? 0)} /></Row>
         </div>
         <h3 className="mb-3 mt-6 font-semibold">Factors</h3>
         <div className="grid gap-3 sm:grid-cols-2">

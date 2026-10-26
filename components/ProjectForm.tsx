@@ -5,6 +5,7 @@ import { Field, Select } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
 import { OPTIONS } from "@/lib/valuation";
 import { SaveButton } from "@/components/SaveButton";
+import { MoneyInput } from "@/components/MoneyInput";
 
 type Props = {
   p?: Project;
@@ -43,7 +44,7 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
         <Field label="Capacity (MW)"><input name="mw" defaultValue={p ? v(p.mw) : d.mw} required className="input" /></Field>
         <Field label="Facility type"><Select name="facilityType" options={FACILITY_TYPES} defaultValue={p ? p.facilityType : d.facilityType} {...pickFirst} /></Field>
         <Field label="Deal type"><Select name="dealType" options={DEAL_TYPES} defaultValue={p ? p.dealType : d.dealType} {...pickFirst} /></Field>
-        <Field label="Funding needed ($)"><input name="fundingNeeded" defaultValue={p ? v(p.fundingNeeded) : d.fundingNeeded} required className="input" /></Field>
+        <Field label="Funding needed ($)"><MoneyInput name="fundingNeeded" defaultValue={p ? v(p.fundingNeeded) : d.fundingNeeded} required /></Field>
         <Field label="Project status"><Select name="projectStatus" options={PROJECT_STATUSES} defaultValue={p ? p.projectStatus : d.projectStatus} {...pickFirst} /></Field>
         <Field label="Cover image URL"><input name="coverImageUrl" defaultValue={v(p?.coverImageUrl)} className="input" /></Field>
         <Field label="Summary" className="sm:col-span-3"><textarea name="summary" rows={4} defaultValue={p ? p.summary : d.summary} className="input" /></Field>
@@ -51,7 +52,7 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
       </div>
       <h3 className="font-semibold">Economics</h3>
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Total capex ($)"><input name="totalCapex" defaultValue={p ? v(p.totalCapex) : d.totalCapex} className="input" /></Field>
+        <Field label="Total capex ($)"><MoneyInput name="totalCapex" defaultValue={p ? v(p.totalCapex) : d.totalCapex} /></Field>
         <Field label="Target IRR (%)"><input name="targetIrr" defaultValue={p ? v(p.targetIrr) : d.targetIrr} className="input" /></Field>
         <Field label="Equity multiple (x)"><input name="equityMultiple" defaultValue={p ? v(p.equityMultiple) : d.equityMultiple} className="input" /></Field>
         <Field label="Lease rate ($/kW/mo)"><input name="leaseRateKwMo" defaultValue={p ? v(p.leaseRateKwMo) : d.leaseRateKwMo} className="input" /></Field>
