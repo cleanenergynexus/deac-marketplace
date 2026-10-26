@@ -7,11 +7,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const [pendingLois, openReqs, applied] = await Promise.all([
     db.loi.count({ where: { status: "PENDING" } }),
     db.analysisRequest.count({ where: { status: { not: "DELIVERED" } } }),
-    db.investor.count({ where: { stage: "APPLIED" } }),
+    db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
   ]);
   const links: [string, string, number?][] = [
     ["/admin", "Dashboard"],
-    ["/admin/investors", "Investor CRM", applied],
+    ["/admin/access", "Access requests", applied],
+    ["/admin/investors", "Investor CRM"],
     ["/admin/developers", "Developer CRM"],
     ["/admin/projects", "Listings"],
     ["/admin/lois", "LOIs", pendingLois],

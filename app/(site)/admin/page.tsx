@@ -7,12 +7,13 @@ import { usd, num, date } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const [investors, developers, projects, lois, activity] = await Promise.all([
+  const [investors, developers, projects, lois, activity, pendingAccess] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
     db.developer.groupBy({ by: ["stage"], _count: true }),
     db.project.findMany({ select: { mw: true, fundingNeeded: true, visibility: true } }),
     db.loi.findMany({ include: { investor: true, project: true }, orderBy: { createdAt: "desc" }, take: 5 }),
     db.activity.findMany({ include: { investor: true, developer: true }, orderBy: { createdAt: "desc" }, take: 10 }),
+    db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
   ]);
   const live = projects.filter((p) => p.visibility !== "DRAFT");
   const count = (g: { stage: string; _count: number }[], s: string) => g.find((x) => x.stage === s)?._count ?? 0;
@@ -20,6 +21,12 @@ export default async function AdminHome() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" />
+      {pendingAccess > 0 && (
+        <Link href="/admin/access" className="flex items-center justify-between rounded-lg bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
+          <span><b>{pendingAccess}</b> investor{pendingAccess === 1 ? "" : "s"} waiting for access approval</span>
+          <span className="font-semibold">Review →</span>
+        </Link>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Approved investors" value={members} sub={`${count(investors, "APPLIED")} applications waiting`} />
         <Stat label="Live listings" value={live.length} sub={`${projects.length - live.length} drafts`} />
