@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Project import uploads deal PDFs through a server action (Vercel caps request bodies at 4.5 MB).
+  experimental: { serverActions: { bodySizeLimit: "4.5mb" } },
   async headers() {
     // Only the public /embed pages may be framed (by deacna.com).
     return [

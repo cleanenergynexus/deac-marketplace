@@ -12,7 +12,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
   const ps = await db.project.findMany({ include: { developer: true, _count: { select: { lois: true } } }, orderBy: sp.sort === "score" ? { valueScore: "desc" } : { updatedAt: "desc" } });
   return (
     <div>
-      <PageHeader title="Listings & leads" subtitle="Every project, from scored lead to live listing." action={<Link href="/admin/projects/new" className="btn">New listing</Link>} />
+      <PageHeader title="Listings & leads" subtitle="Every project, from scored lead to live listing." action={<div className="flex gap-2"><Link href="/admin/projects/import" className="btn-ghost">Import from document</Link><Link href="/admin/projects/new" className="btn">New listing</Link></div>} />
       {ps.length ? (
         <div className="card overflow-x-auto">
           <table className="w-full">
