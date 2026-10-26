@@ -7,7 +7,7 @@ const db = new PrismaClient();
 
 async function main() {
   await db.$transaction([
-    db.campaignRecipient.deleteMany(), db.campaign.deleteMany(), db.activity.deleteMany(), db.analysisRequest.deleteMany(),
+    db.campaignRecipient.deleteMany(), db.campaign.deleteMany(), db.activity.deleteMany(), db.analysisRequest.deleteMany(), db.dealStep.deleteMany(),
     db.loi.deleteMany(), db.document.deleteMany(), db.project.deleteMany(), db.teamMember.deleteMany(), db.user.deleteMany(),
     db.developer.deleteMany(), db.investor.deleteMany(),
   ]);
@@ -46,16 +46,16 @@ async function main() {
     const r = evaluate(inputs);
     created.push(await db.project.create({ data: { ...data, valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw,
       documents: { create: [
-        { name: "Investment Teaser", category: "Teaser", url: "https://example.com/teaser.pdf", access: "SUMMARY" },
-        { name: "Financial Model", category: "Financial Model", url: "https://example.com/model.xlsx", access: "DATAROOM" },
-        { name: "Interconnection Agreement", category: "Interconnection", url: "https://example.com/ia.pdf", access: "DATAROOM" },
-        { name: "Phase I ESA", category: "Environmental", url: "https://example.com/esa.pdf", access: "DATAROOM" },
-        { name: "Site Plan", category: "Site Plan", url: "https://example.com/siteplan.pdf", access: "DATAROOM" },
+        { name: "Investment Teaser", category: "Teaser", url: "https://example.com/teaser.pdf", access: "TEASER" },
+        { name: "Financial Model", category: "Financial Model", url: "https://example.com/model.xlsx", access: "LOI" },
+        { name: "Interconnection Agreement", category: "Interconnection", url: "https://example.com/ia.pdf", access: "LOI" },
+        { name: "Phase I ESA", category: "Environmental", url: "https://example.com/esa.pdf", access: "DILIGENCE" },
+        { name: "Site Plan", category: "Site Plan", url: "https://example.com/siteplan.pdf", access: "NDA" },
       ] } } }));
   }
 
   const inv = await Promise.all([
-    db.investor.create({ data: { name: "Jennifer Walsh", firm: "Meridian Infrastructure Partners", email: "jwalsh@meridian.example", investorType: "Infrastructure Fund", checkMin: 25e6, checkMax: 150e6, preferredStates: "TX,VA,AZ,GA", dealTypes: "FINANCING,SALE", facilityTypes: "Powered Land,Powered Shell,Hyperscale Campus", mwMin: 50, stage: "ACTIVE", accredited: true, ndaSigned: true, source: "Referral", tags: "tier-1,hyperscale", owner: "Joaquin" } }),
+    db.investor.create({ data: { name: "Jennifer Walsh", firm: "Meridian Infrastructure Partners", email: "jwalsh@meridian.example", investorType: "Infrastructure Fund", checkMin: 25e6, checkMax: 150e6, preferredStates: "TX,VA,AZ,GA", dealTypes: "FINANCING,SALE", facilityTypes: "Powered Land,Powered Shell,Hyperscale Campus", mwMin: 50, stage: "ACTIVE", accredited: true, ndaSigned: false, source: "Referral", tags: "tier-1,hyperscale", owner: "Joaquin" } }),
     db.investor.create({ data: { name: "Roberto Méndez", firm: "Méndez Family Office", email: "rm@mendezfo.example", investorType: "Family Office", checkMin: 5e6, checkMax: 40e6, preferredStates: "PR,FL", dealTypes: "FINANCING", stage: "APPROVED", accredited: true, ndaSigned: true, source: "DEAC network", tags: "PR,act60" } }),
     db.investor.create({ data: { name: "Sarah Kim", firm: "Northgate Real Estate Fund IV", email: "skim@northgate.example", investorType: "Real Estate Fund", checkMin: 10e6, checkMax: 75e6, dealTypes: "LEASE,SALE", stage: "VETTING", source: "Conference" } }),
     db.investor.create({ data: { name: "Michael Osei", firm: "Bluewater Credit", email: "mosei@bluewater.example", investorType: "Lender", checkMin: 20e6, checkMax: 300e6, dealTypes: "FINANCING", stage: "CONTACTED", source: "LinkedIn", tags: "debt" } }),
@@ -67,6 +67,8 @@ async function main() {
   await db.user.create({ data: { email: "applicant@deacna.com", name: "Priya Natarajan", passwordHash: pw, role: "INVESTOR", status: "PENDING", investorId: inv[4].id } });
 
   await db.loi.create({ data: { projectId: created[0].id, investorId: inv[0].id, amount: 60e6, structure: "Equity", timeline: "Close Q1 2027", message: "Strong interest; would like to see the interconnection agreement and capex budget.", status: "APPROVED", reviewedAt: new Date() } });
+  await db.dealStep.create({ data: { projectId: created[0].id, investorId: inv[0].id, step: "NDA", status: "APPROVED", signerName: "Jennifer Walsh", signerTitle: "Managing Director", reviewedAt: new Date() } });
+  await db.dealStep.create({ data: { projectId: created[2].id, investorId: inv[0].id, step: "NDA", status: "PENDING", signerName: "Jennifer Walsh", signerTitle: "Managing Director" } });
   await db.loi.create({ data: { projectId: created[2].id, investorId: inv[1].id, amount: 15e6, structure: "Equity", message: "Interested in a co-invest alongside the senior lender.", status: "PENDING" } });
   await db.analysisRequest.create({ data: { projectId: created[0].id, investorId: inv[0].id, focusAreas: "Power & interconnection,Returns / cash flows,Construction budget", returnMetric: "Levered IRR", holdPeriod: "5–7 years", format: "Excel model", questions: "Sensitivity of IRR to 6-month COD delay and to +10% capex?" } });
 

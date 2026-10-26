@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { COOKIE, readToken, signSession, type Session } from "./session";
+import { investorStage, type Stage, type StepStatus } from "./disclosure";
 
 export async function getSession() {
   const c = await cookies();
@@ -44,8 +45,19 @@ export async function requireMember() {
   return u;
 }
 
-export async function hasDataRoomAccess(projectId: string, investorId?: string | null) {
-  if (!investorId) return false;
-  const loi = await db.loi.findUnique({ where: { projectId_investorId: { projectId, investorId } } });
-  return loi?.status === "APPROVED";
+/** Where an investor stands on one listing. Admins see everything. */
+export async function listingAccess(projectId: string, u: { role: string; investorId: string | null; investor?: { ndaSigned: boolean } | null }) {
+  if (u.role === "ADMIN" || !u.investorId) {
+    return { stage: (u.role === "ADMIN" ? "DILIGENCE" : "TEASER") as Stage, nda: undefined, loi: null, diligence: undefined, masterNda: false };
+  }
+  const where = { projectId, investorId: u.investorId };
+  const [loi, steps] = await Promise.all([
+    db.loi.findUnique({ where: { projectId_investorId: where } }),
+    db.dealStep.findMany({ where }),
+  ]);
+  const nda = steps.find((x) => x.step === "NDA");
+  const diligence = steps.find((x) => x.step === "DILIGENCE");
+  const masterNda = !!u.investor?.ndaSigned;
+  const stage = investorStage({ masterNda, nda: nda?.status as StepStatus | undefined, loi: loi?.status as StepStatus | undefined, diligence: diligence?.status as StepStatus | undefined });
+  return { stage, nda, loi, diligence, masterNda };
 }

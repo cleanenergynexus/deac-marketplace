@@ -6,6 +6,7 @@ import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
+import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -237,13 +238,56 @@ export async function updateProject(f: FormData) {
 export async function addDocument(f: FormData) {
   await requireAdmin();
   const projectId = String(f.get("projectId"));
-  await db.document.create({ data: { projectId, name: s(f, "name") ?? "Document", category: s(f, "category") ?? "Other", url: s(f, "url") ?? "#", access: s(f, "access") ?? "DATAROOM" } });
+  await db.document.create({ data: { projectId, name: s(f, "name") ?? "Document", category: s(f, "category") ?? "Other", url: s(f, "url") ?? "#", access: isStage(s(f, "access")) ? String(f.get("access")) : "LOI" } });
   revalidatePath(`/admin/projects/${projectId}`);
 }
 export async function deleteDocument(f: FormData) {
   await requireAdmin();
   const d = await db.document.delete({ where: { id: String(f.get("id")) } });
   revalidatePath(`/admin/projects/${d.projectId}`);
+}
+
+export async function updateDocumentAccess(f: FormData) {
+  await requireAdmin();
+  const access = String(f.get("access"));
+  if (!isStage(access)) return;
+  const d = await db.document.update({ where: { id: String(f.get("id")) }, data: { access } });
+  revalidatePath(`/admin/projects/${d.projectId}`);
+  revalidatePath(`/marketplace/${d.projectId}`);
+}
+
+/** Which listing sections each stage unlocks, plus the project NDA link. */
+export async function saveDisclosure(f: FormData) {
+  await requireAdmin();
+  const id = String(f.get("projectId"));
+  const map = Object.fromEntries(SECTIONS.map((x) => [x.key, isStage(f.get(x.key)) ? String(f.get(x.key)) : x.default]));
+  await db.project.update({ where: { id }, data: { disclosure: JSON.stringify(map), ndaUrl: s(f, "ndaUrl") } });
+  revalidatePath(`/admin/projects/${id}`);
+  revalidatePath(`/marketplace/${id}`);
+}
+
+/** Admin sets an investor's stage on a listing directly (e.g. NDA signed offline). Lowering it revokes later steps. */
+export async function grantStage(f: FormData) {
+  const admin = await requireAdmin();
+  const projectId = String(f.get("projectId"));
+  const investorId = String(f.get("investorId"));
+  const target = String(f.get("stage"));
+  if (!isStage(target) || !investorId) return;
+  const now = new Date();
+  const want = (step: Stage) => (stageRank(step) <= stageRank(target) ? "APPROVED" : null);
+  for (const step of ["NDA", "DILIGENCE"] as const) {
+    const where = { projectId_investorId_step: { projectId, investorId, step } };
+    const status = want(step);
+    if (status) await db.dealStep.upsert({ where, create: { projectId, investorId, step, status, reviewedAt: now, signerName: `Confirmed by ${admin.name}` }, update: { status, reviewedAt: now } });
+    else await db.dealStep.updateMany({ where: { projectId, investorId, step, status: "APPROVED" }, data: { status: "DECLINED", reviewedAt: now } });
+  }
+  if (want("LOI")) await db.loi.upsert({ where: { projectId_investorId: { projectId, investorId } }, create: { projectId, investorId, status: "APPROVED", reviewedAt: now }, update: { status: "APPROVED", reviewedAt: now } });
+  else await db.loi.updateMany({ where: { projectId, investorId, status: "APPROVED" }, data: { status: "DECLINED", reviewedAt: now } });
+  const p = await db.project.findUnique({ where: { id: projectId } });
+  await db.activity.create({ data: { investorId, kind: "SYSTEM", by: admin.name, body: `Access to ${p?.code} set to ${STAGE_INFO[target].label}.` } });
+  revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath(`/marketplace/${projectId}`);
+  revalidatePath("/admin/lois");
 }
 
 /** Saves calculator inputs + score to a project (lead scoring). */
@@ -270,12 +314,31 @@ export async function reviewLoi(f: FormData) {
   const id = String(f.get("id"));
   const status = String(f.get("status")); // APPROVED | DECLINED
   const loi = await db.loi.update({ where: { id }, data: { status, reviewedAt: new Date() }, include: { project: true, investor: true } });
-  await db.activity.create({ data: { investorId: loi.investorId, kind: "SYSTEM", body: `LOI for ${loi.project.code} ${status.toLowerCase()}${status === "APPROVED" ? " — data room unlocked" : ""}.`, by: admin.name } });
+  await db.activity.create({ data: { investorId: loi.investorId, kind: "SYSTEM", body: `LOI for ${loi.project.code} ${status.toLowerCase()}${status === "APPROVED" ? " — LOI stage unlocked" : ""}.`, by: admin.name } });
   if (status === "APPROVED") {
     if (loi.investor.stage === "APPROVED") await db.investor.update({ where: { id: loi.investorId }, data: { stage: "ACTIVE" } });
-    await sendEmail({ to: loi.investor.email, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The data room is now available in your DEAC Marketplace portal.\n\n— DEAC Team` });
+    await sendEmail({ to: loi.investor.email, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The LOI-level details and documents are now open in your DEAC Marketplace portal. When you're ready to go deeper, confirm your interest on the listing to request the full data room.\n\n— DEAC Team` });
   }
   revalidatePath("/admin/lois");
+  revalidatePath(`/marketplace/${loi.projectId}`);
+}
+
+/** Confirms or declines an NDA or full-diligence request. */
+export async function reviewDealStep(f: FormData) {
+  const admin = await requireAdmin();
+  const status = String(f.get("status")); // APPROVED | DECLINED
+  if (status !== "APPROVED" && status !== "DECLINED") return;
+  const d = await db.dealStep.update({ where: { id: String(f.get("id")) }, data: { status, reviewedAt: new Date() }, include: { project: true, investor: true } });
+  const what = d.step === "NDA" ? "NDA" : "full diligence access";
+  await db.activity.create({ data: { investorId: d.investorId, kind: "SYSTEM", by: admin.name, body: `${what} for ${d.project.code} ${status.toLowerCase()}.` } });
+  if (status === "APPROVED") {
+    const next = d.step === "NDA"
+      ? "Your NDA has been confirmed. The confidential project details and NDA-level documents are now open, and you can submit a letter of interest."
+      : "Full diligence access is confirmed. The complete data room is now open.";
+    await sendEmail({ to: d.investor.email, subject: `${d.project.code}: ${d.step === "NDA" ? "NDA confirmed" : "Data room fully open"}`, text: `Hi ${d.investor.name},\n\n${next}\n\nOpen ${d.project.title} in your DEAC Marketplace portal to continue.\n\n— DEAC Team` });
+  }
+  revalidatePath("/admin/lois");
+  revalidatePath(`/marketplace/${d.projectId}`);
 }
 
 export async function updateAnalysisRequest(f: FormData) {
