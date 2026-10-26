@@ -2,11 +2,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ALL_LEAVES, REGIONS, expandMarkets, leavesOf, packMarkets, type MarketNode } from "@/lib/regions";
 
+// The picker's checkboxes belong to no form (this id matches nothing). React resets a form after a save,
+// which would otherwise untick them on screen; the real values go in the hidden inputs below.
+const DETACHED = "market-picker-detached";
+
 /** Tri-state checkbox: checked, unchecked, or partly selected. */
 function Box({ checked, partial, onChange, label }: { checked: boolean; partial?: boolean; onChange: (v: boolean) => void; label: string }) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { if (ref.current) ref.current.indeterminate = !!partial && !checked; }, [partial, checked]);
-  return <input ref={ref} type="checkbox" aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 shrink-0 cursor-pointer accent-brand-600" />;
+  return <input ref={ref} type="checkbox" form={DETACHED} aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 shrink-0 cursor-pointer accent-brand-600" />;
 }
 
 // Nodes whose children are long lists (US states) open only in the right-hand panel.
@@ -21,17 +25,6 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
   const [picked, setPicked] = useState<Set<string>>(() => expandMarkets(initialStates, initialRegions));
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [focus, setFocus] = useState<MarketNode | null>(null);
-  // React resets a form after its server action finishes. That clears these checkboxes in the browser
-  // even though our state still holds the selection, so redraw them from state after any reset.
-  const root = useRef<HTMLDivElement>(null);
-  const [redraw, setRedraw] = useState(0);
-  useEffect(() => {
-    const form = root.current?.closest("form");
-    if (!form) return;
-    const onReset = () => setTimeout(() => setRedraw((n) => n + 1));
-    form.addEventListener("reset", onReset);
-    return () => form.removeEventListener("reset", onReset);
-  }, []);
 
   const status = (code: string) => {
     const ls = leavesOf(code);
@@ -74,7 +67,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
   };
 
   return (
-    <div ref={root} key={redraw} className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       <div className="rounded-lg border border-slate-200 bg-white p-3">
         <label className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
           <Box label="Select All Regions" checked={all} onChange={(v) => setPicked(v ? new Set(ALL_LEAVES) : new Set())} />
