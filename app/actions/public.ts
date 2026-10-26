@@ -41,6 +41,7 @@ export async function applyForAccess(_: unknown, f: FormData) {
     mwMin: n(f, "mwMin"),
     mwMax: n(f, "mwMax"),
     preferredStates: list(f, "states"),
+    preferredRegions: list(f, "regions"),
     dealTypes: list(f, "dealTypes"),
     facilityTypes: list(f, "facilityTypes"),
     accredited: f.get("accredited") === "on",
