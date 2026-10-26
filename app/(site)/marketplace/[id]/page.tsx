@@ -8,6 +8,7 @@ import { Checks } from "@/components/Checks";
 import { Badge, Field, Section, statusTone } from "@/components/ui";
 import { dealTypeLabel, FOCUS_AREAS } from "@/lib/constants";
 import { usd, num } from "@/lib/format";
+import { MoneyInput } from "@/components/MoneyInput";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +114,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             ) : u.investorId ? (
               <ActionForm action={submitLoi} submitLabel="Submit letter of interest" success="Letter of interest submitted. We'll be in touch shortly." className="space-y-3">
                 <input type="hidden" name="projectId" value={p.id} />
-                <Field label="Indicative amount ($)"><input name="amount" className="input" inputMode="numeric" /></Field>
+                <Field label="Indicative amount ($)"><MoneyInput name="amount" /></Field>
                 <Field label="Structure"><select name="structure" className="input"><option>Equity</option><option>Debt</option><option>Lease</option><option>Acquisition</option><option>JV / Partnership</option></select></Field>
                 <Field label="Timeline"><input name="timeline" className="input" placeholder="e.g. close in Q1" /></Field>
                 <Field label="Message"><textarea name="message" rows={3} className="input" /></Field>

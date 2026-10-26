@@ -4,6 +4,7 @@ import { Checks } from "@/components/Checks";
 import { Field, Select } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_TYPES } from "@/lib/constants";
 import { MarketPicker } from "@/components/MarketPicker";
+import { MoneyInput } from "@/components/MoneyInput";
 
 export default function Apply() {
   return (
@@ -21,8 +22,8 @@ export default function Apply() {
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Investor type"><Select name="investorType" options={INVESTOR_TYPES} placeholder="Select…" required /></Field>
-          <Field label="Min check ($)"><input name="checkMin" inputMode="numeric" className="input" placeholder="5,000,000" /></Field>
-          <Field label="Max check ($)"><input name="checkMax" inputMode="numeric" className="input" placeholder="50,000,000" /></Field>
+          <Field label="Min check ($)"><MoneyInput name="checkMin" placeholder="5,000,000" /></Field>
+          <Field label="Max check ($)"><MoneyInput name="checkMax" placeholder="50,000,000" /></Field>
           <Field label="Min MW"><input name="mwMin" inputMode="decimal" className="input" /></Field>
           <Field label="Max MW"><input name="mwMax" inputMode="decimal" className="input" /></Field>
           <Field label="How did you hear about us?"><input name="source" className="input" /></Field>
