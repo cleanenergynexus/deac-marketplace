@@ -2,6 +2,7 @@ import type { Developer, Project } from "@prisma/client";
 import { Field, Select } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
 import { OPTIONS } from "@/lib/valuation";
+import { SaveButton } from "@/components/SaveButton";
 
 export function ProjectForm({ p, developers, developerId, action }: { p?: Project; developers: Pick<Developer, "id" | "company">[]; developerId?: string; action: (f: FormData) => Promise<void> }) {
   const v = (x: unknown) => (x == null ? "" : String(x));
@@ -42,7 +43,7 @@ export function ProjectForm({ p, developers, developerId, action }: { p?: Projec
         <Field label="Capital stack"><input name="capitalStack" defaultValue={v(p?.capitalStack)} className="input" /></Field>
         <Field label="Economics notes" className="sm:col-span-3"><textarea name="economicsNotes" rows={2} defaultValue={v(p?.economicsNotes)} className="input" /></Field>
       </div>
-      <button className="btn">{p ? "Save listing" : "Create listing"}</button>
+      {p ? <SaveButton label="Save listing" savedText="Listing saved" /> : <button className="btn">Create listing</button>}
     </form>
   );
 }

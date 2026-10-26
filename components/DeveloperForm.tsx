@@ -1,6 +1,7 @@
 import type { Developer } from "@prisma/client";
 import { Field, Select } from "@/components/ui";
 import { DEVELOPER_STAGES } from "@/lib/constants";
+import { SaveButton } from "@/components/SaveButton";
 
 export function DeveloperForm({ dev, action }: { dev?: Developer; action: (f: FormData) => Promise<void> }) {
   return (
@@ -20,7 +21,7 @@ export function DeveloperForm({ dev, action }: { dev?: Developer; action: (f: Fo
       </div>
       <Field label="Experience / track record (shown to investors)"><textarea name="experience" rows={4} defaultValue={dev?.experience ?? ""} className="input" /></Field>
       <Field label="Internal notes"><textarea name="notes" rows={2} defaultValue={dev?.notes ?? ""} className="input" /></Field>
-      <button className="btn">{dev ? "Save changes" : "Create developer"}</button>
+      {dev ? <SaveButton label="Save changes" /> : <button className="btn">Create developer</button>}
     </form>
   );
 }
