@@ -111,6 +111,9 @@ model Project {
   projectStatus String // development stage, e.g. "Site Control", "Permitting", "Under Construction", "Operating"
   summary       String
   highlights    String   @default("") // newline separated bullets
+  term          String? // e.g. "24 mo", "15-yr lease"
+  dealStage     String   @default("MARKETING") // deal pipeline, see DEAL_STAGES in lib/constants.ts
+  useOfFunds    String   @default("") // one "Label: amount" per line
   coverImageUrl String?
 
   // Economics (shown after access is granted)
