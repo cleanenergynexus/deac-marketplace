@@ -4,6 +4,7 @@ import { Checks } from "@/components/Checks";
 import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_STAGES, INVESTOR_TYPES } from "@/lib/constants";
 import { MarketPicker } from "@/components/MarketPicker";
 import { csv } from "@/lib/format";
+import { SaveButton } from "@/components/SaveButton";
 
 export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: FormData) => Promise<void> }) {
   return (
@@ -33,7 +34,7 @@ export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: Form
         <label className="flex items-center gap-2"><input type="checkbox" name="accredited" defaultChecked={inv?.accredited} /> Accredited / QIB</label>
         <label className="flex items-center gap-2"><input type="checkbox" name="ndaSigned" defaultChecked={inv?.ndaSigned} /> NDA signed</label>
       </div>
-      <button className="btn">{inv ? "Save changes" : "Create investor"}</button>
+      {inv ? <SaveButton label="Save changes" /> : <button className="btn">Create investor</button>}
     </form>
   );
 }
