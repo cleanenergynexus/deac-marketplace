@@ -55,10 +55,15 @@ export async function setInvestorStage(f: FormData) {
   const inv = await db.investor.update({ where: { id }, data: { stage }, include: { user: true } });
   await db.activity.create({ data: { investorId: id, kind: "STAGE", body: `Stage → ${stage}`, by: admin.name } });
   // Approving the CRM record also approves their login (and declining revokes it).
-  if (inv.user && (stage === "APPROVED" || stage === "ACTIVE")) await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
+  if (inv.user && (stage === "APPROVED" || stage === "ACTIVE")) {
+    const wasPending = inv.user.status !== "APPROVED";
+    await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
+    if (wasPending)
+      await sendEmail({ to: inv.email, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— DEAC Team` });
+  }
   if (inv.user && stage === "DECLINED") await db.user.update({ where: { id: inv.user.id }, data: { status: "REJECTED" } });
   revalidatePath(`/admin/investors/${id}`);
-  revalidatePath("/admin/investors");
+  revalidatePath("/admin", "layout");
 }
 
 export async function logActivity(f: FormData) {
