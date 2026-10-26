@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
 
@@ -278,4 +278,39 @@ export async function sendCampaign(f: FormData) {
   }
   await db.campaign.update({ where: { id: c.id }, data: { status: "SENT", sentAt: new Date() } });
   revalidatePath(`/admin/outreach/${c.id}`);
+}
+
+// ---------- Team (DEAC admin logins) ----------
+export async function addTeamAdmin(_: unknown, f: FormData) {
+  const admin = await requireAdmin();
+  const email = s(f, "email")?.toLowerCase();
+  const name = s(f, "name");
+  const password = String(f.get("password") ?? "");
+  if (!email || !name || password.length < 10) return { error: "Name, email and a temporary password of at least 10 characters are required." };
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing && existing.role !== "ADMIN") return { error: "That email belongs to an investor or developer account. Use a different email for the team login." };
+  if (existing) return { error: "That person is already on the team." };
+  await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED" } });
+  await sendEmail({ to: email, subject: "Your DEAC Marketplace team login", text: `Hi ${name.split(" ")[0]},\n\n${admin.name} added you to the DEAC Marketplace team.\n\nSign in at ${process.env.PUBLIC_APP_URL ?? ""}/login with this email. ${admin.name} will share your temporary password; please change it under My account after signing in.\n\n— DEAC Team` });
+  revalidatePath("/admin/team");
+  return { ok: true };
+}
+
+export async function removeTeamAdmin(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  if (id === admin.id) return; // can't remove yourself
+  if ((await db.user.count({ where: { role: "ADMIN" } })) <= 1) return; // always keep one admin
+  await db.user.delete({ where: { id } });
+  revalidatePath("/admin/team");
+}
+
+export async function changeOwnPassword(_: unknown, f: FormData) {
+  const admin = await requireAdmin();
+  const current = String(f.get("current") ?? "");
+  const next = String(f.get("next") ?? "");
+  if (next.length < 10) return { error: "New password must be at least 10 characters." };
+  if (!(await checkPassword(current, admin.passwordHash))) return { error: "Current password is incorrect." };
+  await db.user.update({ where: { id: admin.id }, data: { passwordHash: await hashPassword(next) } });
+  return { ok: true };
 }
