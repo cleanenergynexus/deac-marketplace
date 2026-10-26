@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
-import { marketMatches } from "@/lib/regions";
+import { marketMatches, marketsOverlap } from "@/lib/regions";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -259,7 +259,7 @@ export async function segmentInvestors(seg: Segment) {
   const has = (csvField: string, wanted?: string[]) => !wanted?.length || csvField.split(",").some((x) => wanted.includes(x.trim()));
   return all.filter(
     (i) =>
-      (!seg.regions?.length || csvList(i.preferredRegions).some((r) => seg.regions!.includes(r))) &&
+      (!seg.regions?.length || marketsOverlap(csvList(i.preferredStates), csvList(i.preferredRegions), seg.regions)) &&
       (!seg.states?.length || seg.states.some((st) => marketMatches(csvList(i.preferredStates), csvList(i.preferredRegions), st))) &&
       has(i.dealTypes, seg.dealTypes) &&
       (!seg.investorTypes?.length || (i.investorType && seg.investorTypes.includes(i.investorType))) &&

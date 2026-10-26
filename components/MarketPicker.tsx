@@ -1,73 +1,111 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { REGIONS, SUB_REGIONS } from "@/lib/regions";
-import { US_STATES } from "@/lib/constants";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ALL_LEAVES, REGIONS, expandMarkets, leavesOf, packMarkets, type MarketNode } from "@/lib/regions";
 
 /** Tri-state checkbox: checked, unchecked, or partly selected. */
-function Box({ checked, partial, onChange, label, bold }: { checked: boolean; partial?: boolean; onChange: (v: boolean) => void; label: string; bold?: boolean }) {
+function Box({ checked, partial, onChange, label }: { checked: boolean; partial?: boolean; onChange: (v: boolean) => void; label: string }) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { if (ref.current) ref.current.indeterminate = !!partial && !checked; }, [partial, checked]);
-  return (
-    <label className={`flex cursor-pointer items-center gap-2 text-sm ${bold ? "font-semibold" : ""}`}>
-      <input ref={ref} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-brand-600" />
-      {label}
-    </label>
-  );
+  return <input ref={ref} type="checkbox" aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 shrink-0 cursor-pointer accent-brand-600" />;
 }
 
-/** Region tree + US states picker. Submits as `regions` and `states` form fields. */
-export function MarketPicker({ regions: initialRegions = [], states: initialStates = [] }: { regions?: string[]; states?: string[] }) {
-  const [regions, setRegions] = useState<Set<string>>(new Set(initialRegions));
-  const [states, setStates] = useState<Set<string>>(new Set(initialStates));
+// Nodes whose children are long lists (US states) open only in the right-hand panel.
+const PANEL_ONLY = new Set(["USA"]);
 
-  const setMany = (set: Set<string>, codes: readonly string[], on: boolean) => {
-    const next = new Set(set);
-    codes.forEach((c) => (on ? next.add(c) : next.delete(c)));
-    return next;
+/**
+ * Drill-down market picker. Left: accordion tree (region > sub-region > country).
+ * Right: the children of whatever you open, e.g. United States shows the states.
+ * Submits as `regions` and `states` form fields.
+ */
+export function MarketPicker({ regions: initialRegions = [], states: initialStates = [] }: { regions?: string[]; states?: string[] }) {
+  const [picked, setPicked] = useState<Set<string>>(() => expandMarkets(initialStates, initialRegions));
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const [focus, setFocus] = useState<MarketNode | null>(null);
+
+  const status = (code: string) => {
+    const ls = leavesOf(code);
+    const n = ls.filter((l) => picked.has(l)).length;
+    return { checked: n === ls.length, partial: n > 0 && n < ls.length, count: n, total: ls.length };
   };
-  const allCodes = SUB_REGIONS.map((r) => r.code);
-  const allRegions = allCodes.every((c) => regions.has(c));
-  const allStates = US_STATES.every((s) => states.has(s));
+  const toggle = (code: string, on: boolean) => {
+    const next = new Set(picked);
+    leavesOf(code).forEach((l) => (on ? next.add(l) : next.delete(l)));
+    setPicked(next);
+  };
+  const openNode = (n: MarketNode) => {
+    setFocus(n);
+    if (!PANEL_ONLY.has(n.code)) setOpen((o) => { const x = new Set(o); x.has(n.code) && focus?.code === n.code ? x.delete(n.code) : x.add(n.code); return x; });
+  };
+  const all = picked.size === ALL_LEAVES.length;
+  const packed = useMemo(() => packMarkets(picked), [picked]);
+
+  const row = (n: MarketNode, depth: number): React.ReactNode => {
+    const st = status(n.code);
+    const kids = n.children ?? [];
+    const isOpen = open.has(n.code);
+    const active = focus?.code === n.code;
+    return (
+      <li key={n.code}>
+        <div className={`flex items-center gap-2 rounded px-1.5 py-1 ${active ? "bg-brand-50" : "hover:bg-slate-50"}`} style={{ paddingLeft: 6 + depth * 18 }}>
+          <Box label={n.label} checked={st.checked} partial={st.partial} onChange={(v) => toggle(n.code, v)} />
+          {kids.length ? (
+            <button type="button" onClick={() => openNode(n)} className={`flex flex-1 items-center justify-between text-left text-sm ${depth === 0 ? "font-semibold" : ""}`}>
+              <span>{n.label}{st.partial && PANEL_ONLY.has(n.code) && <span className="ml-1 text-xs font-normal text-slate-500">({st.count} of {st.total})</span>}</span>
+              <span className="text-slate-400">{PANEL_ONLY.has(n.code) ? "›" : isOpen ? "▾" : "▸"}</span>
+            </button>
+          ) : (
+            <span className="flex-1 text-sm">{n.label}</span>
+          )}
+        </div>
+        {kids.length > 0 && isOpen && !PANEL_ONLY.has(n.code) && <ul>{kids.map((k) => row(k, depth + 1))}</ul>}
+      </li>
+    );
+  };
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <Box bold label="Select All Regions" checked={allRegions} partial={regions.size > 0} onChange={(v) => setRegions(setMany(regions, allCodes, v))} />
-        <div className="mt-3 space-y-3">
-          {REGIONS.map((r) => {
-            const kids = r.children.map((c) => c.code);
-            const all = kids.every((k) => regions.has(k));
-            const some = kids.some((k) => regions.has(k));
-            return (
-              <div key={r.code}>
-                <Box bold label={r.label} checked={all} partial={some} onChange={(v) => setRegions(setMany(regions, kids, v))} />
-                <div className="ml-6 mt-1 space-y-1">
-                  {r.children.map((c) => (
-                    <Box key={c.code} label={c.label} checked={regions.has(c.code)} onChange={(v) => setRegions(setMany(regions, [c.code], v))} />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-3">
+        <label className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
+          <Box label="Select All Regions" checked={all} partial={picked.size > 0} onChange={(v) => setPicked(v ? new Set(ALL_LEAVES) : new Set())} />
+          Select All Regions
+        </label>
+        <ul className="mt-1">{REGIONS.map((r) => row(r, 0))}</ul>
       </div>
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <Box bold label="Select all US states" checked={allStates} partial={states.size > 0} onChange={(v) => setStates(setMany(states, US_STATES, v))} />
-          <span className="text-xs text-slate-500">{states.size} selected</span>
-        </div>
-        <div className="mt-3 grid grid-cols-5 gap-1 sm:grid-cols-7">
-          {US_STATES.map((s) => (
-            <button type="button" key={s} onClick={() => setStates(setMany(states, [s], !states.has(s)))}
-              className={`rounded border px-1 py-1 text-xs ${states.has(s) ? "border-brand-500 bg-brand-50 font-semibold text-brand-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-              {s}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-slate-500">Leave everything blank if you're open to any market.</p>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-3">
+        {focus?.children?.length ? (
+          <>
+            <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
+              <span className="flex items-center gap-2">
+                <Box label={`Select all in ${focus.label}`} checked={status(focus.code).checked} partial={status(focus.code).partial} onChange={(v) => toggle(focus.code, v)} />
+                {focus.label}: select all
+              </span>
+              <span className="text-xs font-normal text-slate-500">{status(focus.code).count} of {status(focus.code).total}</span>
+            </label>
+            <ul className={`mt-2 grid gap-x-3 gap-y-1 ${focus.children.length > 8 ? "max-h-80 overflow-y-auto sm:grid-cols-2" : ""}`}>
+              {focus.children.map((c) => {
+                const st = status(c.code);
+                return (
+                  <li key={c.code} className="flex items-center gap-2 px-1.5 py-0.5 text-sm">
+                    <Box label={c.label} checked={st.checked} partial={st.partial} onChange={(v) => toggle(c.code, v)} />
+                    {c.children?.length ? (
+                      <button type="button" onClick={() => openNode(c)} className="flex flex-1 justify-between text-left">
+                        <span>{c.label}</span><span className="text-slate-400">›</span>
+                      </button>
+                    ) : <span>{c.label}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        ) : (
+          <p className="p-2 text-sm text-slate-500">Click a region on the left to drill down. Open <b>North America › United States</b> to pick individual states.</p>
+        )}
       </div>
-      {[...regions].map((r) => <input key={r} type="hidden" name="regions" value={r} />)}
-      {[...states].map((s) => <input key={s} type="hidden" name="states" value={s} />)}
+
+      <p className="text-xs text-slate-500 md:col-span-2">Leave everything blank if you&apos;re open to any market.</p>
+      {packed.regions.map((r) => <input key={r} type="hidden" name="regions" value={r} />)}
+      {packed.states.map((s) => <input key={s} type="hidden" name="states" value={s} />)}
     </div>
   );
 }
