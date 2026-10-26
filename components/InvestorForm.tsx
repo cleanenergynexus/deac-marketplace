@@ -28,7 +28,7 @@ export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: Form
       </div>
       <Field label="Deal types"><Checks name="dealTypes" options={DEAL_TYPES} selected={csv(inv?.dealTypes)} /></Field>
       <Field label="Facility types"><Checks name="facilityTypes" options={FACILITY_TYPES} selected={csv(inv?.facilityTypes)} /></Field>
-      <Field label="Markets of interest"><MarketPicker regions={csv(inv?.preferredRegions)} states={csv(inv?.preferredStates)} /></Field>
+      <Field label="Markets of interest" group><MarketPicker regions={csv(inv?.preferredRegions)} states={csv(inv?.preferredStates)} /></Field>
       <Field label="Notes"><textarea name="notes" rows={3} defaultValue={inv?.notes ?? ""} className="input" /></Field>
       <div className="flex gap-6 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" name="accredited" defaultChecked={inv?.accredited} /> Accredited / QIB</label>

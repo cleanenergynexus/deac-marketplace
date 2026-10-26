@@ -21,6 +21,17 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
   const [picked, setPicked] = useState<Set<string>>(() => expandMarkets(initialStates, initialRegions));
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [focus, setFocus] = useState<MarketNode | null>(null);
+  // React resets a form after its server action finishes. That clears these checkboxes in the browser
+  // even though our state still holds the selection, so redraw them from state after any reset.
+  const root = useRef<HTMLDivElement>(null);
+  const [redraw, setRedraw] = useState(0);
+  useEffect(() => {
+    const form = root.current?.closest("form");
+    if (!form) return;
+    const onReset = () => setTimeout(() => setRedraw((n) => n + 1));
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, []);
 
   const status = (code: string) => {
     const ls = leavesOf(code);
@@ -54,7 +65,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
               <span className="text-slate-400">{PANEL_ONLY.has(n.code) ? "›" : isOpen ? "▾" : "▸"}</span>
             </button>
           ) : (
-            <span className="flex-1 text-sm">{n.label}</span>
+            <span className="flex-1 cursor-pointer text-sm" onClick={() => toggle(n.code, !st.checked)}>{n.label}</span>
           )}
         </div>
         {kids.length > 0 && isOpen && !PANEL_ONLY.has(n.code) && <ul>{kids.map((k) => row(k, depth + 1))}</ul>}
@@ -63,7 +74,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div ref={root} key={redraw} className="grid gap-4 md:grid-cols-2">
       <div className="rounded-lg border border-slate-200 bg-white p-3">
         <label className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
           <Box label="Select All Regions" checked={all} onChange={(v) => setPicked(v ? new Set(ALL_LEAVES) : new Set())} />
@@ -92,7 +103,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
                       <button type="button" onClick={() => openNode(c)} className="flex flex-1 justify-between text-left">
                         <span>{c.label}</span><span className="text-slate-400">›</span>
                       </button>
-                    ) : <span>{c.label}</span>}
+                    ) : <span className="flex-1 cursor-pointer" onClick={() => toggle(c.code, !st.checked)}>{c.label}</span>}
                   </li>
                 );
               })}

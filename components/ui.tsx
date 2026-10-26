@@ -25,7 +25,16 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
   );
 }
 
-export function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+/** Labelled form field. Use `group` when it wraps several inputs, so a click on text inside it doesn't toggle the first input. */
+export function Field({ label, children, className = "", group }: { label: string; children: ReactNode; className?: string; group?: boolean }) {
+  if (group) {
+    return (
+      <div role="group" aria-label={label} className={`block ${className}`}>
+        <span className="label">{label}</span>
+        {children}
+      </div>
+    );
+  }
   return (
     <label className={`block ${className}`}>
       <span className="label">{label}</span>
