@@ -2,7 +2,8 @@ import { applyForAccess } from "@/app/actions/public";
 import { ActionForm } from "@/components/ActionForm";
 import { Checks } from "@/components/Checks";
 import { Field, Select } from "@/components/ui";
-import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_TYPES, US_STATES } from "@/lib/constants";
+import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_TYPES } from "@/lib/constants";
+import { MarketPicker } from "@/components/MarketPicker";
 
 export default function Apply() {
   return (
@@ -28,7 +29,7 @@ export default function Apply() {
         </div>
         <Field label="Deal types of interest"><Checks name="dealTypes" options={DEAL_TYPES} /></Field>
         <Field label="Facility types"><Checks name="facilityTypes" options={FACILITY_TYPES} /></Field>
-        <Field label="Preferred states / markets"><Checks name="states" options={US_STATES} /></Field>
+        <Field label="Markets of interest"><MarketPicker /></Field>
         <Field label="Anything else about your mandate?"><textarea name="notes" rows={3} className="input" /></Field>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="accredited" /> I confirm I am an accredited / qualified institutional investor.</label>
       </ActionForm>

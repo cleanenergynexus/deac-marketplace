@@ -2,6 +2,7 @@ import { createCampaign } from "@/app/actions/admin";
 import { Checks } from "@/components/Checks";
 import { Field, PageHeader } from "@/components/ui";
 import { DEAL_TYPES, INVESTOR_STAGES, INVESTOR_TYPES, US_STATES } from "@/lib/constants";
+import { SUB_REGIONS } from "@/lib/regions";
 
 export default function NewCampaign() {
   return (
@@ -13,7 +14,8 @@ export default function NewCampaign() {
         <Field label="Stages (none = all)"><Checks name="stages" options={INVESTOR_STAGES} selected={["APPROVED", "ACTIVE"]} /></Field>
         <Field label="Investor types"><Checks name="investorTypes" options={INVESTOR_TYPES} /></Field>
         <Field label="Deal type interest"><Checks name="dealTypes" options={DEAL_TYPES} /></Field>
-        <details><summary className="label cursor-pointer">States</summary><div className="mt-2"><Checks name="states" options={US_STATES} /></div></details>
+        <Field label="Regions of interest"><Checks name="regions" options={SUB_REGIONS.map((r) => ({ value: r.code, label: r.label }))} /></Field>
+        <details><summary className="label cursor-pointer">US states</summary><div className="mt-2"><Checks name="states" options={US_STATES} /></div></details>
         <Field label="Tag contains"><input name="tags" className="input max-w-xs" /></Field>
         <h3 className="font-semibold">Message</h3>
         <Field label="Subject"><input name="subject" required className="input" /></Field>

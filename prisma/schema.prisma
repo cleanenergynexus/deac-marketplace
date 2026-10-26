@@ -36,6 +36,7 @@ model Investor {
   checkMin        Float?
   checkMax        Float?
   preferredStates String   @default("") // comma separated, e.g. "TX,VA,PR"
+  preferredRegions String  @default("") // comma separated codes from lib/regions.ts, e.g. "NORTH_AMERICA,MENA"
   dealTypes       String   @default("") // comma separated: LEASE,FINANCING,SALE
   facilityTypes   String   @default("")
   mwMin           Float?

@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
+import { marketMatches } from "@/lib/regions";
+
+const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 const n = (f: FormData, k: string) => { const v = s(f, k); return v ? Number(v.replace(/[$,%]/g, "")) : null; };
@@ -23,6 +26,7 @@ function investorData(f: FormData) {
     mwMin: n(f, "mwMin"),
     mwMax: n(f, "mwMax"),
     preferredStates: list(f, "states"),
+    preferredRegions: list(f, "regions"),
     dealTypes: list(f, "dealTypes"),
     facilityTypes: list(f, "facilityTypes"),
     accredited: f.get("accredited") === "on",
@@ -247,7 +251,7 @@ export async function updateAnalysisRequest(f: FormData) {
 }
 
 // ---------- Outreach ----------
-export type Segment = { stages?: string[]; states?: string[]; dealTypes?: string[]; investorTypes?: string[]; tags?: string };
+export type Segment = { stages?: string[]; states?: string[]; regions?: string[]; dealTypes?: string[]; investorTypes?: string[]; tags?: string };
 
 export async function segmentInvestors(seg: Segment) {
   await requireAdmin();
@@ -255,7 +259,8 @@ export async function segmentInvestors(seg: Segment) {
   const has = (csvField: string, wanted?: string[]) => !wanted?.length || csvField.split(",").some((x) => wanted.includes(x.trim()));
   return all.filter(
     (i) =>
-      has(i.preferredStates, seg.states) &&
+      (!seg.regions?.length || csvList(i.preferredRegions).some((r) => seg.regions!.includes(r))) &&
+      (!seg.states?.length || seg.states.some((st) => marketMatches(csvList(i.preferredStates), csvList(i.preferredRegions), st))) &&
       has(i.dealTypes, seg.dealTypes) &&
       (!seg.investorTypes?.length || (i.investorType && seg.investorTypes.includes(i.investorType))) &&
       (!seg.tags || i.tags.toLowerCase().includes(seg.tags.toLowerCase())),
@@ -264,7 +269,7 @@ export async function segmentInvestors(seg: Segment) {
 
 export async function createCampaign(f: FormData) {
   await requireAdmin();
-  const segment: Segment = { stages: f.getAll("stages").map(String), states: f.getAll("states").map(String), dealTypes: f.getAll("dealTypes").map(String), investorTypes: f.getAll("investorTypes").map(String), tags: s(f, "tags") ?? undefined };
+  const segment: Segment = { stages: f.getAll("stages").map(String), states: f.getAll("states").map(String), regions: f.getAll("regions").map(String), dealTypes: f.getAll("dealTypes").map(String), investorTypes: f.getAll("investorTypes").map(String), tags: s(f, "tags") ?? undefined };
   const c = await db.campaign.create({ data: { name: s(f, "name") ?? "Campaign", subject: s(f, "subject") ?? "", body: s(f, "body") ?? "", segment: JSON.stringify(segment) } });
   redirect(`/admin/outreach/${c.id}`);
 }

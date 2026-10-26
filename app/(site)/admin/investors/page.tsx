@@ -4,6 +4,7 @@ import { importInvestors } from "@/app/actions/admin";
 import { Badge, PageHeader, Empty } from "@/components/ui";
 import { INVESTOR_STAGES, INVESTOR_TYPES, stageLabel } from "@/lib/constants";
 import { usd, date } from "@/lib/format";
+import { marketSummary } from "@/lib/regions";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export default async function Investors({ searchParams }: { searchParams: Promis
                   <td className="td"><Link href={`/admin/investors/${i.id}`} className="font-medium text-brand-600">{i.name}</Link><div className="text-xs text-slate-500">{i.firm}</div></td>
                   <td className="td">{i.investorType ?? "—"}</td>
                   <td className="td">{i.checkMin || i.checkMax ? `${usd(i.checkMin)}–${usd(i.checkMax)}` : "—"}</td>
-                  <td className="td text-xs">{i.preferredStates || "Any"}</td>
+                  <td className="td max-w-[220px] text-xs">{marketSummary(i.preferredStates, i.preferredRegions)}</td>
                   <td className="td"><Badge tone={i.stage === "APPLIED" ? "amber" : ["APPROVED", "ACTIVE"].includes(i.stage) ? "green" : i.stage === "DECLINED" ? "red" : "slate"}>{stageLabel(INVESTOR_STAGES, i.stage)}</Badge></td>
                   <td className="td">{i._count.lois}</td>
                   <td className="td text-xs">{date(i.lastContactAt)}</td>

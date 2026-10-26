@@ -4,6 +4,7 @@ import { setInvestorStage } from "@/app/actions/admin";
 import { PageHeader, Empty } from "@/components/ui";
 import { usd, date } from "@/lib/format";
 import { dealTypeLabel } from "@/lib/constants";
+import { marketSummary } from "@/lib/regions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function AccessRequests() {
                   <div><dt className="text-xs text-slate-500">Check size</dt><dd>{i.checkMin || i.checkMax ? `${usd(i.checkMin)}–${usd(i.checkMax)}` : "—"}</dd></div>
                   <div><dt className="text-xs text-slate-500">Deal types</dt><dd>{i.dealTypes.split(",").filter(Boolean).map(dealTypeLabel).join(", ") || "Any"}</dd></div>
                   <div><dt className="text-xs text-slate-500">Accredited</dt><dd>{i.accredited ? "Yes (self-certified)" : "Not confirmed"}</dd></div>
-                  <div className="sm:col-span-4"><dt className="text-xs text-slate-500">Markets</dt><dd>{i.preferredStates.split(",").filter(Boolean).join(", ") || "Any"}</dd></div>
+                  <div className="sm:col-span-4"><dt className="text-xs text-slate-500">Markets</dt><dd>{marketSummary(i.preferredStates, i.preferredRegions)}</dd></div>
                   {i.notes && <div className="sm:col-span-4"><dt className="text-xs text-slate-500">Mandate notes</dt><dd className="whitespace-pre-line">{i.notes}</dd></div>}
                 </dl>
               </div>

@@ -7,6 +7,7 @@ import { Timeline } from "@/components/Timeline";
 import { Badge, PageHeader, Section, statusTone } from "@/components/ui";
 import { INVESTOR_STAGES, stageLabel } from "@/lib/constants";
 import { usd, csv } from "@/lib/format";
+import { marketMatches } from "@/lib/regions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,9 @@ export default async function InvestorDetail({ params }: { params: Promise<{ id:
   const inv = await db.investor.findUnique({ where: { id }, include: { user: true, lois: { include: { project: true } }, activities: { orderBy: { createdAt: "desc" } }, analysisRequests: { include: { project: true } } } });
   if (!inv) notFound();
   // Suggested matches: listings fitting this investor's mandate.
-  const states = csv(inv.preferredStates), deals = csv(inv.dealTypes), types = csv(inv.facilityTypes);
+  const states = csv(inv.preferredStates), regions = csv(inv.preferredRegions), deals = csv(inv.dealTypes), types = csv(inv.facilityTypes);
   const matches = (await db.project.findMany({ where: { visibility: { not: "DRAFT" } } })).filter(
-    (p) => (!states.length || states.includes(p.state)) && (!deals.length || deals.includes(p.dealType)) && (!types.length || types.includes(p.facilityType)) && (inv.mwMin == null || p.mw >= inv.mwMin) && (inv.mwMax == null || p.mw <= inv.mwMax),
+    (p) => marketMatches(states, regions, p.state) && (!deals.length || deals.includes(p.dealType)) && (!types.length || types.includes(p.facilityType)) && (inv.mwMin == null || p.mw >= inv.mwMin) && (inv.mwMax == null || p.mw <= inv.mwMax),
   );
   return (
     <div className="space-y-6">

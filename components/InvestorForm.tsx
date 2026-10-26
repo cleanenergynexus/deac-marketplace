@@ -1,7 +1,8 @@
 import type { Investor } from "@prisma/client";
 import { Field, Select } from "@/components/ui";
 import { Checks } from "@/components/Checks";
-import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_STAGES, INVESTOR_TYPES, US_STATES } from "@/lib/constants";
+import { DEAL_TYPES, FACILITY_TYPES, INVESTOR_STAGES, INVESTOR_TYPES } from "@/lib/constants";
+import { MarketPicker } from "@/components/MarketPicker";
 import { csv } from "@/lib/format";
 
 export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: FormData) => Promise<void> }) {
@@ -26,7 +27,7 @@ export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: Form
       </div>
       <Field label="Deal types"><Checks name="dealTypes" options={DEAL_TYPES} selected={csv(inv?.dealTypes)} /></Field>
       <Field label="Facility types"><Checks name="facilityTypes" options={FACILITY_TYPES} selected={csv(inv?.facilityTypes)} /></Field>
-      <details><summary className="label cursor-pointer">Preferred states ({csv(inv?.preferredStates).join(", ") || "any"})</summary><div className="mt-2"><Checks name="states" options={US_STATES} selected={csv(inv?.preferredStates)} /></div></details>
+      <Field label="Markets of interest"><MarketPicker regions={csv(inv?.preferredRegions)} states={csv(inv?.preferredStates)} /></Field>
       <Field label="Notes"><textarea name="notes" rows={3} defaultValue={inv?.notes ?? ""} className="input" /></Field>
       <div className="flex gap-6 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" name="accredited" defaultChecked={inv?.accredited} /> Accredited / QIB</label>
