@@ -88,7 +88,7 @@ export function MarketPicker({ regions: initialRegions = [], states: initialStat
           <>
             <label className="flex cursor-pointer items-center justify-between gap-2 border-b border-slate-100 px-1.5 pb-2 text-sm font-semibold">
               <span className="flex items-center gap-2">
-                <Box label={`Select all in ${focus.label}`} checked={status(focus.code).checked} partial={status(focus.code).partial} onChange={(v) => toggle(focus.code, v)} />
+                <Box label={`Select all in ${focus.label}`} checked={status(focus.code).checked} onChange={(v) => toggle(focus.code, v)} />
                 {focus.label}: select all
               </span>
               <span className="text-xs font-normal text-slate-500">{status(focus.code).count} of {status(focus.code).total}</span>
