@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
-import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
+import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
 
@@ -190,6 +190,40 @@ export async function createProject(f: FormData) {
   const data = projectData(f);
   const count = await db.project.count();
   const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  redirect(`/admin/projects/${p.id}`);
+}
+/** Last step of the import wizard: saves the reviewed listing, creating the developer if it's new. */
+export async function createImportedProject(f: FormData) {
+  const admin = await requireAdmin();
+  let developerId = String(f.get("developerId") ?? "");
+  if (developerId === "__new__") {
+    const company = s(f, "devCompany");
+    if (!company) throw new Error("Enter the developer's company name.");
+    const dev = await db.developer.create({
+      data: { company, contactName: s(f, "devContactName") ?? company, email: s(f, "devEmail") ?? "", phone: s(f, "devPhone"), website: s(f, "devWebsite"), source: "Document import", stage: "LEAD", owner: admin.name },
+    });
+    developerId = dev.id;
+  }
+  f.set("developerId", developerId);
+  const data = projectData(f);
+  if (!data.state || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("State, facility type, deal type and project status are required.");
+
+  // Scoring hints from the document, kept only if they are valid calculator values.
+  let valuationInputs: string | null = null;
+  try {
+    const raw = JSON.parse(String(f.get("valuation") ?? "{}"));
+    const clean = Object.fromEntries(Object.entries(raw).filter(([k, v]) => k in DEFAULT_INPUTS && typeof v === typeof DEFAULT_INPUTS[k as keyof ValuationInputs]));
+    if (data.mw) clean.mw = data.mw;
+    if (data.dealType === "SALE" && data.fundingNeeded) clean.askingPrice = data.fundingNeeded;
+    if (Object.keys(clean).length) valuationInputs = JSON.stringify(clean);
+  } catch { /* no hints */ }
+
+  const count = await db.project.count();
+  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const source = s(f, "sourceName");
+  const contacts = s(f, "contactsNote");
+  await db.activity.create({ data: { developerId, kind: "SYSTEM", by: admin.name, body: `${p.code} imported from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });
+  revalidatePath("/admin/projects");
   redirect(`/admin/projects/${p.id}`);
 }
 export async function updateProject(f: FormData) {

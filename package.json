@@ -13,6 +13,7 @@
     "create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0",
     "@prisma/client": "6.19.3",
     "bcryptjs": "2.4.3",
     "jose": "5.10.0",
