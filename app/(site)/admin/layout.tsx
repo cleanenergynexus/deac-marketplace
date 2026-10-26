@@ -18,6 +18,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ["/admin/requests", "Intake requests", openReqs],
     ["/admin/outreach", "Outreach"],
     ["/admin/calculator", "Valuation calculator"],
+    ["/admin/team", "Team"],
+    ["/admin/account", "My account"],
   ];
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
