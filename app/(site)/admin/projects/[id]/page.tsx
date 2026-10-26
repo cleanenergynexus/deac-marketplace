@@ -1,23 +1,35 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { addDocument, deleteDocument, saveValuation, updateProject } from "@/app/actions/admin";
+import { addDocument, deleteDocument, grantStage, saveDisclosure, saveValuation, updateDocumentAccess, updateProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Calculator } from "@/components/Calculator";
 import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/components/ui";
 import { DOC_CATEGORIES } from "@/lib/constants";
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { usd } from "@/lib/format";
+import { docStage, investorStage, parseDisclosure, SECTIONS, STAGES, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
+
+const stageOptions = STAGES.map((s) => ({ value: s, label: `${STAGE_INFO[s].step}${s === "TEASER" ? " (all members)" : ""}` }));
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectAdmin({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [p, developers] = await Promise.all([
-    db.project.findUnique({ where: { id }, include: { documents: true, lois: { include: { investor: true } }, developer: true } }),
+  const [p, developers, investors] = await Promise.all([
+    db.project.findUnique({ where: { id }, include: { documents: { orderBy: { createdAt: "asc" } }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
     db.developer.findMany({ select: { id: true, company: true }, orderBy: { company: "asc" } }),
+    db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
   ]);
   if (!p) notFound();
+  const show = parseDisclosure(p.disclosure);
+
+  // Every investor engaged on this listing, with the stage they've reached.
+  type Row = { investor: (typeof p.lois)[number]["investor"]; nda?: StepStatus; loi?: StepStatus; diligence?: StepStatus; amount?: number | null };
+  const engaged = new Map<string, Row>();
+  const row = (inv: Row["investor"]) => engaged.get(inv.id) ?? engaged.set(inv.id, { investor: inv }).get(inv.id)!;
+  for (const l of p.lois) Object.assign(row(l.investor), { loi: l.status as StepStatus, amount: l.amount });
+  for (const d of p.dealSteps) row(d.investor)[d.step === "NDA" ? "nda" : "diligence"] = d.status as StepStatus;
 
   // Pre-fill the calculator from listing data when it hasn't been scored yet.
   const assetMap: Record<string, string> = { "Powered Land": "Powered Land", "Powered Shell": "Powered Shell", "Mining Facility": "Mining Facility", "Industrial Conversion": "Industrial Conversion", "Old Data Center": "Old Data Center" };
@@ -39,10 +51,27 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
         action={<Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link>} />
       <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} /></Section>
 
+      <div id="disclosure">
+        <Section title="Investor disclosure" action={<Link href={`/marketplace/${p.id}?as=TEASER`} className="text-sm text-brand-600">Preview by stage</Link>}>
+          <p className="mb-4 text-sm text-slate-600">Investors start at the teaser and see more as you confirm each step: NDA, LOI, then full diligence. Pick the stage that opens each part of the listing. Headline facts (MW, facility, location, funding, status) are always visible to approved members.</p>
+          <form action={saveDisclosure} className="space-y-3">
+            <input type="hidden" name="projectId" value={p.id} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SECTIONS.map((x) => <Field key={x.key} label={x.label}><Select name={x.key} options={stageOptions} defaultValue={show[x.key]} /></Field>)}
+              <Field label="Project NDA link (optional; otherwise the standard confidentiality terms apply)"><input name="ndaUrl" defaultValue={p.ndaUrl ?? ""} className="input" placeholder="https://…" /></Field>
+            </div>
+            <button className="btn-ghost">Save disclosure</button>
+          </form>
+        </Section>
+      </div>
+
       <Section title="Documents">
-        <table className="w-full"><thead><tr><th className="th">Name</th><th className="th">Category</th><th className="th">Access</th><th className="th"></th></tr></thead>
+        <table className="w-full"><thead><tr><th className="th">Name</th><th className="th">Category</th><th className="th">Opens at</th><th className="th"></th></tr></thead>
           <tbody className="divide-y divide-slate-100">{p.documents.map((d) => (
-            <tr key={d.id}><td className="td"><a href={d.url} target="_blank" className="text-brand-600">{d.name}</a></td><td className="td">{d.category}</td><td className="td"><Badge tone={d.access === "SUMMARY" ? "blue" : "purple"}>{d.access === "SUMMARY" ? "All members" : "Data room"}</Badge></td>
+            <tr key={d.id}><td className="td"><a href={d.url} target="_blank" className="text-brand-600">{d.name}</a></td><td className="td">{d.category}</td><td className="td">
+              <form action={updateDocumentAccess} className="flex items-center gap-2"><input type="hidden" name="id" value={d.id} />
+                <select name="access" defaultValue={docStage(d.access)} className="input py-1">{stageOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+                <button className="text-xs font-semibold text-brand-600">Save</button></form></td>
               <td className="td text-right"><form action={deleteDocument}><input type="hidden" name="id" value={d.id} /><button className="text-xs text-red-600">Remove</button></form></td></tr>
           ))}</tbody></table>
         <form action={addDocument} className="mt-4 grid gap-3 sm:grid-cols-5">
@@ -50,13 +79,34 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
           <Field label="Name"><input name="name" required className="input" /></Field>
           <Field label="Link (Drive, SharePoint, S3…)" className="sm:col-span-2"><input name="url" required className="input" /></Field>
           <Field label="Category"><Select name="category" options={DOC_CATEGORIES} /></Field>
-          <Field label="Access"><select name="access" className="input"><option value="DATAROOM">Data room (after LOI)</option><option value="SUMMARY">All approved members</option></select></Field>
+          <Field label="Opens at"><Select name="access" options={stageOptions} defaultValue="LOI" /></Field>
           <div><button className="btn-ghost">Add document</button></div>
         </form>
       </Section>
 
-      <Section title="LOIs">
-        {p.lois.length ? <ul className="divide-y divide-slate-100 text-sm">{p.lois.map((l) => <li key={l.id} className="flex justify-between py-2"><Link href={`/admin/investors/${l.investorId}`} className="text-brand-600">{l.investor.name} ({l.investor.firm})</Link><span>{usd(l.amount)} <Badge tone={statusTone(l.status)}>{l.status}</Badge></span></li>)}</ul> : <p className="text-sm text-slate-500">None yet.</p>}
+      <Section title="Investor access" action={<Link href="/admin/lois" className="text-sm text-brand-600">Review queue</Link>}>
+        {engaged.size ? (
+          <table className="w-full"><thead><tr><th className="th">Investor</th><th className="th">Stage</th><th className="th">NDA</th><th className="th">LOI</th><th className="th">Diligence</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">{[...engaged.values()].map((r) => {
+              const st = investorStage({ masterNda: r.investor.ndaSigned, ...r });
+              return (
+                <tr key={r.investor.id}>
+                  <td className="td"><Link href={`/admin/investors/${r.investor.id}`} className="text-brand-600">{r.investor.name}</Link><div className="text-xs text-slate-500">{r.investor.firm}</div></td>
+                  <td className="td"><Badge tone={st === "TEASER" ? "slate" : "green"}>{STAGE_INFO[st].label}</Badge></td>
+                  <td className="td">{r.nda ? <Badge tone={statusTone(r.nda)}>{r.nda}</Badge> : r.investor.ndaSigned ? <span className="text-xs text-slate-500">Master NDA</span> : "—"}</td>
+                  <td className="td">{r.loi ? <><Badge tone={statusTone(r.loi)}>{r.loi}</Badge> <span className="text-xs">{usd(r.amount)}</span></> : "—"}</td>
+                  <td className="td">{r.diligence ? <Badge tone={statusTone(r.diligence)}>{r.diligence}</Badge> : "—"}</td>
+                </tr>
+              );
+            })}</tbody></table>
+        ) : <p className="text-sm text-slate-500">No investor has signed an NDA or sent an LOI yet.</p>}
+        <form action={grantStage} className="mt-4 grid items-end gap-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
+          <input type="hidden" name="projectId" value={p.id} />
+          <Field label="Set access for investor" className="sm:col-span-2"><Select name="investorId" required placeholder="Choose investor…" options={investors.map((i) => ({ value: i.id, label: `${i.name}${i.firm ? ` (${i.firm})` : ""}` }))} /></Field>
+          <Field label="Stage"><Select name="stage" options={stageOptions} defaultValue="NDA" /></Field>
+          <div><button className="btn-ghost">Set access</button></div>
+          <p className="text-xs text-slate-500 sm:col-span-4">Use this when an NDA or LOI was signed outside the portal. Choosing a lower stage revokes the later steps. An investor with a master NDA on their CRM record always has at least NDA access.</p>
+        </form>
       </Section>
 
       <div id="valuation">

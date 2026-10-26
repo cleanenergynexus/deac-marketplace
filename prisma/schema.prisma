@@ -54,6 +54,7 @@ model Investor {
 
   user             User?
   lois             Loi[]
+  dealSteps        DealStep[]
   activities       Activity[]
   analysisRequests AnalysisRequest[]
   campaignSends    CampaignRecipient[]
@@ -129,12 +130,17 @@ model Project {
   valueScore      Int?
   adjustedValueMw Float?
 
+  // Staged disclosure (lib/disclosure.ts): JSON map of listing section -> stage that unlocks it.
+  disclosure String?
+  ndaUrl     String? // link to the project NDA investors accept before the NDA stage
+
   visibility String   @default("DRAFT") // DRAFT | PRIVATE (approved investors) | TEASER (also on public embed)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   documents        Document[]
   lois             Loi[]
+  dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
 }
 
@@ -145,7 +151,7 @@ model Document {
   name      String
   category  String // Teaser, Financial Model, Interconnection, Site Plan, Environmental, Legal, Other
   url       String // link to file storage (S3, Drive, SharePoint...)
-  access    String   @default("DATAROOM") // SUMMARY (any approved investor) | DATAROOM (after approved LOI)
+  access    String   @default("LOI") // stage that unlocks it: TEASER | NDA | LOI | DILIGENCE (legacy: SUMMARY = TEASER, DATAROOM = LOI)
   createdAt DateTime @default(now())
 }
 
@@ -165,6 +171,24 @@ model Loi {
   createdAt  DateTime @default(now())
 
   @@unique([projectId, investorId])
+}
+
+// Admin-confirmed steps around the LOI: NDA (before) and full diligence access (after).
+model DealStep {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investorId  String
+  investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  step        String // NDA | DILIGENCE
+  status      String    @default("PENDING") // PENDING | APPROVED | DECLINED
+  signerName  String?
+  signerTitle String?
+  message     String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([projectId, investorId, step])
 }
 
 // Investor intake: what they need to analyze a project. The team organizes the data room package around it.

@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
-  const [pendingLois, openReqs, applied] = await Promise.all([
+  const [pendingLois, pendingSteps, openReqs, applied] = await Promise.all([
     db.loi.count({ where: { status: "PENDING" } }),
+    db.dealStep.count({ where: { status: "PENDING" } }),
     db.analysisRequest.count({ where: { status: { not: "DELIVERED" } } }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
   ]);
@@ -15,7 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ["/admin/investors", "Investor CRM"],
     ["/admin/developers", "Developer CRM"],
     ["/admin/projects", "Listings"],
-    ["/admin/lois", "LOIs", pendingLois],
+    ["/admin/lois", "NDAs & LOIs", pendingLois + pendingSteps],
     ["/admin/requests", "Intake requests", openReqs],
     ["/admin/outreach", "Outreach"],
     ["/admin/calculator", "Valuation calculator"],
