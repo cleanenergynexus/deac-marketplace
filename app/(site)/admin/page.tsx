@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { PageHeader, Stat, Section, Badge, statusTone } from "@/components/ui";
-import { INVESTOR_STAGES, DEVELOPER_STAGES } from "@/lib/constants";
+import { INVESTOR_STAGES, DEVELOPER_STAGES, projectPipelineStage } from "@/lib/constants";
 import { usd, num, date } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,15 @@ export const dynamic = "force-dynamic";
 export default async function AdminHome() {
   const [investors, developers, projects, lois, activity, pendingAccess] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
-    db.developer.groupBy({ by: ["stage"], _count: true }),
+    db.developer.findMany({ select: { stage: true, projects: { select: { pipelineStage: true } } } }),
     db.project.findMany({ select: { mw: true, fundingNeeded: true, visibility: true } }),
     db.loi.findMany({ include: { investor: true, project: true }, orderBy: { createdAt: "desc" }, take: 5 }),
     db.activity.findMany({ include: { investor: true, developer: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
   ]);
+  // Developer pipeline counts board tiles: each project, plus developers with no project yet.
+  const tiles = developers.flatMap((d) => (d.projects.length ? d.projects.map((p) => projectPipelineStage(p, d.stage)) : [d.stage]));
+  const pipeline = DEVELOPER_STAGES.map((s) => ({ stage: s.value, _count: tiles.filter((t) => t === s.value).length }));
   const live = projects.filter((p) => p.visibility !== "DRAFT");
   const count = (g: { stage: string; _count: number }[], s: string) => g.find((x) => x.stage === s)?._count ?? 0;
   const members = count(investors, "APPROVED") + count(investors, "ACTIVE");
@@ -38,7 +41,7 @@ export default async function AdminHome() {
           <Funnel stages={INVESTOR_STAGES} counts={investors} href="/admin/investors?stage=" />
         </Section>
         <Section title="Developer pipeline">
-          <Funnel stages={DEVELOPER_STAGES} counts={developers} href="/admin/developers?stage=" />
+          <Funnel stages={DEVELOPER_STAGES} counts={pipeline} href="/admin/developers?stage=" />
         </Section>
         <Section title="Recent LOIs" action={<Link href="/admin/lois" className="text-sm text-brand-600">All</Link>}>
           <ul className="divide-y divide-slate-100 text-sm">{lois.map((l) => (

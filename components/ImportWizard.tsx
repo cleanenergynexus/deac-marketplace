@@ -9,7 +9,7 @@ import type { ImportResult } from "@/lib/importer";
 
 const LABELS: Record<string, string> = { title: "Title", state: "State", mw: "Capacity (MW)", facilityType: "Facility type", dealType: "Deal type", fundingNeeded: "Funding needed", projectStatus: "Project status", summary: "Summary" };
 
-export function ImportWizard({ developers, enabled }: { developers: Pick<Developer, "id" | "company">[]; enabled: boolean }) {
+export function ImportWizard({ developers, developerId, enabled }: { developers: Pick<Developer, "id" | "company">[]; developerId?: string; enabled: boolean }) {
   const [state, extract, pending] = useActionState<ExtractState, FormData>(extractProject, undefined);
   const result = state?.result;
 
@@ -37,7 +37,7 @@ export function ImportWizard({ developers, enabled }: { developers: Pick<Develop
           </div>
         </form>
       ) : (
-        <Review result={result} sourceName={state?.sourceName ?? "document"} developers={developers} onRestart={() => window.location.reload()} />
+        <Review result={result} sourceName={state?.sourceName ?? "document"} developers={developers} developerId={developerId} onRestart={() => window.location.reload()} />
       )}
     </div>
   );
@@ -53,8 +53,9 @@ function Steps({ step }: { step: 1 | 2 }) {
   return <ol className="flex flex-wrap gap-6 text-sm">{item(1, "Upload document")}{item(2, "Review & create listing")}</ol>;
 }
 
-function Review({ result, sourceName, developers, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; onRestart: () => void }) {
-  const [devChoice, setDevChoice] = useState(result.developerMatchId ?? (result.developer.company ? "__new__" : ""));
+function Review({ result, sourceName, developers, developerId, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; developerId?: string; onRestart: () => void }) {
+  // Started from a developer's page: keep that developer, whatever the document names.
+  const [devChoice, setDevChoice] = useState(developerId ?? result.developerMatchId ?? (result.developer.company ? "__new__" : ""));
   const contactsNote = result.contacts.map((c) => [c.name, c.role && `(${c.role})`, c.company, c.email, c.phone].filter(Boolean).join(" ")).join("; ");
   const scoringCount = Object.keys(result.valuation).length;
 
@@ -65,7 +66,8 @@ function Review({ result, sourceName, developers, onRestart }: { result: ImportR
         <option value="__new__">+ New developer{result.developer.company ? `: ${result.developer.company}` : ""}</option>
         {developers.map((d) => <option key={d.id} value={d.id}>{d.company}</option>)}
       </select>
-      {result.developerMatchId && <span className="mt-1 block text-xs text-emerald-700">Matched an existing developer.</span>}
+      {developerId && devChoice === developerId ? <span className="mt-1 block text-xs text-slate-500">Linked to the developer you started from.</span>
+        : result.developerMatchId && <span className="mt-1 block text-xs text-emerald-700">Matched an existing developer.</span>}
     </Field>
   );
 

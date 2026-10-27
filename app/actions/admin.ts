@@ -8,6 +8,7 @@ import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
 import { parseDocRows, planDocChanges } from "@/lib/documents";
 import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
+import { DEVELOPER_STAGES, stageLabel } from "@/lib/constants";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -147,6 +148,18 @@ export async function setDeveloperStage(f: FormData) {
   revalidatePath(`/admin/developers/${id}`);
   revalidatePath("/admin/developers");
 }
+/** Moves one project on the Developer CRM board. Each project advances on its own, so one can close while another is passed. */
+export async function setProjectPipelineStage(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const stage = String(f.get("stage"));
+  if (!DEVELOPER_STAGES.some((s) => s.value === stage)) throw new Error("Unknown stage.");
+  const p = await db.project.update({ where: { id }, data: { pipelineStage: stage } });
+  await db.activity.create({ data: { developerId: p.developerId, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${stageLabel(DEVELOPER_STAGES, stage)}`, by: admin.name } });
+  revalidatePath("/admin/developers");
+  revalidatePath(`/admin/developers/${p.developerId}`);
+  revalidatePath(`/admin/projects/${id}`);
+}
 export async function addTeamMember(f: FormData) {
   await requireAdmin();
   const developerId = String(f.get("developerId"));
@@ -190,11 +203,16 @@ function projectData(f: FormData) {
     visibility: s(f, "visibility") ?? "DRAFT",
   };
 }
+/** New projects start at Lead on the CRM board unless the form picked another stage. */
+function pipelineStageFrom(f: FormData) {
+  const v = s(f, "pipelineStage");
+  return v && DEVELOPER_STAGES.some((x) => x.value === v) ? v : "LEAD";
+}
 export async function createProject(f: FormData) {
   await requireAdmin();
   const data = projectData(f);
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: pipelineStageFrom(f), code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
   redirect(`/admin/projects/${p.id}`);
 }
 /** Last step of the import wizard: saves the reviewed listing, creating the developer if it's new. */
@@ -224,7 +242,7 @@ export async function createImportedProject(f: FormData) {
   } catch { /* no hints */ }
 
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: pipelineStageFrom(f), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
   await db.activity.create({ data: { developerId, kind: "SYSTEM", by: admin.name, body: `${p.code} imported from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });

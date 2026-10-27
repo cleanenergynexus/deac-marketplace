@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteProject, grantStage, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
+import { StageSelect } from "@/components/StageSelect";
+import { projectPipelineStage } from "@/lib/constants";
 import { Calculator } from "@/components/Calculator";
 import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/components/ui";
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
@@ -47,7 +49,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <Link href="/admin/projects" className="text-sm text-brand-600">← Listings</Link>
       <PageHeader title={p.title} subtitle={<>{p.code} · <Link href={`/admin/developers/${p.developerId}`} className="text-brand-600">{p.developer.company}</Link> · <Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></>}
-        action={<Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link>} />
+        action={<div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">CRM stage</span><StageSelect projectId={p.id} stage={projectPipelineStage(p, p.developer.stage)} className="w-44" /><Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link></div>} />
       <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} deleteAction={deleteProject}
         documents={p.documents.map((d) => ({ id: d.id, name: d.name, url: d.url === "#" ? "" : d.url, access: docStage(d.access) }))} /></Section>
 

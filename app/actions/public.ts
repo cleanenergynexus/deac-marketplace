@@ -84,6 +84,7 @@ export async function submitProject(_: unknown, f: FormData) {
       monthsToPower: n(f, "monthsToPower") ?? undefined,
       powerRateCents: n(f, "powerRateCents"),
       visibility: "DRAFT",
+      pipelineStage: "LEAD",
     },
   });
   await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? state}" via website.` } });

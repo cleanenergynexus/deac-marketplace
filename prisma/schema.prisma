@@ -71,7 +71,7 @@ model Developer {
   hq          String?
   experience  String? // track record narrative
   mwDelivered Float?
-  stage       String   @default("LEAD") // see lib/constants.ts
+  stage       String   @default("LEAD") // used on the CRM board only while the developer has no projects; see lib/constants.ts
   source      String?
   notes       String?
   owner       String?
@@ -113,6 +113,7 @@ model Project {
   highlights    String   @default("") // newline separated bullets
   term          String? // e.g. "24 mo", "15-yr lease"
   dealStage     String   @default("MARKETING") // deal pipeline, see DEAL_STAGES in lib/constants.ts
+  pipelineStage String? // Developer CRM board stage (DEVELOPER_STAGES). Null = older project, follows its developer's stage.
   useOfFunds    String   @default("") // one "Label: amount" per line
   coverImageUrl String?
 
