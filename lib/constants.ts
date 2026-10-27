@@ -52,6 +52,9 @@ export const DEVELOPER_STAGES = [
   { value: "PASSED", label: "Passed" },
 ] as const;
 
+/** A project's Developer CRM stage. Projects saved before per-project stages follow their developer's stage. */
+export const projectPipelineStage = (p: { pipelineStage: string | null }, developerStage: string) => p.pipelineStage ?? developerStage;
+
 export const stageLabel = (list: readonly { value: string; label: string }[], v: string) =>
   list.find((s) => s.value === v)?.label ?? v;
 
