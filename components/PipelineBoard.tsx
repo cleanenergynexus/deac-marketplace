@@ -84,6 +84,7 @@ function ProjectCard({ c }: { c: Extract<BoardCard, { kind: "project" }> }) {
       <div className="text-xs text-slate-500">
         <Link href={`/admin/developers/${c.developerId}`} className="hover:text-brand-600">{c.company}</Link>
         {c.siblings > 1 && <span> · {c.siblings} projects</span>}
+        <span> · </span><Link href={`/admin/projects/${c.id}/data-room`} className="hover:text-brand-600">Data room</Link>
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
         <span className="font-mono text-slate-500">{c.code} · {num(c.mw)} MW</span>

@@ -7,6 +7,8 @@ import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/l
 import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
 import { parseDocRows, planDocChanges } from "@/lib/documents";
+import { fileUrl } from "@/lib/dataroom";
+import { deleteStored } from "@/lib/storage";
 import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
 import { DEVELOPER_STAGES, stageLabel } from "@/lib/constants";
 
@@ -258,10 +260,13 @@ export async function updateProject(f: FormData) {
   const rows = parseDocRows(f.get("documents"));
   if (rows) {
     const plan = planDocChanges(await db.document.findMany({ where: { projectId: id } }), rows);
+    // Data room picks must be files of this project; their link points at the access-checked download route.
+    const ownFiles = new Set((await db.dataRoomFile.findMany({ where: { projectId: id, id: { in: plan.create.flatMap((r) => r.fileId ?? []) } }, select: { id: true } })).map((f) => f.id));
+    const creates = plan.create.filter((r) => !r.fileId || ownFiles.has(r.fileId));
     await db.$transaction([
       db.document.deleteMany({ where: { projectId: id, id: { in: plan.remove } } }),
       ...plan.update.map((r) => db.document.updateMany({ where: { id: r.id, projectId: id }, data: { name: r.name, url: r.url, access: r.access } })),
-      ...plan.create.map((r) => db.document.create({ data: { projectId: id, name: r.name, url: r.url, access: r.access, category: "Other" } })),
+      ...creates.map((r) => db.document.create({ data: { projectId: id, name: r.name, url: r.fileId ? fileUrl(r.fileId) : r.url, access: r.access, category: "Other", fileId: r.fileId ?? null } })),
     ]);
   }
   revalidatePath(`/admin/projects/${id}`);
@@ -274,11 +279,13 @@ export async function deleteProject(f: FormData) {
   const id = String(f.get("id"));
   const p = await db.project.findUnique({ where: { id } });
   if (!p) redirect("/admin/projects");
+  const stored = await db.dataRoomFile.findMany({ where: { projectId: id }, select: { storageKey: true } });
   await db.$transaction([
     db.loi.deleteMany({ where: { projectId: id } }),
     db.analysisRequest.deleteMany({ where: { projectId: id } }),
-    db.project.delete({ where: { id } }), // documents and NDA/diligence steps cascade
+    db.project.delete({ where: { id } }), // documents, data room and NDA/diligence steps cascade
   ]);
+  await deleteStored(stored.map((f) => f.storageKey));
   await db.activity.create({ data: { developerId: p.developerId, kind: "SYSTEM", by: admin.name, body: `Listing ${p.code} (${p.title}) deleted.` } });
   revalidatePath("/admin/projects");
   revalidatePath("/marketplace");

@@ -143,6 +143,8 @@ model Project {
   updatedAt  DateTime @updatedAt
 
   documents        Document[]
+  dataRoomFolders  DataRoomFolder[]
+  dataRoomFiles    DataRoomFile[]
   lois             Loi[]
   dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
@@ -154,9 +156,45 @@ model Document {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name      String
   category  String // Teaser, Financial Model, Interconnection, Site Plan, Environmental, Legal, Other
-  url       String // link to file storage (S3, Drive, SharePoint...)
+  url       String // external link (Drive, SharePoint...), or /api/data-room/files/<fileId> for a data room file
   access    String   @default("LOI") // stage that unlocks it: TEASER | NDA | LOI | DILIGENCE (legacy: SUMMARY = TEASER, DATAROOM = LOI)
+  fileId    String? // set when the document is a file from the project's data room
+  file      DataRoomFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+// ---------- Project data room (internal file manager; listing documents pick files from here) ----------
+model DataRoomFolder {
+  id        String           @id @default(cuid())
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId  String? // null = top level
+  parent    DataRoomFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DataRoomFolder[] @relation("FolderTree")
+  files     DataRoomFile[]
+  name      String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([projectId])
+}
+
+model DataRoomFile {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folderId    String? // null = top level
+  folder      DataRoomFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  name        String
+  size        Float // bytes
+  contentType String          @default("application/octet-stream")
+  storageKey  String // Vercel Blob pathname (private store), or "local:<path>" in local development
+  uploadedBy  String?
+  documents   Document[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([projectId])
 }
 
 // Letter of interest. APPROVED unlocks that project's data room for that investor.

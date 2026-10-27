@@ -1,16 +1,24 @@
 "use client";
 import { useState } from "react";
-import { STAGES, type Stage } from "@/lib/disclosure";
+import Link from "next/link";
+import { STAGES, TIER_LABEL, type Stage } from "@/lib/disclosure";
 import type { DocRow } from "@/lib/documents";
+import { filePathLabel, type DrFile, type DrFolder } from "@/lib/dataroom";
+import { DataRoomPicker } from "@/components/DataRoomPicker";
+import { FileIcon } from "@/components/DataRoomIcons";
 
-const TIER_LABEL: Record<Stage, string> = { TEASER: "Public", NDA: "After NDA", LOI: "After LOI", DILIGENCE: "Full data room" };
+/** The project's data room, so listing documents can be picked from it. */
+export type DataRoomIndex = { projectId: string; folders: DrFolder[]; files: DrFile[] };
+
 // Inputs belong to a form that doesn't exist, so React's reset of the listing form after a save leaves them alone.
 // Only the hidden JSON field is submitted.
 const DETACHED = "documents-editor-detached";
 
 /** Document list inside the listing form: rename, relink, change tier or remove each row; add new ones at the bottom. Saved with the listing. */
-export function DocumentsEditor({ initial }: { initial: DocRow[] }) {
+export function DocumentsEditor({ initial, dataRoom }: { initial: DocRow[]; dataRoom?: DataRoomIndex }) {
   const [rows, setRows] = useState<DocRow[]>(initial);
+  const [picking, setPicking] = useState(false);
+  const fileById = new Map(dataRoom?.files.map((f) => [f.id, f]));
   const [draft, setDraft] = useState<{ name: string; url: string; access: Stage }>({ name: "", url: "", access: "TEASER" });
   const set = (i: number, patch: Partial<DocRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const add = () => {
@@ -34,7 +42,15 @@ export function DocumentsEditor({ initial }: { initial: DocRow[] }) {
         {rows.map((r, i) => (
           <li key={r.id || `new-${i}`} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
             <input form={DETACHED} aria-label="Document name" value={r.name} onChange={(e) => set(i, { name: e.target.value })} className="input min-w-0 flex-[2]" />
-            <input form={DETACHED} aria-label="Link" value={r.url} onChange={(e) => set(i, { url: e.target.value })} placeholder="Link (Drive, SharePoint…)" className="input min-w-0 flex-1 text-xs" />
+            {r.fileId ? (
+              <a href={`/api/data-room/files/${r.fileId}`} target="_blank" rel="noreferrer" title="Open from the data room"
+                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-600 hover:border-brand-500">
+                <FileIcon name={fileById.get(r.fileId)?.name ?? ""} className="h-4 w-4" />
+                <span className="truncate">{dataRoom && fileById.get(r.fileId) ? `Data room / ${filePathLabel(dataRoom.folders, fileById.get(r.fileId)!)}` : "Data room file"}</span>
+              </a>
+            ) : (
+              <input form={DETACHED} aria-label="Link" value={r.url} onChange={(e) => set(i, { url: e.target.value })} placeholder="Link (Drive, SharePoint…)" className="input min-w-0 flex-1 text-xs" />
+            )}
             {tierSelect(r.access, (access) => set(i, { access }), "Access tier")}
             <button type="button" aria-label={`Remove ${r.name}`} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="px-2 text-lg leading-none text-slate-400 hover:text-red-600">×</button>
           </li>
@@ -47,6 +63,18 @@ export function DocumentsEditor({ initial }: { initial: DocRow[] }) {
         {tierSelect(draft.access, (access) => setDraft({ ...draft, access }), "New document access tier")}
         <button type="button" onClick={add} disabled={!draft.name.trim()} className="btn shrink-0 whitespace-nowrap">+ Add Document</button>
       </div>
+      {dataRoom && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-sm">
+          <button type="button" onClick={() => setPicking(true)} className="btn-ghost">📁 Add from data room</button>
+          <Link href={`/admin/projects/${dataRoom.projectId}/data-room`} className="text-brand-600">Open data room</Link>
+          <span className="text-xs text-slate-500">{dataRoom.files.length ? `${dataRoom.files.length} file${dataRoom.files.length > 1 ? "s" : ""} in this project's data room.` : "Upload files to the project's data room first."} Remember to Save Listing.</span>
+        </div>
+      )}
+      {picking && dataRoom && (
+        <DataRoomPicker folders={dataRoom.folders} files={dataRoom.files} taken={new Set(rows.flatMap((r) => r.fileId ?? []))}
+          onClose={() => setPicking(false)}
+          onPick={(picked, access) => { setRows((rs) => [...rs, ...picked.map((f) => ({ id: "", name: f.name, url: "", access, fileId: f.id }))]); setPicking(false); }} />
+      )}
     </div>
   );
 }
@@ -55,7 +83,7 @@ export function DocumentsEditor({ initial }: { initial: DocRow[] }) {
 export function DeleteListingButton({ action, title }: { action: (f: FormData) => Promise<void>; title: string }) {
   return (
     <button type="submit" formAction={action} formNoValidate className="btn-ghost text-red-700 hover:bg-red-50"
-      onClick={(e) => { if (!confirm(`Delete "${title}"? This removes the listing, its documents, NDAs, LOIs and analysis requests. It can't be undone.`)) e.preventDefault(); }}>
+      onClick={(e) => { if (!confirm(`Delete "${title}"? This removes the listing, its documents and data room files, NDAs, LOIs and analysis requests. It can't be undone.`)) e.preventDefault(); }}>
       Delete Listing
     </button>
   );

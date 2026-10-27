@@ -11,6 +11,9 @@ export const STAGE_INFO: Record<Stage, { label: string; step: string; unlock: st
   DILIGENCE: { label: "Full diligence", step: "Full data room", unlock: "Unlocks once full diligence access is confirmed" },
 };
 
+/** Short tier names used on documents (listing editor and data room). */
+export const TIER_LABEL: Record<Stage, string> = { TEASER: "Public", NDA: "After NDA", LOI: "After LOI", DILIGENCE: "Full data room" };
+
 export const stageRank = (s: Stage) => STAGES.indexOf(s);
 export const atLeast = (have: Stage, need: Stage) => stageRank(have) >= stageRank(need);
 export const isStage = (v: unknown): v is Stage => typeof v === "string" && (STAGES as readonly string[]).includes(v);

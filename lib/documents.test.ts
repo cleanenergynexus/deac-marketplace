@@ -36,3 +36,14 @@ test("plans creates, updates and removals", () => {
 test("an empty list removes everything", () => {
   assert.deepEqual(planDocChanges([{ id: "a", name: "x", url: "", access: "LOI" }], []).remove, ["a"]);
 });
+
+test("data room rows keep their file and ignore links", () => {
+  assert.deepEqual(parseDocRows(JSON.stringify([{ id: "", name: "ESA", url: "https://x", access: "NDA", fileId: "f1" }])), [
+    { id: "", name: "ESA", url: "", access: "NDA", fileId: "f1" },
+  ]);
+  const existing = [{ id: "a", name: "ESA", url: "/api/data-room/files/f1", access: "NDA", fileId: "f1" }];
+  assert.deepEqual(planDocChanges(existing, [{ id: "a", name: "ESA", url: "", access: "NDA" }]), { create: [], update: [], remove: [] });
+  const plan = planDocChanges(existing, [{ id: "a", name: "Phase I ESA", url: "", access: "LOI" }, { id: "", name: "SIS", url: "", access: "LOI", fileId: "f2" }]);
+  assert.deepEqual(plan.update, [{ id: "a", name: "Phase I ESA", url: "/api/data-room/files/f1", access: "LOI", fileId: "f1" }]);
+  assert.deepEqual(plan.create, [{ name: "SIS", url: "", access: "LOI", fileId: "f2" }]);
+});
