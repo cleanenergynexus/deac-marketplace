@@ -6,6 +6,7 @@ import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
+import { parseDocRows, planDocChanges } from "@/lib/documents";
 import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
@@ -235,29 +236,37 @@ export async function updateProject(f: FormData) {
   const id = String(f.get("id"));
   const data = projectData(f);
   await db.project.update({ where: { id }, data: { ...data, monthsToPower: data.monthsToPower ?? undefined } });
+  // The editor sends the whole document list; make the project's documents match it.
+  const rows = parseDocRows(f.get("documents"));
+  if (rows) {
+    const plan = planDocChanges(await db.document.findMany({ where: { projectId: id } }), rows);
+    await db.$transaction([
+      db.document.deleteMany({ where: { projectId: id, id: { in: plan.remove } } }),
+      ...plan.update.map((r) => db.document.updateMany({ where: { id: r.id, projectId: id }, data: { name: r.name, url: r.url, access: r.access } })),
+      ...plan.create.map((r) => db.document.create({ data: { projectId: id, name: r.name, url: r.url, access: r.access, category: "Other" } })),
+    ]);
+  }
   revalidatePath(`/admin/projects/${id}`);
+  revalidatePath(`/marketplace/${id}`);
   revalidatePath("/marketplace");
 }
-export async function addDocument(f: FormData) {
-  await requireAdmin();
-  const projectId = String(f.get("projectId"));
-  await db.document.create({ data: { projectId, name: s(f, "name") ?? "Document", category: s(f, "category") ?? "Other", url: s(f, "url") ?? "#", access: isStage(s(f, "access")) ? String(f.get("access")) : "LOI" } });
-  revalidatePath(`/admin/projects/${projectId}`);
-}
-export async function deleteDocument(f: FormData) {
-  await requireAdmin();
-  const d = await db.document.delete({ where: { id: String(f.get("id")) } });
-  revalidatePath(`/admin/projects/${d.projectId}`);
+/** Deletes a listing and everything attached to it. */
+export async function deleteProject(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const p = await db.project.findUnique({ where: { id } });
+  if (!p) redirect("/admin/projects");
+  await db.$transaction([
+    db.loi.deleteMany({ where: { projectId: id } }),
+    db.analysisRequest.deleteMany({ where: { projectId: id } }),
+    db.project.delete({ where: { id } }), // documents and NDA/diligence steps cascade
+  ]);
+  await db.activity.create({ data: { developerId: p.developerId, kind: "SYSTEM", by: admin.name, body: `Listing ${p.code} (${p.title}) deleted.` } });
+  revalidatePath("/admin/projects");
+  revalidatePath("/marketplace");
+  redirect("/admin/projects");
 }
 
-export async function updateDocumentAccess(f: FormData) {
-  await requireAdmin();
-  const access = String(f.get("access"));
-  if (!isStage(access)) return;
-  const d = await db.document.update({ where: { id: String(f.get("id")) }, data: { access } });
-  revalidatePath(`/admin/projects/${d.projectId}`);
-  revalidatePath(`/marketplace/${d.projectId}`);
-}
 
 /** Which listing sections each stage unlocks, plus the project NDA link. */
 export async function saveDisclosure(f: FormData) {

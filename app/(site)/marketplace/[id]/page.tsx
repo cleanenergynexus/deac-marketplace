@@ -165,7 +165,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 const open = can(d.stage);
                 return (
                   <li key={d.id} className="flex items-center justify-between gap-4 py-3">
-                    <span>{open ? <a href={d.url} target="_blank" rel="noreferrer" className="font-medium text-brand-600 hover:underline">{d.name}</a> : <span className="text-slate-700">{d.name}</span>}<span className="ml-2 text-xs text-slate-400">{d.category}</span></span>
+                    <span>{open && d.url && d.url !== "#" ? <a href={d.url} target="_blank" rel="noreferrer" className="font-medium text-brand-600 hover:underline">{d.name}</a> : <span className="text-slate-700">{d.name}</span>}{d.category !== "Other" && <span className="ml-2 text-xs text-slate-400">{d.category}</span>}{open && (!d.url || d.url === "#") && <span className="ml-2 text-xs text-slate-400">· being uploaded</span>}</span>
                     <span className="flex items-center gap-3">
                       {open && d.stage !== "TEASER" && <span className="text-xs text-emerald-600">Unlocked</span>}
                       <span className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${DOC_BADGE[d.stage].cls}`}>{open ? "" : "🔒 "}{DOC_BADGE[d.stage].label}</span>

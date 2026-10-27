@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { addDocument, deleteDocument, grantStage, saveDisclosure, saveValuation, updateDocumentAccess, updateProject } from "@/app/actions/admin";
+import { deleteProject, grantStage, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Calculator } from "@/components/Calculator";
 import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/components/ui";
-import { DOC_CATEGORIES } from "@/lib/constants";
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { usd } from "@/lib/format";
 import { docStage, investorStage, parseDisclosure, SECTIONS, STAGES, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
@@ -17,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjectAdmin({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [p, developers, investors] = await Promise.all([
-    db.project.findUnique({ where: { id }, include: { documents: { orderBy: { createdAt: "asc" } }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
+    db.project.findUnique({ where: { id }, include: { documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
     db.developer.findMany({ select: { id: true, company: true }, orderBy: { company: "asc" } }),
     db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
   ]);
@@ -49,7 +48,8 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
       <Link href="/admin/projects" className="text-sm text-brand-600">← Listings</Link>
       <PageHeader title={p.title} subtitle={<>{p.code} · <Link href={`/admin/developers/${p.developerId}`} className="text-brand-600">{p.developer.company}</Link> · <Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></>}
         action={<Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link>} />
-      <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} /></Section>
+      <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} deleteAction={deleteProject}
+        documents={p.documents.map((d) => ({ id: d.id, name: d.name, url: d.url === "#" ? "" : d.url, access: docStage(d.access) }))} /></Section>
 
       <div id="disclosure">
         <Section title="Investor disclosure" action={<Link href={`/marketplace/${p.id}?as=TEASER`} className="text-sm text-brand-600">Preview by stage</Link>}>
@@ -64,25 +64,6 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
           </form>
         </Section>
       </div>
-
-      <Section title="Documents">
-        <table className="w-full"><thead><tr><th className="th">Name</th><th className="th">Category</th><th className="th">Opens at</th><th className="th"></th></tr></thead>
-          <tbody className="divide-y divide-slate-100">{p.documents.map((d) => (
-            <tr key={d.id}><td className="td"><a href={d.url} target="_blank" className="text-brand-600">{d.name}</a></td><td className="td">{d.category}</td><td className="td">
-              <form action={updateDocumentAccess} className="flex items-center gap-2"><input type="hidden" name="id" value={d.id} />
-                <select name="access" defaultValue={docStage(d.access)} className="input py-1">{stageOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-                <button className="text-xs font-semibold text-brand-600">Save</button></form></td>
-              <td className="td text-right"><form action={deleteDocument}><input type="hidden" name="id" value={d.id} /><button className="text-xs text-red-600">Remove</button></form></td></tr>
-          ))}</tbody></table>
-        <form action={addDocument} className="mt-4 grid gap-3 sm:grid-cols-5">
-          <input type="hidden" name="projectId" value={p.id} />
-          <Field label="Name"><input name="name" required className="input" /></Field>
-          <Field label="Link (Drive, SharePoint, S3…)" className="sm:col-span-2"><input name="url" required className="input" /></Field>
-          <Field label="Category"><Select name="category" options={DOC_CATEGORIES} /></Field>
-          <Field label="Opens at"><Select name="access" options={stageOptions} defaultValue="LOI" /></Field>
-          <div><button className="btn-ghost">Add document</button></div>
-        </form>
-      </Section>
 
       <Section title="Investor access" action={<Link href="/admin/lois" className="text-sm text-brand-600">Review queue</Link>}>
         {engaged.size ? (
