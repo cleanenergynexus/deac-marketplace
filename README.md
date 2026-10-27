@@ -51,10 +51,17 @@ Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Op
 
 1. **Vercel:** Add New → Project → import `cleanenergynexus/deac-marketplace`.
 2. **Database:** in the Vercel project, Storage → add a Neon Postgres database. This sets `DATABASE_URL`.
-3. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
-4. **Deploy.** The build creates the database tables automatically.
-5. **First admin:** open `/setup` on the live site, enter the `SETUP_TOKEN`, and create your login (the page shuts off once an admin exists; then delete `SETUP_TOKEN`). Add the rest of your staff under **Admin → Team**. Alternative from a terminal: `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
-6. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
-7. **Embed on deacna.com (optional):** paste the iframe snippet above into any page.
+3. **Data room file storage:** Storage → Create → **Blob**, choose **Private** access, connect it to the project. This sets `BLOB_READ_WRITE_TOKEN`.
+4. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
+5. **Deploy.** The build creates the database tables automatically.
+6. **First admin:** open `/setup` on the live site, enter the `SETUP_TOKEN`, and create your login (the page shuts off once an admin exists; then delete `SETUP_TOKEN`). Add the rest of your staff under **Admin → Team**. Alternative from a terminal: `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
+7. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
+8. **Embed on deacna.com (optional):** paste the iframe snippet above into any page.
 
-Documents are links today (Drive / SharePoint / S3). Signed-URL uploads with view tracking are a natural next step.
+## Project data rooms
+
+Each project has an internal data room (**Listing → 📁 Data room**, or **Data room** on its Developer CRM tile) that works like Windows Explorer: folder tree, address bar with back/forward/up, details or icons view, sort, search, multi-select (Ctrl/Shift), right-click menu, rename (F2), cut/paste (Ctrl+X / Ctrl+V), Move to…, drag to move, and upload of files or whole folders (button or drag from the desktop). A name clash on upload keeps both ("Report (2).pdf"). An empty data room offers a standard folder set.
+
+Files are stored in a **private** Vercel Blob store (`BLOB_READ_WRITE_TOKEN`); browsers upload straight to Blob, so there is no 4.5 MB limit. Without a token, local development saves files in `./.data-room`.
+
+Listing documents can point at data room files: **Share on listing** in the data room (pick a tier: Public, After NDA, After LOI, Full data room), or **Add from data room** in the listing editor. Investors open these through `/api/data-room/files/<id>`, which checks their stage on that listing every time; the Blob URL is never exposed. Nothing in the data room is visible to investors until it is shared. Documents can still be plain links (Drive / SharePoint).

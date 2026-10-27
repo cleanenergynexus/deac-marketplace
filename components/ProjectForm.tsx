@@ -6,7 +6,7 @@ import { DEAL_STAGES, DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } 
 import { OPTIONS } from "@/lib/valuation";
 import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
-import { DeleteListingButton, DocumentsEditor } from "@/components/DocumentsEditor";
+import { DeleteListingButton, DocumentsEditor, type DataRoomIndex } from "@/components/DocumentsEditor";
 import type { DocRow } from "@/lib/documents";
 import Link from "next/link";
 
@@ -24,11 +24,13 @@ type Props = {
   submitLabel?: string;
   /** Editable document list (saved with the listing). */
   documents?: DocRow[];
+  /** The project's data room, so documents can be picked from it. */
+  dataRoom?: DataRoomIndex;
   /** Shows a Delete Listing button that submits to this action. */
   deleteAction?: (f: FormData) => Promise<void>;
 };
 
-export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing", documents, deleteAction }: Props) {
+export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing", documents, dataRoom, deleteAction }: Props) {
   const v = (x: unknown) => (x == null ? "" : String(x));
   const d = (draft ?? {}) as Partial<ListingDraft>;
   // On an imported draft, a value the document didn't give stays empty until the admin picks one.
@@ -75,9 +77,9 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
       </div>
       {documents && (
         <>
-          <h3 className="font-semibold">Documents</h3>
+          <h3 id="documents" className="scroll-mt-4 font-semibold">Documents</h3>
           {/* Remount from the saved rows after each save, so new rows pick up their ids. */}
-          <DocumentsEditor key={documents.map((d) => `${d.id}:${d.name}:${d.url}:${d.access}`).join("|")} initial={documents} />
+          <DocumentsEditor key={documents.map((d) => `${d.id}:${d.name}:${d.url}:${d.access}`).join("|")} initial={documents} dataRoom={dataRoom} />
         </>
       )}
       {children}
