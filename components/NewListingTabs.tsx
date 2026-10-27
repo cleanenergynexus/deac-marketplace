@@ -15,7 +15,7 @@ export function NewListingTabs({ active, developer }: { active: "manual" | "impo
       {developer && <Link href={`/admin/developers/${developer.id}`} className="text-sm text-brand-600">← {developer.company}</Link>}
       <div className="flex flex-col gap-3 sm:flex-row">
         {tab("manual", "/admin/projects/new", "Enter the details", "Fill in the listing form yourself.")}
-        {tab("import", "/admin/projects/import", "Import from a document", "Upload a teaser or offering memo and Claude prefills the listing.")}
+        {tab("import", "/admin/projects/import", "Import from a web page or document", "Paste a link or upload a teaser and Claude prefills the listing.")}
       </div>
     </div>
   );
