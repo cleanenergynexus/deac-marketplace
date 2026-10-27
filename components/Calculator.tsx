@@ -5,6 +5,7 @@ import {
   evaluate, evaluateOperating, type OperatingInputs, type ValuationInputs,
 } from "@/lib/valuation";
 import { MoneyInput } from "@/components/MoneyInput";
+import { DEFAULT_SCORING, SCORING_LABELS, maxRawScore, type ScoringConfig } from "@/lib/scoring";
 
 const money = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }));
 const toneCls = { green: "bg-emerald-600", amber: "bg-amber-500", red: "bg-red-600" } as const;
@@ -12,9 +13,11 @@ const toneCls = { green: "bg-emerald-600", amber: "bg-amber-500", red: "bg-red-6
 type Props = {
   initial?: ValuationInputs | null;
   onSave?: (inputs: ValuationInputs) => Promise<{ score: number }>;
+  /** Saved scoring model (Admin → Scoring settings). Defaults to the workbook. */
+  scoring?: ScoringConfig;
 };
 
-export function Calculator({ initial, onSave }: Props) {
+export function Calculator({ initial, onSave, scoring }: Props) {
   const [mode, setMode] = useState<"bid" | "operating">("bid");
   return (
     <div className="space-y-4">
@@ -22,16 +25,16 @@ export function Calculator({ initial, onSave }: Props) {
         <button onClick={() => setMode("bid")} className={`rounded-md px-3 py-1.5 ${mode === "bid" ? "bg-brand-600 text-white" : ""}`}>Powered land / shell bid</button>
         <button onClick={() => setMode("operating")} className={`rounded-md px-3 py-1.5 ${mode === "operating" ? "bg-brand-600 text-white" : ""}`}>Operating data center</button>
       </div>
-      {mode === "bid" ? <BidCalculator initial={initial} onSave={onSave} /> : <OperatingCalculator />}
+      {mode === "bid" ? <BidCalculator initial={initial} onSave={onSave} scoring={scoring} /> : <OperatingCalculator />}
     </div>
   );
 }
 
-function BidCalculator({ initial, onSave }: Props) {
+function BidCalculator({ initial, onSave, scoring = DEFAULT_SCORING }: Props) {
   const [i, setI] = useState<ValuationInputs>(initial ?? DEFAULT_INPUTS);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const r = useMemo(() => evaluate(i), [i]);
+  const r = useMemo(() => evaluate(i, scoring), [i, scoring]);
   const set = <K extends keyof ValuationInputs>(k: K, v: ValuationInputs[K]) => { setI((p) => ({ ...p, [k]: v })); setSaved(null); };
 
   const sel = (k: keyof typeof OPTIONS & keyof ValuationInputs, label: string) => (
@@ -79,7 +82,7 @@ function BidCalculator({ initial, onSave }: Props) {
         <div className={`rounded-xl p-5 text-white ${toneCls[r.recommendation.tone]}`}>
           <div className="text-xs uppercase tracking-wide opacity-80">Recommendation</div>
           <div className="text-3xl font-extrabold">{r.recommendation.label}</div>
-          <div className="mt-1 text-sm">Value score <b>{r.score}</b> · Buy ≥70 · Negotiate 50–69 · Walk away &lt;50</div>
+          <div className="mt-1 text-sm">Value score <b>{r.score}</b>{scoring.scaleTo100 ? " / 100" : ""} · Buy ≥{scoring.thresholds.buy} · Negotiate ≥{scoring.thresholds.negotiate} · Walk away &lt;{scoring.thresholds.negotiate}</div>
         </div>
         <div className="card p-5 text-sm">
           <Line k="Base benchmark" v={`${money(r.base)}/MW`} />
@@ -109,6 +112,16 @@ function BidCalculator({ initial, onSave }: Props) {
             </div>
           ))}
         </div>
+        <details className="card p-5 text-sm">
+          <summary className="cursor-pointer font-semibold">Score points</summary>
+          <div className="mt-2">
+            {Object.entries(r.points).map(([k, pts]) => (
+              <div key={k} className="flex justify-between py-0.5"><span className="text-slate-600">{SCORING_LABELS[k as keyof typeof SCORING_LABELS]}</span><span>{Math.round(pts * 100) / 100}</span></div>
+            ))}
+            <div className="mt-1 flex justify-between border-t border-slate-100 pt-1 font-semibold"><span>Total</span><span>{Math.round(Object.values(r.points).reduce((a, b) => a + b, 0) * 100) / 100} of {Math.round(maxRawScore(scoring) * 100) / 100}{scoring.scaleTo100 ? ` → ${r.score}/100` : ""}</span></div>
+            <a href="/admin/scoring" className="mt-2 inline-block text-xs text-brand-600">Edit scoring settings</a>
+          </div>
+        </details>
         {onSave && (
           <button className="btn w-full" disabled={pending} onClick={() => start(async () => { const res = await onSave(i); setSaved(`Saved · score ${res.score}`); })}>
             {pending ? "Saving…" : saved ?? "Save score to this lead"}

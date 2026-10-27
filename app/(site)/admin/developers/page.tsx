@@ -4,6 +4,8 @@ import { Badge, PageHeader, Empty } from "@/components/ui";
 import { PipelineBoard, type BoardCard } from "@/components/PipelineBoard";
 import { DEVELOPER_STAGES, projectPipelineStage, stageLabel } from "@/lib/constants";
 import { num } from "@/lib/format";
+import { recommendation } from "@/lib/valuation";
+import { getScoring } from "@/lib/scoring-db";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +16,13 @@ export default async function Developers({ searchParams }: { searchParams: Promi
     include: { projects: { select: { id: true, code: true, title: true, mw: true, valueScore: true, pipelineStage: true }, orderBy: { createdAt: "asc" } } },
   });
   const board = sp.view !== "table";
+  const scoring = await getScoring();
 
   // One tile per project, so each one moves through the pipeline on its own.
   // Developers without a project yet keep a tile of their own so they don't drop off the board.
   const cards: BoardCard[] = devs.flatMap((d): BoardCard[] =>
     d.projects.length
-      ? d.projects.map((p) => ({ kind: "project", id: p.id, stage: projectPipelineStage(p, d.stage), title: p.title, code: p.code, mw: p.mw, score: p.valueScore, developerId: d.id, company: d.company, siblings: d.projects.length }))
+      ? d.projects.map((p) => ({ kind: "project", id: p.id, stage: projectPipelineStage(p, d.stage), title: p.title, code: p.code, mw: p.mw, score: p.valueScore, scoreTone: p.valueScore != null ? recommendation(p.valueScore, scoring).tone : undefined, developerId: d.id, company: d.company, siblings: d.projects.length }))
       : [{ kind: "developer", id: d.id, stage: d.stage, company: d.company, contactName: d.contactName }],
   ).filter((c) => !sp.stage || c.stage === sp.stage);
   const projectCount = devs.reduce((a, d) => a + d.projects.length, 0);
