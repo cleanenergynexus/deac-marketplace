@@ -7,7 +7,7 @@ import { num } from "@/lib/format";
 
 /** One tile on the Developer CRM board: a project, or a developer that has no projects yet. */
 export type BoardCard =
-  | { kind: "project"; id: string; stage: string; title: string; code: string; mw: number; score: number | null; developerId: string; company: string; siblings: number }
+  | { kind: "project"; id: string; stage: string; title: string; code: string; mw: number; score: number | null; scoreTone?: "green" | "amber" | "red"; developerId: string; company: string; siblings: number }
   | { kind: "developer"; id: string; stage: string; company: string; contactName: string };
 
 const key = (c: BoardCard) => `${c.kind}:${c.id}`;
@@ -89,7 +89,7 @@ function ProjectCard({ c }: { c: Extract<BoardCard, { kind: "project" }> }) {
       <div className="mt-2 flex items-center justify-between text-xs">
         <span className="font-mono text-slate-500">{c.code} · {num(c.mw)} MW</span>
         {c.score != null && c.score > 0 && (
-          <span className={`rounded-full px-2 py-0.5 font-medium ${c.score >= 70 ? "bg-emerald-100 text-emerald-800" : c.score >= 50 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700"}`}>Score {c.score}</span>
+          <span className={`rounded-full px-2 py-0.5 font-medium ${{ green: "bg-emerald-100 text-emerald-800", amber: "bg-amber-100 text-amber-800", red: "bg-red-100 text-red-700" }[c.scoreTone ?? (c.score >= 70 ? "green" : c.score >= 50 ? "amber" : "red")]}`}>Score {c.score}</span>
         )}
       </div>
     </>

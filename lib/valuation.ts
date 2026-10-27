@@ -1,22 +1,11 @@
 // Port of "Interactive_Powered_Asset_Bid_Calculator_DEAC_v2.xlsx".
 // Each function mirrors one Excel formula; cell references are noted so the two can be checked side by side.
+// The value score uses the editable model in lib/scoring.ts (defaults = the workbook).
+import { DEFAULT_SCORING, LEVEL_ORDER, NUMERIC_ORDER, levelPoints, maxRawScore, numericPoints, scoreLabel, type ScoringConfig } from "@/lib/scoring";
 
 export const ASSET_TYPES = ["Powered Land", "Powered Shell", "Mining Facility", "Industrial Conversion", "Old Data Center"] as const;
 
-export const OPTIONS = {
-  powerStatus: ["Live", "Signed", "Queued", "Speculative"],
-  marketTier: ["Primary", "Secondary", "Tertiary"],
-  infrastructure: ["Substation+Fiber+Roads", "Substation+Fiber", "Substation+Roads", "Fiber+Roads", "Substation Only", "Fiber Only", "Roads Only", "None"],
-  environmentalRisk: ["Low", "Moderate", "High"],
-  sellerMotivation: ["High", "Moderate", "Low"],
-  fiber: ["Excellent", "Good", "Fair"],
-  water: ["Excellent", "Good", "Fair"],
-  entitlements: ["Fully Entitled", "Partial", "None"],
-  backupPower: ["Yes", "Planned", "None"],
-  substation: ["On-Site", "Nearby", "Distant"],
-  density: ["Liquid Capable", "Air Only", "Limited"],
-  transmission: ["High", "Medium", "Low"],
-} as const;
+export { OPTIONS } from "@/lib/valuation-options";
 
 export type ValuationInputs = {
   assetType: string; // B6
@@ -137,41 +126,37 @@ export function factorBreakdown(i: ValuationInputs) {
   return rows;
 }
 
-// B38 — value score. Note: like the workbook, this can exceed 100 (max ≈ 130).
-export function valueScore(i: ValuationInputs): number {
-  const s =
-    pick(i.powerStatus, { Live: 25, Signed: 18, Queued: 9 }, 3) +
-    Math.max(0, 16 - i.monthsToPower * 0.35) +
-    Math.max(0, 14 - i.powerRateCents * 1.8) +
-    pick(i.marketTier, { Primary: 6, Secondary: 7 }, 4) +
-    (infraLevel(i.infrastructure) === "all" ? 11 : 8) +
-    Math.min(9, i.expansionMw * 0.3) +
-    pick(i.environmentalRisk, { Low: 7, Moderate: 4 }, 1) +
-    (i.fiber === "Excellent" ? 7 : 4) +
-    (i.water === "Excellent" ? 5 : 3) +
-    (i.entitlements === "Fully Entitled" ? 8 : 5) +
-    (i.backupPower === "Yes" ? 6 : 3) +
-    (i.substation === "On-Site" ? 7 : 4) +
-    (i.density === "Liquid Capable" ? 7 : 4) +
-    (i.transmission === "High" ? 6 : 3);
-  return round(s, 0);
+// B38 — value score: sum of each factor's points (Admin → Scoring settings).
+// With the default settings this matches the workbook, including its quirks (can exceed 100, max 135).
+export function scoreBreakdown(i: ValuationInputs, cfg: ScoringConfig = DEFAULT_SCORING): Record<string, number> {
+  const inputs: Record<string, number> = { monthsToPower: i.monthsToPower, powerRate: i.powerRateCents, expansion: i.expansionMw };
+  return {
+    ...Object.fromEntries(LEVEL_ORDER.map((k) => [k, levelPoints(cfg, k, i[k])])),
+    ...Object.fromEntries(NUMERIC_ORDER.map((k) => [k, numericPoints(cfg, k, inputs[k] ?? 0)])),
+  };
 }
 
-// B39
-export function recommendation(score: number): { label: "Buy" | "Negotiate" | "Walk Away"; tone: "green" | "amber" | "red" } {
-  if (score >= 70) return { label: "Buy", tone: "green" };
-  if (score >= 50) return { label: "Negotiate", tone: "amber" };
-  return { label: "Walk Away", tone: "red" };
+export function valueScore(i: ValuationInputs, cfg: ScoringConfig = DEFAULT_SCORING): number {
+  const raw = Object.values(scoreBreakdown(i, cfg)).reduce((a, b) => a + b, 0);
+  if (!cfg.scaleTo100) return round(raw, 0);
+  const max = maxRawScore(cfg);
+  return max > 0 ? round((raw / max) * 100, 0) : 0;
 }
 
-export function evaluate(i: ValuationInputs) {
+// B39 — thresholds are editable too.
+export function recommendation(score: number, cfg: ScoringConfig = DEFAULT_SCORING) {
+  return scoreLabel(score, cfg);
+}
+
+export function evaluate(i: ValuationInputs, cfg: ScoringConfig = DEFAULT_SCORING) {
   const factors = factorBreakdown(i);
   const base = baseBenchmark(i.assetType, i.marketTier); // B29
   const adjustmentFactor = round(Object.values(factors).reduce((a, f) => a * f.weight, 1), 2); // B30
   const adjustedValueMw = base * adjustmentFactor; // B31
   const perMw = { good: adjustedValueMw * 0.85, market: adjustedValueMw, high: adjustedValueMw * 1.1 }; // B32–B34
   const hasMw = i.mw > 0;
-  const score = valueScore(i);
+  const points = scoreBreakdown(i, cfg);
+  const score = valueScore(i, cfg);
   const asking = i.askingPrice && i.askingPrice > 0 ? i.askingPrice : null;
   return {
     base,
@@ -181,7 +166,8 @@ export function evaluate(i: ValuationInputs) {
     perMw,
     total: hasMw ? { good: perMw.good * i.mw, market: perMw.market * i.mw, high: perMw.high * i.mw } : null, // B35–B37
     score,
-    recommendation: recommendation(score),
+    points,
+    recommendation: recommendation(score, cfg),
     // Not in the workbook: asking price vs. market value, shown when both are entered.
     askingVsMarket: asking && hasMw ? asking / (perMw.market * i.mw) - 1 : null,
   };

@@ -285,3 +285,11 @@ model CampaignRecipient {
   error      String?
   createdAt  DateTime @default(now())
 }
+
+// Editable value-score model (Admin → Scoring settings). One row, id "default". JSON shape: ScoringConfig in lib/scoring.ts.
+model ScoringSettings {
+  id        String   @id @default("default")
+  config    String // JSON
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

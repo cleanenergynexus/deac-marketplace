@@ -9,6 +9,7 @@ import { Calculator } from "@/components/Calculator";
 import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/components/ui";
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { usd } from "@/lib/format";
+import { getScoring } from "@/lib/scoring-db";
 import { docStage, investorStage, parseDisclosure, SECTIONS, STAGES, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
 
 const stageOptions = STAGES.map((s) => ({ value: s, label: `${STAGE_INFO[s].step}${s === "TEASER" ? " (all members)" : ""}` }));
@@ -17,10 +18,11 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectAdmin({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [p, developers, investors] = await Promise.all([
+  const [p, developers, investors, scoring] = await Promise.all([
     db.project.findUnique({ where: { id }, include: { documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] }, dataRoomFolders: { select: { id: true, parentId: true, name: true } }, dataRoomFiles: { select: { id: true, folderId: true, name: true } }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
     db.developer.findMany({ select: { id: true, company: true }, orderBy: { company: "asc" } }),
     db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
+    getScoring(),
   ]);
   if (!p) notFound();
   const show = parseDisclosure(p.disclosure);
@@ -95,7 +97,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
 
       <div id="valuation">
         <Section title="Valuation & lead score (internal only)">
-          <Calculator initial={initial} onSave={save} />
+          <Calculator initial={initial} onSave={save} scoring={scoring} />
         </Section>
       </div>
     </div>

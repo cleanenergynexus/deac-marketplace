@@ -4,11 +4,13 @@ import { Badge, PageHeader, Empty, statusTone } from "@/components/ui";
 import { dealTypeLabel } from "@/lib/constants";
 import { usd, num } from "@/lib/format";
 import { recommendation } from "@/lib/valuation";
+import { getScoring } from "@/lib/scoring-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function Projects({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sp = await searchParams;
+  const scoring = await getScoring();
   const ps = await db.project.findMany({ include: { developer: true, _count: { select: { lois: true } } }, orderBy: sp.sort === "score" ? { valueScore: "desc" } : { updatedAt: "desc" } });
   return (
     <div>
@@ -25,7 +27,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
                 <td className="td">{num(p.mw, 1)}</td>
                 <td className="td text-xs">{p.facilityType}</td>
                 <td className="td">{usd(p.fundingNeeded)}</td>
-                <td className="td">{p.valueScore != null ? <Badge tone={recommendation(p.valueScore).tone}>{p.valueScore} {recommendation(p.valueScore).label}</Badge> : <span className="text-xs text-slate-400">unscored</span>}</td>
+                <td className="td">{p.valueScore != null ? <Badge tone={recommendation(p.valueScore, scoring).tone}>{p.valueScore} {recommendation(p.valueScore, scoring).label}</Badge> : <span className="text-xs text-slate-400">unscored</span>}</td>
                 <td className="td">{p._count.lois}</td>
                 <td className="td"><Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></td>
               </tr>

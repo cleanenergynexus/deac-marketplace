@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
 import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
+import { normalizeScoring, type ScoringConfig } from "@/lib/scoring";
+import { getScoring } from "@/lib/scoring-db";
 import { sendEmail } from "@/lib/email";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
 import { parseDocRows, planDocChanges } from "@/lib/documents";
@@ -330,7 +332,7 @@ export async function grantStage(f: FormData) {
 /** Saves calculator inputs + score to a project (lead scoring). */
 export async function saveValuation(projectId: string, inputs: ValuationInputs) {
   await requireAdmin();
-  const r = evaluate(inputs);
+  const r = evaluate(inputs, await getScoring());
   const p = await db.project.update({ where: { id: projectId }, data: { valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw } });
   const dev = await db.developer.findUnique({ where: { id: p.developerId } });
   if (dev && ["LEAD", "SCREENING"].includes(dev.stage)) await db.developer.update({ where: { id: dev.id }, data: { stage: "SCORED" } });
@@ -457,4 +459,40 @@ export async function changeOwnPassword(_: unknown, f: FormData) {
   if (!(await checkPassword(current, admin.passwordHash))) return { error: "Current password is incorrect." };
   await db.user.update({ where: { id: admin.id }, data: { passwordHash: await hashPassword(next) } });
   return { ok: true };
+}
+
+// ---------- Scoring settings ----------
+/** Re-scores every listing that has saved calculator inputs. Returns how many changed. */
+async function rescoreAll(cfg: ScoringConfig) {
+  const ps = await db.project.findMany({ where: { valuationInputs: { not: null }, valueScore: { not: null } }, select: { id: true, valuationInputs: true, valueScore: true } });
+  let changed = 0;
+  for (const p of ps) {
+    const inputs = parseInputs(p.valuationInputs);
+    if (!inputs) continue;
+    const score = evaluate(inputs, cfg).score;
+    if (score === p.valueScore) continue;
+    await db.project.update({ where: { id: p.id }, data: { valueScore: score } });
+    changed++;
+  }
+  return { scored: ps.length, changed };
+}
+
+async function storeScoring(cfg: ScoringConfig, by: string) {
+  const config = JSON.stringify(cfg);
+  await db.scoringSettings.upsert({ where: { id: "default" }, create: { id: "default", config, updatedBy: by }, update: { config, updatedBy: by } });
+  const res = await rescoreAll(cfg);
+  revalidatePath("/admin", "layout"); // scores and Buy/Negotiate labels show across the admin area
+  return res;
+}
+
+type ScoringState = { error?: string; ok?: string } | undefined;
+
+/** Saves the scoring model from Admin → Scoring settings and re-scores saved listings. */
+export async function saveScoring(_: ScoringState, f: FormData): Promise<ScoringState> {
+  const admin = await requireAdmin();
+  let cfg: ScoringConfig;
+  try { cfg = normalizeScoring(JSON.parse(String(f.get("config") ?? ""))); } catch { return { error: "Could not read the settings. Reload the page and try again." }; }
+  if (cfg.thresholds.negotiate > cfg.thresholds.buy) return { error: "The Negotiate threshold can't be higher than the Buy threshold." };
+  const { scored, changed } = await storeScoring(cfg, admin.name);
+  return { ok: `Scoring saved. ${scored ? `Re-scored ${scored} listing${scored === 1 ? "" : "s"} (${changed} changed).` : "No listings have saved scores yet."}` };
 }
