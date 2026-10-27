@@ -23,17 +23,21 @@ export function ImportWizard({ developers, developerId, enabled }: { developers:
       )}
       {!result ? (
         <form action={extract} className="card space-y-4 p-6">
-          <Field label="Deal document">
+          <Field label="Web page">
+            <input type="text" name="url" inputMode="url" className="input" placeholder="https://www.broker.com/listings/data-center-site" />
+            <span className="mt-1 block text-xs text-slate-500">A listing page, broker page or developer&apos;s project page. A direct link to a PDF works too.</span>
+          </Field>
+          <Field label="Or upload a deal document">
             <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.html,application/pdf,image/*,text/*" className="input" />
             <span className="mt-1 block text-xs text-slate-500">PDF teaser, offering memo or broker flyer (up to 4.4 MB), a screenshot, or a text file. Save Word or PowerPoint as PDF first.</span>
           </Field>
           <Field label="Or paste text (email, notes…)">
-            <textarea name="text" rows={5} className="input" placeholder="Paste a deal email or notes. You can combine this with a file." />
+            <textarea name="text" rows={5} className="input" placeholder="Paste a deal email or notes. You can combine this with a link or a file." />
           </Field>
           {state?.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{state.error}</p>}
           <div className="flex items-center gap-3">
-            <button className="btn" disabled={pending || !enabled}>{pending ? "Reading document…" : "Extract project details"}</button>
-            {pending && <span className="text-sm text-slate-500">Claude is reading the document. This usually takes under a minute.</span>}
+            <button className="btn" disabled={pending || !enabled}>{pending ? "Reading…" : "Extract project details"}</button>
+            {pending && <span className="text-sm text-slate-500">Claude is reading it. This usually takes under a minute.</span>}
           </div>
         </form>
       ) : (
@@ -50,7 +54,7 @@ function Steps({ step }: { step: 1 | 2 }) {
       {label}
     </li>
   );
-  return <ol className="flex flex-wrap gap-6 text-sm">{item(1, "Upload document")}{item(2, "Review & create listing")}</ol>;
+  return <ol className="flex flex-wrap gap-6 text-sm">{item(1, "Add a source")}{item(2, "Review & create listing")}</ol>;
 }
 
 function Review({ result, sourceName, developers, developerId, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; developerId?: string; onRestart: () => void }) {
@@ -79,7 +83,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
           <button type="button" onClick={onRestart} className="btn-ghost">Start over</button>
         </div>
         {result.blank.length > 0 && (
-          <p className="rounded bg-amber-50 p-2 text-amber-900">Not found in the document, fill in: {result.blank.map((k) => LABELS[k] ?? k).join(", ")}.</p>
+          <p className="rounded bg-amber-50 p-2 text-amber-900">Not found in the source, fill in: {result.blank.map((k) => LABELS[k] ?? k).join(", ")}.</p>
         )}
         {result.missing.length > 0 && <p className="text-slate-600">Investors will likely ask for: {result.missing.join(", ")}.</p>}
       </div>

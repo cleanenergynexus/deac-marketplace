@@ -14,7 +14,7 @@ export default async function ImportProject({ searchParams }: { searchParams: Pr
   const developer = developers.find((d) => d.id === developerId);
   return (
     <div>
-      <PageHeader title={developer ? `Import a project for ${developer.company}` : "Import project from a document"} subtitle="Upload a teaser or offering memo. Claude reads it and prefills the listing for you to review." />
+      <PageHeader title={developer ? `Import a project for ${developer.company}` : "Import a project"} subtitle="Paste a link to a listing web page, or upload a teaser or offering memo. Claude reads it and prefills the listing for you to review." />
       <NewListingTabs active="import" developer={developer} />
       <ImportWizard developers={developers} developerId={developer?.id} enabled={importerEnabled()} />
     </div>

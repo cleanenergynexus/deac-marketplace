@@ -3,19 +3,32 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { extractListing, importerEnabled, type SourceDoc } from "@/lib/extract";
+import { fetchWebPage, WebPageError } from "@/lib/webpage";
 import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES, toImportResult, type ImportResult } from "@/lib/importer";
 
 export type ExtractState = { error?: string; result?: ImportResult; sourceName?: string } | undefined;
 
 const TEXT_EXT: Record<string, string> = { txt: "text/plain", md: "text/markdown", csv: "text/csv", html: "text/html", htm: "text/html", pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 
-/** Step 1 of the import wizard: read the uploaded document (and/or pasted text) with Claude. */
+/** Step 1 of the import wizard: read the web page, uploaded document and/or pasted text with Claude. */
 export async function extractProject(_: ExtractState, f: FormData): Promise<ExtractState> {
   await requireAdmin();
   if (!importerEnabled()) return { error: "The importer isn't set up yet: add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables, then redeploy." };
 
   const docs: SourceDoc[] = [];
   const names: string[] = [];
+  const url = String(f.get("url") ?? "").trim();
+  if (url) {
+    try {
+      const page = await fetchWebPage(url);
+      docs.push(page);
+      names.push(page.name);
+    } catch (e) {
+      if (e instanceof WebPageError) return { error: e.message };
+      console.error("Web page fetch failed", e);
+      return { error: "Couldn't load that web page. Paste the page text instead." };
+    }
+  }
   const file = f.get("file");
   if (file instanceof File && file.size > 0) {
     if (file.size > MAX_UPLOAD_BYTES) return { error: "That file is over 4.4 MB. Compress the PDF (or upload just the key pages), or paste the text below." };
@@ -31,7 +44,7 @@ export async function extractProject(_: ExtractState, f: FormData): Promise<Extr
   }
   const pasted = String(f.get("text") ?? "").trim();
   if (pasted) { docs.push({ kind: "text", text: pasted, name: "Pasted text" }); names.push("pasted text"); }
-  if (!docs.length) return { error: "Choose a file or paste the deal text first." };
+  if (!docs.length) return { error: "Paste a web page link, choose a file, or paste the deal text first." };
 
   try {
     const raw = await extractListing(docs);

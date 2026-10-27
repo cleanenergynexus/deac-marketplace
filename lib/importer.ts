@@ -69,7 +69,7 @@ export const EXTRACTION_SCHEMA = {
 } as const;
 
 export const EXTRACTION_PROMPT = `You are an analyst at DEAC, a curated marketplace for data center deals (powered land, powered shells, data centers) that are offered for lease, sale or investment.
-Read the attached deal document (teaser, offering memorandum, broker flyer, email...) and fill in the listing fields. Rules:
+Read the attached deal document (teaser, offering memorandum, broker flyer, listing web page, email...) and fill in the listing fields. Rules:
 - Use only facts stated in the document. Never guess numbers. When a value is not stated, use "" for text and choices, and -1 for numbers.
 - mw: power available now or contracted for the first phase, in MW (convert kVA/kW; 1 MVA ≈ 1 MW). expansionMw: additional MW described as future or scalable capacity.
 - fundingNeeded: the asking price (for sale), or the capital raise / funding sought, in US dollars. -1 if not stated.
