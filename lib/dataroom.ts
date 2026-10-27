@@ -130,7 +130,7 @@ export function inlineSafe(contentType: string) {
 }
 
 /** Blob pathname for a new upload. The display name is kept in the database; the path just needs to be safe. */
-export function storagePath(projectId: string, name: string) {
+export function storagePath(projectId: string, name: string, unique = "") {
   const safe = name.normalize("NFKD").replace(/[^\w.\- ]+/g, "").replace(/\s+/g, "-").replace(/^[-.]+/, "").slice(0, 120) || "file";
-  return `data-room/${projectId}/${safe}`;
+  return `data-room/${projectId}/${unique ? `${unique}-` : ""}${safe}`;
 }

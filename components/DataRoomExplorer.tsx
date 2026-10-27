@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { createFolder, createStandardFolders, deleteItems, ensureFolders, moveItems, registerFile, renameItem, shareOnListing, unshareFromListing } from "@/app/actions/dataroom";
 import { canMoveFolder, cleanName, descendantIds, fileKind, fileUrl, folderPath, formatBytes, storagePath, uploadDirs } from "@/lib/dataroom";
 import { STAGES, TIER_LABEL, type Stage } from "@/lib/disclosure";
@@ -9,7 +9,7 @@ import { FileIcon, FolderIcon } from "@/components/DataRoomIcons";
 
 export type ExFolder = { id: string; parentId: string | null; name: string; updatedAt: string };
 export type ExFile = { id: string; folderId: string | null; name: string; size: number; contentType: string; updatedAt: string; uploadedBy: string | null; shared: Stage | null };
-type Props = { projectId: string; rootLabel: string; folders: ExFolder[]; files: ExFile[]; storage: "blob" | "local" | "missing" };
+type Props = { projectId: string; rootLabel: string; folders: ExFolder[]; files: ExFile[]; storage: "blob" | "local" | "missing"; uploadMethod: "token" | "presigned" };
 
 type Item = { key: string; kind: "folder"; id: string; name: string; updatedAt: string; folder: ExFolder } | { key: string; kind: "file"; id: string; name: string; updatedAt: string; file: ExFile };
 type Upload = { id: number; name: string; pct: number; status: "uploading" | "done" | "error"; error?: string };
@@ -22,7 +22,7 @@ const MULTIPART_OVER = 50 * 1024 * 1024;
 let uploadSeq = 0;
 
 /** Windows Explorer-style file manager for one project's data room. */
-export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage }: Props) {
+export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage, uploadMethod }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [cwd, setCwd] = useState<string | null>(null);
@@ -191,7 +191,8 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
           const folderId = parts.length ? dirMap[parts.join("/")] ?? target : target;
           let key: string;
           if (storage === "blob") {
-            const blob = await upload(storagePath(projectId, job.file.name), job.file, {
+            const send = uploadMethod === "presigned" ? uploadPresigned : upload;
+            const blob = await send(storagePath(projectId, job.file.name, crypto.randomUUID().slice(0, 8)), job.file, {
               access: "private", handleUploadUrl: "/api/data-room/upload", clientPayload: projectId,
               multipart: job.file.size > MULTIPART_OVER, contentType: job.file.type || undefined,
               onUploadProgress: ({ percentage }) => patchUpload(job.id, { pct: Math.min(99, Math.round(percentage)) }),

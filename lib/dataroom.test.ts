@@ -69,4 +69,5 @@ test("storage paths are safe", () => {
   assert.equal(storagePath("p1", "Phase I ESA (final).pdf"), "data-room/p1/Phase-I-ESA-final.pdf");
   assert.equal(storagePath("p1", "../../etc"), "data-room/p1/etc");
   assert.equal(storagePath("p1", "日本"), "data-room/p1/file");
+  assert.equal(storagePath("p1", "a.pdf", "u1"), "data-room/p1/u1-a.pdf");
 });

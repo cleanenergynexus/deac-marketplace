@@ -10,10 +10,17 @@ import { del, get, head } from "@vercel/blob";
 
 export type StorageMode = "blob" | "local" | "missing";
 
+// Connecting a Blob store in Vercel adds either BLOB_READ_WRITE_TOKEN (older stores)
+// or BLOB_STORE_ID, which the SDK pairs with the deployment's own Vercel login (OIDC).
+export const hasReadWriteToken = () => !!process.env.BLOB_READ_WRITE_TOKEN;
+
 export function storageMode(): StorageMode {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return "blob";
+  if (hasReadWriteToken() || process.env.BLOB_STORE_ID) return "blob";
   return process.env.VERCEL ? "missing" : "local";
 }
+
+/** How the browser uploads: a client token (needs the read-write token) or a presigned URL (works with BLOB_STORE_ID). */
+export const blobUploadMethod = (): "token" | "presigned" => (hasReadWriteToken() ? "token" : "presigned");
 
 const LOCAL_PREFIX = "local:";
 const localRoot = () => path.join(process.cwd(), ".data-room");
