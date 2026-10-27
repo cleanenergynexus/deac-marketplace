@@ -6,6 +6,9 @@ import { DEAL_STAGES, DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } 
 import { OPTIONS } from "@/lib/valuation";
 import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
+import { DeleteListingButton, DocumentsEditor } from "@/components/DocumentsEditor";
+import type { DocRow } from "@/lib/documents";
+import Link from "next/link";
 
 type Props = {
   p?: Project;
@@ -19,9 +22,13 @@ type Props = {
   /** Extra hidden inputs or sections rendered before the submit button. */
   children?: ReactNode;
   submitLabel?: string;
+  /** Editable document list (saved with the listing). */
+  documents?: DocRow[];
+  /** Shows a Delete Listing button that submits to this action. */
+  deleteAction?: (f: FormData) => Promise<void>;
 };
 
-export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing" }: Props) {
+export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing", documents, deleteAction }: Props) {
   const v = (x: unknown) => (x == null ? "" : String(x));
   const d = (draft ?? {}) as Partial<ListingDraft>;
   // On an imported draft, a value the document didn't give stays empty until the admin picks one.
@@ -66,8 +73,21 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
         <Field label="Capital stack"><input name="capitalStack" defaultValue={p ? v(p.capitalStack) : d.capitalStack} className="input" /></Field>
         <Field label="Economics notes" className="sm:col-span-3"><textarea name="economicsNotes" rows={2} defaultValue={p ? v(p.economicsNotes) : d.economicsNotes} className="input" /></Field>
       </div>
+      {documents && (
+        <>
+          <h3 className="font-semibold">Documents</h3>
+          {/* Remount from the saved rows after each save, so new rows pick up their ids. */}
+          <DocumentsEditor key={documents.map((d) => `${d.id}:${d.name}:${d.url}:${d.access}`).join("|")} initial={documents} />
+        </>
+      )}
       {children}
-      {p ? <SaveButton label="Save listing" savedText="Listing saved" /> : <button className="btn">{submitLabel}</button>}
+      {p ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <SaveButton label="Save Listing" savedText="Listing saved" />
+          <Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview on Marketplace</Link>
+          {deleteAction && <DeleteListingButton action={deleteAction} title={p.title} />}
+        </div>
+      ) : <button className="btn">{submitLabel}</button>}
     </form>
   );
 }
