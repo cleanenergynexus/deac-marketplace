@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push --skip-generate && next build",
+    "build": "prisma generate && prisma db push --skip-generate && tsx scripts/normalize-phones.ts && next build",
     "start": "next start",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:normalize-phones": "tsx scripts/normalize-phones.ts",
     "test": "tsx --test lib/*.test.ts",
     "postinstall": "prisma generate",
     "create-admin": "tsx scripts/create-admin.ts"

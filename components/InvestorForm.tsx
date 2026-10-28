@@ -6,6 +6,7 @@ import { MarketPicker } from "@/components/MarketPicker";
 import { csv } from "@/lib/format";
 import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: FormData) => Promise<void> }) {
   return (
@@ -16,7 +17,7 @@ export function InvestorForm({ inv, action }: { inv?: Investor; action: (f: Form
         <Field label="Firm"><input name="firm" defaultValue={inv?.firm ?? ""} className="input" /></Field>
         <Field label="Title"><input name="title" defaultValue={inv?.title ?? ""} className="input" /></Field>
         {!inv && <Field label="Email"><input name="email" type="email" required className="input" /></Field>}
-        <Field label="Phone"><input name="phone" defaultValue={inv?.phone ?? ""} className="input" /></Field>
+        <Field label="Phone"><PhoneInput name="phone" defaultValue={inv?.phone} /></Field>
         <Field label="Investor type"><Select name="investorType" options={INVESTOR_TYPES} defaultValue={inv?.investorType} placeholder="—" /></Field>
         {!inv && <Field label="Stage"><Select name="stage" options={INVESTOR_STAGES} /></Field>}
         <Field label="Min check ($)"><MoneyInput name="checkMin" defaultValue={inv?.checkMin} /></Field>

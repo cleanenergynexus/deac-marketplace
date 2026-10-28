@@ -13,6 +13,8 @@ import { CONTACT_TABS, contactTab, initials, projectContactId } from "@/lib/crm"
 import { funnelStages, projectStage, projectStageLabel } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
 import { num } from "@/lib/format";
+import { formatPhone, telHref } from "@/lib/phone";
+import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 
@@ -86,14 +88,19 @@ export default async function ContactRecord({ params, searchParams }: { params: 
           </div>
           <div className="mt-4 space-y-1 text-left text-sm">
             {contact.email && <a href={`mailto:${contact.email}`} className="block truncate text-brand-600">{contact.email}</a>}
-            {contact.phone && <a href={`tel:${contact.phone}`} className="block text-slate-700">{contact.phone}</a>}
-            {contact.mobile && <a href={`tel:${contact.mobile}`} className="block text-slate-700">{contact.mobile} <span className="text-xs text-slate-400">mobile</span></a>}
+            {contact.phone && <a href={telHref(contact.phone)} className="block text-slate-700">{formatPhone(contact.phone)}</a>}
+            {contact.mobile && <a href={telHref(contact.mobile)} className="block text-slate-700">{formatPhone(contact.mobile)} <span className="text-xs text-slate-400">mobile</span></a>}
+            {hasAddress(contact) && (
+              <a href={mapsHref(contact)} target="_blank" rel="noreferrer" className="block pt-1 text-slate-600 hover:text-brand-600">
+                {addressLines(contact).map((l) => <span key={l} className="block">{l}</span>)}
+              </a>
+            )}
             {contact.linkedin && <a href={contact.linkedin.startsWith("http") ? contact.linkedin : `https://${contact.linkedin}`} target="_blank" rel="noreferrer" className="block truncate text-brand-600">LinkedIn</a>}
           </div>
         </div>
         <details className="card p-5" open>
           <summary className="cursor-pointer text-sm font-semibold">About this contact</summary>
-          <div className="mt-4"><ContactForm contact={contact} action={updateContact} compact /></div>
+          <div className="mt-4"><ContactForm contact={contact} action={updateContact} compact country={dev.country} /></div>
         </details>
         {otherContacts.length > 0 && (
           <form action={deleteContact} className="text-center">
@@ -123,7 +130,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
           <Link href={`/admin/developers/${dev.id}`} className="block rounded-lg border border-slate-200 p-3 hover:border-brand-500">
             <div className="font-semibold text-brand-700">{dev.company}</div>
             {dev.website && <div className="truncate text-xs text-slate-500">{dev.website.replace(/^https?:\/\//, "")}</div>}
-            <div className="mt-1 text-xs text-slate-500">{[dev.hq, `${dev.projects.length} project${dev.projects.length === 1 ? "" : "s"}`, `${dev.contacts.length} contact${dev.contacts.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</div>
+            <div className="mt-1 text-xs text-slate-500">{[shortPlace(dev) || dev.hq, `${dev.projects.length} project${dev.projects.length === 1 ? "" : "s"}`, `${dev.contacts.length} contact${dev.contacts.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</div>
           </Link>
         </section>
 

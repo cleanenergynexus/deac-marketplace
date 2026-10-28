@@ -14,6 +14,8 @@ import { deleteStored } from "@/lib/storage";
 import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
 import { allStages, funnelStages, normalizePipeline, pipelineLabel, placeStage, projectStage, type PipelineConfig } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
+import { normalizePhone, phoneFromForm } from "@/lib/phone";
+import { addressFromForm } from "@/lib/address";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -27,7 +29,7 @@ function investorData(f: FormData) {
     name: s(f, "name") ?? "",
     firm: s(f, "firm"),
     title: s(f, "title"),
-    phone: s(f, "phone"),
+    phone: phoneFromForm(f, "phone"),
     investorType: s(f, "investorType"),
     checkMin: n(f, "checkMin"),
     checkMax: n(f, "checkMax"),
@@ -107,7 +109,7 @@ export async function importInvestors(f: FormData) {
     if (!email) continue;
     const exists = await db.investor.findUnique({ where: { email } });
     if (exists) continue;
-    await db.investor.create({ data: { email, name: col(r, "name") ?? email, firm: col(r, "firm"), title: col(r, "title"), phone: col(r, "phone"), investorType: col(r, "investorType"), preferredStates: (col(r, "states") ?? "").replace(/[;| ]+/g, ","), source: col(r, "source") ?? "CSV import", tags: col(r, "tags") ?? "" } });
+    await db.investor.create({ data: { email, name: col(r, "name") ?? email, firm: col(r, "firm"), title: col(r, "title"), phone: normalizePhone(col(r, "phone")), investorType: col(r, "investorType"), preferredStates: (col(r, "states") ?? "").replace(/[;| ]+/g, ","), source: col(r, "source") ?? "CSV import", tags: col(r, "tags") ?? "" } });
     created++;
   }
   redirect(`/admin/investors?imported=${created}`);
@@ -131,12 +133,12 @@ function parseCsv(text: string): string[][] {
 
 // ---------- Developers ----------
 function developerData(f: FormData) {
-  return { company: s(f, "company") ?? "", website: s(f, "website"), hq: s(f, "hq"), experience: s(f, "experience"), mwDelivered: n(f, "mwDelivered"), source: s(f, "source"), owner: s(f, "owner"), notes: s(f, "notes") };
+  return { company: s(f, "company") ?? "", ...addressFromForm(f), website: s(f, "website"), hq: s(f, "hq"), experience: s(f, "experience"), mwDelivered: n(f, "mwDelivered"), source: s(f, "source"), owner: s(f, "owner"), notes: s(f, "notes") };
 }
 /** New company plus its first (primary) contact. After this, contact details are edited on the contact record. */
 export async function createDeveloper(f: FormData) {
   const admin = await requireAdmin();
-  const contact = { name: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: s(f, "phone"), title: s(f, "contactTitle") };
+  const contact = { name: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: phoneFromForm(f, "phone", s(f, "country") ?? "US"), title: s(f, "contactTitle") };
   const d = await db.developer.create({ data: { ...developerData(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: placeStage(allStages(await getPipeline()), s(f, "stage")),
     contacts: { create: { ...contact, email: contact.email || null, isPrimary: true, source: s(f, "source"), owner: s(f, "owner") ?? admin.name } } } });
   redirect(`/admin/developers/${d.id}`);
@@ -235,8 +237,8 @@ export async function createImportedProject(f: FormData) {
     const company = s(f, "devCompany");
     if (!company) throw new Error("Enter the developer's company name.");
     const dev = await db.developer.create({
-      data: { company, contactName: s(f, "devContactName") ?? company, email: s(f, "devEmail") ?? "", phone: s(f, "devPhone"), website: s(f, "devWebsite"), source: "Document import", stage: "LEAD", owner: admin.name,
-        contacts: s(f, "devContactName") ? { create: { name: s(f, "devContactName")!, email: s(f, "devEmail")?.toLowerCase(), phone: s(f, "devPhone"), source: "Document import", owner: admin.name, isPrimary: true } } : undefined },
+      data: { company, contactName: s(f, "devContactName") ?? company, email: s(f, "devEmail") ?? "", phone: phoneFromForm(f, "devPhone"), website: s(f, "devWebsite"), source: "Document import", stage: "LEAD", owner: admin.name,
+        contacts: s(f, "devContactName") ? { create: { name: s(f, "devContactName")!, email: s(f, "devEmail")?.toLowerCase(), phone: phoneFromForm(f, "devPhone"), source: "Document import", owner: admin.name, isPrimary: true } } : undefined },
     });
     developerId = dev.id;
   }

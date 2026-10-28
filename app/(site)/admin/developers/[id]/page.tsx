@@ -15,6 +15,8 @@ import { StageSelect } from "@/components/StageSelect";
 import { allStages, funnelStages, projectStage } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
 import { usd } from "@/lib/format";
+import { formatPhone } from "@/lib/phone";
+import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 
@@ -35,7 +37,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
   return (
     <div className="space-y-6">
       <Link href="/admin/developers" className="text-sm text-brand-600">← Developer CRM</Link>
-      <PageHeader title={dev.company} subtitle={[dev.hq, dev.website?.replace(/^https?:\/\//, ""), `${dev.contacts.length} contact${dev.contacts.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")} action={
+      <PageHeader title={dev.company} subtitle={[shortPlace(dev) || dev.hq, dev.website?.replace(/^https?:\/\//, ""), `${dev.contacts.length} contact${dev.contacts.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")} action={
         // With projects, each project carries its own stage (see the Projects table). Until then the developer has one.
         dev.projects.length ? undefined : (
         <form action={setDeveloperStage} className="flex items-center gap-2">
@@ -55,7 +57,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
                     <span className="min-w-0 text-sm">
                       <span className="flex items-center gap-2 font-semibold text-slate-900">{c.name}{c.isPrimary && <Badge tone="blue">Primary</Badge>}</span>
                       {c.title && <span className="block text-xs text-slate-500">{c.title}</span>}
-                      <span className="block truncate text-xs text-slate-500">{[c.email, c.phone].filter(Boolean).join(" · ")}</span>
+                      <span className="block truncate text-xs text-slate-500">{[c.email, formatPhone(c.phone ?? c.mobile)].filter(Boolean).join(" · ")}</span>
                       <span className="block text-xs text-slate-400">{lastTouch.get(c.id) ? `Last touch ${ago(lastTouch.get(c.id))}` : "No touchpoints yet"}</span>
                     </span>
                   </Link>
@@ -64,7 +66,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
             </ul>
             <details className="mt-4">
               <summary className="cursor-pointer text-sm font-medium text-brand-600">+ Add a contact at {dev.company}</summary>
-              <div className="mt-3"><ContactForm developerId={dev.id} action={createContact} /></div>
+              <div className="mt-3"><ContactForm developerId={dev.id} action={createContact} country={dev.country} /></div>
             </details>
           </section>
           <Section title="Projects" action={<Link href={`/admin/projects/new?developerId=${dev.id}`} className="btn-ghost">Add a project</Link>}>
@@ -76,7 +78,14 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
                   <td className="td"><Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></td></tr>
               ))}</tbody></table></div>)}
           </Section>
-          <Section title="Company profile"><DeveloperForm dev={dev} action={updateDeveloper} /></Section>
+          <Section title="Company profile">
+            {hasAddress(dev) && (
+              <a href={mapsHref(dev)} target="_blank" rel="noreferrer" className="mb-4 block text-sm text-slate-700 hover:text-brand-600">
+                {addressLines(dev).map((l) => <span key={l} className="block">{l}</span>)}
+              </a>
+            )}
+            <DeveloperForm dev={dev} action={updateDeveloper} />
+          </Section>
           <Section title="Team & bios (shown on listings)">
             <div className="grid gap-3 sm:grid-cols-2">
               {dev.team.map((m) => (

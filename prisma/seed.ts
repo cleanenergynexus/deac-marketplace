@@ -16,11 +16,11 @@ async function main() {
   await db.user.create({ data: { email: "admin@deacna.com", name: "DEAC Admin", passwordHash: pw, role: "ADMIN", status: "APPROVED" } });
 
   const devs = await Promise.all([
-    db.developer.create({ data: { company: "Lone Star Digital Infrastructure", contactName: "Maria Alvarez", email: "maria@lonestardi.example", hq: "Dallas, TX", mwDelivered: 340, stage: "LISTED", source: "Referral", experience: "Developer of 6 data center campuses across ERCOT since 2014, totaling 340 MW delivered. Self-performs site acquisition, interconnection and entitlement.", team: { create: [
+    db.developer.create({ data: { company: "Lone Star Digital Infrastructure", contactName: "Maria Alvarez", email: "maria@lonestardi.example", hq: "Dallas, TX", street: "2200 Ross Ave, Suite 4100", city: "Dallas", region: "TX", postalCode: "75201", country: "US", mwDelivered: 340, stage: "LISTED", source: "Referral", experience: "Developer of 6 data center campuses across ERCOT since 2014, totaling 340 MW delivered. Self-performs site acquisition, interconnection and entitlement.", team: { create: [
       { name: "Maria Alvarez", title: "CEO & Founder", bio: "20 years in power and digital infrastructure. Previously led development at a top-5 colocation provider; delivered 200+ MW.", sortOrder: 0 },
       { name: "David Chen", title: "VP Power & Interconnection", bio: "Former ERCOT transmission planner. Secured 1.2 GW of large-load interconnection agreements.", sortOrder: 1 },
     ] } } }),
-    db.developer.create({ data: { company: "Caribe Data Parks", contactName: "Luis Rivera", email: "luis@caribedp.example", hq: "San Juan, PR", mwDelivered: 45, stage: "LISTED", source: "DEAC network", experience: "Puerto Rico–focused developer of resilient, renewable-backed data centers with on-site microgrids.", team: { create: [
+    db.developer.create({ data: { company: "Caribe Data Parks", contactName: "Luis Rivera", email: "luis@caribedp.example", hq: "San Juan, PR", street: "1250 Ave Ponce de León, Suite 700", city: "San Juan", region: "PR", postalCode: "00907", country: "US", mwDelivered: 45, stage: "LISTED", source: "DEAC network", experience: "Puerto Rico–focused developer of resilient, renewable-backed data centers with on-site microgrids.", team: { create: [
       { name: "Luis Rivera", title: "Managing Partner", bio: "Energy developer with 15 years of utility-scale solar and storage across the Caribbean.", sortOrder: 0 },
     ] } } }),
     db.developer.create({ data: { company: "Appalachian Power Sites LLC", contactName: "Tom Becker", email: "tom@apsites.example", hq: "Charleston, WV", stage: "SCORED", source: "Website submission", experience: "Repurposing former industrial and coal sites with existing transmission." } }),
@@ -76,9 +76,9 @@ async function main() {
     await db.activity.create({ data: { investorId: inv[i].id, kind: "NOTE", body, by: "Joaquin" } });
   // Developer contacts (one primary per company) and a communications history.
   const contactSeed: [number, string, string, string, string?][] = [
-    [0, "Maria Alvarez", "CEO & Founder", "maria@lonestardi.example", "+1 214 555 0142"],
-    [0, "David Chen", "VP Power & Interconnection", "david@lonestardi.example", "+1 214 555 0177"],
-    [1, "Luis Rivera", "Managing Partner", "luis@caribedp.example", "+1 787 555 0110"],
+    [0, "Maria Alvarez", "CEO & Founder", "maria@lonestardi.example", "+12145550142"],
+    [0, "David Chen", "VP Power & Interconnection", "david@lonestardi.example", "+12145550177"],
+    [1, "Luis Rivera", "Managing Partner", "luis@caribedp.example", "+17875550110"],
     [2, "Tom Becker", "Principal", "tom@apsites.example"],
     [3, "Aisha Khan", "Founder", "aisha@desertcompute.example"],
   ];

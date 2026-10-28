@@ -1,4 +1,5 @@
 import { submitProject } from "@/app/actions/public";
+import { PhoneInput } from "@/components/PhoneInput";
 import { ActionForm } from "@/components/ActionForm";
 import { Field, Select } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
@@ -16,7 +17,7 @@ export default function SubmitProject() {
           <Field label="Company"><input name="company" required className="input" /></Field>
           <Field label="Contact name"><input name="contactName" required className="input" /></Field>
           <Field label="Email"><input name="email" type="email" required className="input" /></Field>
-          <Field label="Phone"><input name="phone" className="input" /></Field>
+          <Field label="Phone"><PhoneInput name="phone" /></Field>
           <Field label="Website" className="sm:col-span-2"><input name="website" className="input" /></Field>
           <Field label="Track record (projects, MW delivered)" className="sm:col-span-2"><textarea name="experience" rows={3} className="input" /></Field>
         </div>
