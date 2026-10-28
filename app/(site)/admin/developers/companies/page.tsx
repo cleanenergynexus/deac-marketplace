@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { loadCrm } from "@/lib/contacts-db";
 import { ago } from "@/lib/crm";
-import { DEVELOPER_STAGES, projectPipelineStage, stageLabel } from "@/lib/constants";
+import { allStages, pipelineLabel, projectStageLabel } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 import { num, usd } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function Companies({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const sp = await searchParams;
   const q = sp.q?.trim().toLowerCase();
-  const { developers, lastTouch } = await loadCrm();
+  const [{ developers, lastTouch }, pipeline] = await Promise.all([loadCrm(), getPipeline()]);
   const rows = developers.filter((d) => !q || [d.company, d.hq, ...d.contacts.map((c) => c.name)].some((x) => x?.toLowerCase().includes(q)));
 
   return (
@@ -36,9 +37,9 @@ export default async function Companies({ searchParams }: { searchParams: Promis
                     <td className="td">
                       {d.projects.length ? (
                         <ul className="space-y-1">{d.projects.map((p) => (
-                          <li key={p.id} className="flex items-center gap-2 text-sm"><Link href={`/admin/projects/${p.id}`} className="text-slate-700 hover:text-brand-600">{p.title}</Link><Badge>{stageLabel(DEVELOPER_STAGES, projectPipelineStage(p, d.stage))}</Badge></li>
+                          <li key={p.id} className="flex items-center gap-2 text-sm"><Link href={`/admin/projects/${p.id}`} className="text-slate-700 hover:text-brand-600">{p.title}</Link><Badge>{projectStageLabel(pipeline, p, d.stage)}</Badge></li>
                         ))}</ul>
-                      ) : <span className="text-sm text-slate-500">No projects · <Badge>{stageLabel(DEVELOPER_STAGES, d.stage)}</Badge></span>}
+                      ) : <span className="text-sm text-slate-500">No projects · <Badge>{pipelineLabel(allStages(pipeline), d.stage)}</Badge></span>}
                     </td>
                     <td className="td align-top">{num(d.projects.reduce((a, p) => a + p.mw, 0))}</td>
                     <td className="td align-top">{usd(d.projects.reduce((a, p) => a + p.fundingNeeded, 0))}</td>

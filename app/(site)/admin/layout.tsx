@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ["/admin/developers/companies", "Companies", 0, true],
     ["/admin/developers/contacts", "Contacts", 0, true],
     ["/admin/developers/projects", "Projects", 0, true],
+    ["/admin/developers/funnels", "Funnels", 0, true],
     ["/admin/projects", "Listings"],
     ["/admin/lois", "NDAs & LOIs", pendingLois + pendingSteps],
     ["/admin/requests", "Intake requests", openReqs],

@@ -3,14 +3,15 @@ import { Badge, Empty, PageHeader } from "@/components/ui";
 import { Avatar } from "@/components/CrmIcons";
 import { loadCrm } from "@/lib/contacts-db";
 import { ago, initials, projectContactId } from "@/lib/crm";
-import { DEVELOPER_STAGES, projectPipelineStage, stageLabel } from "@/lib/constants";
+import { projectStageLabel } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function Contacts({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const sp = await searchParams;
   const q = sp.q?.trim().toLowerCase();
-  const { developers, lastTouch, openTasks } = await loadCrm();
+  const [{ developers, lastTouch, openTasks }, pipeline] = await Promise.all([loadCrm(), getPipeline()]);
   const rows = developers.flatMap((d) => d.contacts.map((c) => ({ c, d, projects: d.projects.filter((p) => projectContactId(p, d.contacts) === c.id) })))
     .filter(({ c, d }) => !q || [c.name, c.email, c.title, d.company].some((x) => x?.toLowerCase().includes(q)))
     .sort((a, b) => (lastTouch.get(b.c.id)?.getTime() ?? 0) - (lastTouch.get(a.c.id)?.getTime() ?? 0) || a.c.name.localeCompare(b.c.name));
@@ -39,7 +40,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
                   <td className="td text-xs">{c.email && <a href={`mailto:${c.email}`} className="block text-brand-600">{c.email}</a>}<span className="text-slate-500">{c.phone ?? c.mobile}</span></td>
                   <td className="td">
                     <ul className="space-y-0.5 text-xs">{projects.map((p) => (
-                      <li key={p.id}><Link href={`/admin/projects/${p.id}`} className="text-slate-700 hover:text-brand-600">{p.code}</Link> <span className="text-slate-500">· {stageLabel(DEVELOPER_STAGES, projectPipelineStage(p, d.stage))}</span></li>
+                      <li key={p.id}><Link href={`/admin/projects/${p.id}`} className="text-slate-700 hover:text-brand-600">{p.code}</Link> <span className="text-slate-500">· {projectStageLabel(pipeline, p, d.stage)}</span></li>
                     ))}</ul>
                     {!projects.length && <span className="text-xs text-slate-400">—</span>}
                   </td>

@@ -35,7 +35,7 @@ export async function loadCrm() {
       orderBy: { updatedAt: "desc" },
       include: {
         contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
-        projects: { select: { id: true, code: true, title: true, mw: true, state: true, fundingNeeded: true, valueScore: true, pipelineStage: true, contactId: true, visibility: true }, orderBy: { createdAt: "asc" } },
+        projects: { select: { id: true, code: true, title: true, mw: true, state: true, fundingNeeded: true, valueScore: true, dealType: true, pipelineStage: true, contactId: true, visibility: true }, orderBy: { createdAt: "asc" } },
       },
     }),
     db.activity.groupBy({ by: ["contactId"], where: { contactId: { not: null }, kind: { in: LOGGED } }, _max: { createdAt: true } }),

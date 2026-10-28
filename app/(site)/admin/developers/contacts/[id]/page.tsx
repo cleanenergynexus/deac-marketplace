@@ -10,7 +10,8 @@ import { ConfirmButton } from "@/components/ConfirmButton";
 import { StageSelect } from "@/components/StageSelect";
 import { Badge } from "@/components/ui";
 import { CONTACT_TABS, contactTab, initials, projectContactId } from "@/lib/crm";
-import { DEVELOPER_STAGES, projectPipelineStage, stageLabel } from "@/lib/constants";
+import { funnelStages, projectStage, projectStageLabel } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 import { num } from "@/lib/format";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
@@ -35,14 +36,14 @@ export default async function ContactRecord({ params, searchParams }: { params: 
       developer: {
         include: {
           contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
-          projects: { select: { id: true, code: true, title: true, mw: true, valueScore: true, pipelineStage: true, contactId: true }, orderBy: { createdAt: "asc" } },
+          projects: { select: { id: true, code: true, title: true, mw: true, valueScore: true, dealType: true, pipelineStage: true, contactId: true }, orderBy: { createdAt: "asc" } },
         },
       },
     },
   });
   if (!contact) notFound();
   const dev = contact.developer;
-  const scoring = await getScoring();
+  const [scoring, pipeline] = await Promise.all([getScoring(), getPipeline()]);
 
   // The primary contact also carries company-wide history logged before contact records existed.
   const where = { OR: [{ contactId: id }, ...(contact.isPrimary ? [{ developerId: dev.id, contactId: null }] : [])] };
@@ -137,7 +138,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
                   <span className="font-mono">{p.code} · {num(p.mw)} MW</span>
                   {p.valueScore != null && <span className="shrink-0 whitespace-nowrap"><Badge tone={recommendation(p.valueScore, scoring).tone}>Score {p.valueScore}</Badge></span>}
                 </div>
-                <div className="mt-2"><StageSelect projectId={p.id} stage={projectPipelineStage(p, dev.stage)} className="w-full" /></div>
+                <div className="mt-2"><StageSelect projectId={p.id} stage={projectStage(pipeline, p, dev.stage)} stages={funnelStages(pipeline, p.dealType)} className="w-full" /></div>
               </li>
             ))}
           </ul>
@@ -154,7 +155,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
                   <li key={p.id} className="py-2">
                     <Link href={`/admin/projects/${p.id}`} className="text-slate-800 hover:text-brand-600">{p.title}</Link>
                     <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>{stageLabel(DEVELOPER_STAGES, projectPipelineStage(p, dev.stage))}{owner ? ` · ${owner.name}` : ""}</span>
+                      <span>{projectStageLabel(pipeline, p, dev.stage)}{owner ? ` · ${owner.name}` : ""}</span>
                       <form action={setProjectContact}>
                         <input type="hidden" name="projectId" value={p.id} />
                         <input type="hidden" name="contactId" value={id} />
