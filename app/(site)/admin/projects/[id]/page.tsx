@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { deleteProject, grantStage, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
 import { StageSelect } from "@/components/StageSelect";
-import { projectPipelineStage } from "@/lib/constants";
+import { funnelStages, projectStage } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 import { Calculator } from "@/components/Calculator";
 import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/components/ui";
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
@@ -18,11 +19,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectAdmin({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [p, developers, investors, scoring] = await Promise.all([
+  const [p, developers, investors, scoring, pipeline] = await Promise.all([
     db.project.findUnique({ where: { id }, include: { documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] }, dataRoomFolders: { select: { id: true, parentId: true, name: true } }, dataRoomFiles: { select: { id: true, folderId: true, name: true } }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
     db.developer.findMany({ select: { id: true, company: true }, orderBy: { company: "asc" } }),
     db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
     getScoring(),
+    getPipeline(),
   ]);
   if (!p) notFound();
   const show = parseDisclosure(p.disclosure);
@@ -51,7 +53,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <Link href="/admin/projects" className="text-sm text-brand-600">← Listings</Link>
       <PageHeader title={p.title} subtitle={<>{p.code} · <Link href={`/admin/developers/${p.developerId}`} className="text-brand-600">{p.developer.company}</Link> · <Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></>}
-        action={<div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">CRM stage</span><StageSelect projectId={p.id} stage={projectPipelineStage(p, p.developer.stage)} className="w-44" /><Link href={`/admin/projects/${p.id}/data-room`} className="btn-ghost">📁 Data room{p.dataRoomFiles.length ? ` (${p.dataRoomFiles.length})` : ""}</Link><Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link></div>} />
+        action={<div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">CRM stage</span><StageSelect projectId={p.id} stage={projectStage(pipeline, p, p.developer.stage)} stages={funnelStages(pipeline, p.dealType)} className="w-44" /><Link href={`/admin/projects/${p.id}/data-room`} className="btn-ghost">📁 Data room{p.dataRoomFiles.length ? ` (${p.dataRoomFiles.length})` : ""}</Link><Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link></div>} />
       <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} deleteAction={deleteProject}
         documents={p.documents.map((d) => ({ id: d.id, name: d.name, url: d.url === "#" ? "" : d.url, access: docStage(d.access), ...(d.fileId && { fileId: d.fileId }) }))}
         dataRoom={{ projectId: p.id, folders: p.dataRoomFolders, files: p.dataRoomFiles }} /></Section>

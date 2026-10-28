@@ -333,3 +333,11 @@ model ScoringSettings {
   updatedBy String?
   updatedAt DateTime @updatedAt
 }
+
+// Developer CRM funnels: Kanban columns per deal type (lib/pipeline.ts). One row, id "default".
+model PipelineSettings {
+  id        String   @id @default("default")
+  config    String // JSON
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

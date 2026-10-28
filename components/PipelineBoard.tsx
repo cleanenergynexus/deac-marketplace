@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useOptimistic, useTransition, useState } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { setDeveloperStage, setProjectPipelineStage } from "@/app/actions/admin";
-import { DEVELOPER_STAGES } from "@/lib/constants";
+import type { PipelineStage } from "@/lib/pipeline";
 import { num } from "@/lib/format";
 
 type Person = { id: string; name: string; title: string | null; initials: string; lastTouch: string | null; openTasks: number };
@@ -24,8 +24,8 @@ export type BoardCard = {
 
 const key = (c: BoardCard) => `${c.kind}:${c.id}`;
 
-/** Kanban board. Drag a tile to another column, or use the stage menu on the tile. */
-export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
+/** Kanban board for one funnel. Drag a tile to another column, or use the stage menu on the tile. */
+export function PipelineBoard({ cards, stages }: { cards: BoardCard[]; stages: PipelineStage[] }) {
   const [, startTransition] = useTransition();
   const [optimistic, move] = useOptimistic(cards, (list, m: { key: string; stage: string }) => list.map((c) => (key(c) === m.key ? { ...c, stage: m.stage } : c)));
   const [dragging, setDragging] = useState<string | null>(null);
@@ -43,8 +43,8 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
   };
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4">
-      {DEVELOPER_STAGES.map((s) => {
+    <ScrollFrame>
+      {stages.map((s) => {
         const col = optimistic.filter((c) => c.stage === s.value);
         return (
           <div
@@ -77,7 +77,7 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                     onChange={(e) => setStage(c, e.target.value)}
                     className="mt-2 w-full rounded border border-slate-200 bg-white px-1 py-0.5 text-xs text-slate-600"
                   >
-                    {DEVELOPER_STAGES.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+                    {stages.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
                   </select>
                 </div>
               ))}
@@ -85,6 +85,86 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
           </div>
         );
       })}
+    </ScrollFrame>
+  );
+}
+
+/**
+ * Wide boards scroll sideways. Besides the board's own scrolling (trackpad, shift + wheel), there is a scrollbar above
+ * the columns and one below them that stays pinned to the bottom of the window while the board is taller than the
+ * screen, plus arrow buttons that move one column at a time. The bars are drawn by us rather than the browser so they
+ * stay visible on Macs, which otherwise hide scrollbars until you scroll.
+ */
+function ScrollFrame({ children }: { children: React.ReactNode }) {
+  const board = useRef<HTMLDivElement>(null);
+  const [m, setM] = useState({ x: 0, view: 1, total: 1 });
+
+  useEffect(() => {
+    const el = board.current;
+    if (!el) return;
+    const measure = () => setM({ x: el.scrollLeft, view: el.clientWidth, total: el.scrollWidth });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    el.addEventListener("scroll", measure, { passive: true });
+    return () => { ro.disconnect(); el.removeEventListener("scroll", measure); };
+  }, []);
+
+  const max = Math.max(0, m.total - m.view);
+  const overflow = max > 1;
+  const step = (dir: 1 | -1) => board.current?.scrollBy({ left: dir * 268, behavior: "smooth" }); // one column (w-64 + gap)
+  const arrow = "rounded-md border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40";
+  const bar = (where: "top" | "bottom") => <Bar where={where} x={m.x} view={m.view} total={m.total} onScroll={(x) => { if (board.current) board.current.scrollLeft = x; }} />;
+
+  return (
+    <div className="relative">
+      <div className={`mb-2 flex items-center gap-2 ${overflow ? "" : "hidden"}`}>
+        <button type="button" aria-label="Scroll left" onClick={() => step(-1)} disabled={m.x <= 1} className={arrow}>←</button>
+        <div className="flex-1">{bar("top")}</div>
+        <button type="button" aria-label="Scroll right" onClick={() => step(1)} disabled={m.x >= max - 1} className={arrow}>→</button>
+      </div>
+      <div ref={board} id="crm-board" className="overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max gap-3">{children}</div>
+      </div>
+      <div className={`sticky bottom-0 z-10 bg-slate-50/90 py-2 backdrop-blur ${overflow ? "" : "hidden"}`}>{bar("bottom")}</div>
+    </div>
+  );
+}
+
+/** A horizontal scrollbar for the board: drag the thumb, or click the track to jump there. */
+function Bar({ where, x, view, total, onScroll }: { where: "top" | "bottom"; x: number; view: number; total: number; onScroll: (x: number) => void }) {
+  const track = useRef<HTMLDivElement>(null);
+  const max = Math.max(1, total - view);
+  const thumb = Math.max(8, Math.min(100, (view / total) * 100)); // % of the track
+  const left = (x / max) * (100 - thumb);
+
+  // Track position (0..1 of the free space) -> board scroll position.
+  const toScroll = (clientX: number, grab: number) => {
+    const r = track.current!.getBoundingClientRect();
+    const free = r.width * (1 - thumb / 100);
+    return Math.min(max, Math.max(0, ((clientX - r.left - grab) / Math.max(1, free)) * max));
+  };
+  const drag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const t = e.currentTarget;
+    const grab = e.clientX - t.getBoundingClientRect().left;
+    t.setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent) => onScroll(toScroll(ev.clientX, grab));
+    const onUp = () => { t.removeEventListener("pointermove", onMove); t.removeEventListener("pointerup", onUp); };
+    t.addEventListener("pointermove", onMove);
+    t.addEventListener("pointerup", onUp);
+  };
+  const jump = (e: React.PointerEvent<HTMLDivElement>) => {
+    const w = track.current!.getBoundingClientRect().width * (thumb / 100);
+    onScroll(toScroll(e.clientX, w / 2));
+  };
+
+  return (
+    <div ref={track} data-scrollbar={where} role="scrollbar" aria-orientation="horizontal" aria-controls="crm-board" aria-valuemin={0} aria-valuemax={Math.round(max)} aria-valuenow={Math.round(x)}
+      onPointerDown={jump} className="relative h-2.5 cursor-pointer rounded-full bg-slate-200">
+      <div onPointerDown={drag} className="absolute inset-y-0 cursor-grab rounded-full bg-slate-400 hover:bg-slate-500 active:cursor-grabbing" style={{ width: `${thumb}%`, left: `${left}%` }} />
     </div>
   );
 }

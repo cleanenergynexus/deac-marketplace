@@ -1,23 +1,27 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { PageHeader, Stat, Section, Badge, statusTone } from "@/components/ui";
-import { INVESTOR_STAGES, DEVELOPER_STAGES, projectPipelineStage } from "@/lib/constants";
+import { DEAL_TYPES, INVESTOR_STAGES } from "@/lib/constants";
+import { funnelKey, projectStage } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 import { usd, num, date } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const [investors, developers, projects, lois, activity, pendingAccess] = await Promise.all([
+  const [investors, developers, projects, lois, activity, pendingAccess, pipeline] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
-    db.developer.findMany({ select: { stage: true, projects: { select: { pipelineStage: true } } } }),
+    db.developer.findMany({ select: { stage: true, projects: { select: { dealType: true, pipelineStage: true } } } }),
     db.project.findMany({ select: { mw: true, fundingNeeded: true, visibility: true } }),
     db.loi.findMany({ include: { investor: true, project: true }, orderBy: { createdAt: "desc" }, take: 5 }),
     db.activity.findMany({ include: { investor: true, developer: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
+    getPipeline(),
   ]);
-  // Developer pipeline counts board tiles: each project, plus developers with no project yet.
-  const tiles = developers.flatMap((d) => (d.projects.length ? d.projects.map((p) => projectPipelineStage(p, d.stage)) : [d.stage]));
-  const pipeline = DEVELOPER_STAGES.map((s) => ({ stage: s.value, _count: tiles.filter((t) => t === s.value).length }));
+  // Developer pipeline counts board tiles per deal type funnel. Companies with no project yet are counted separately.
+  const tiles = developers.flatMap((d) => d.projects.map((p) => ({ funnel: funnelKey(p.dealType), stage: projectStage(pipeline, p, d.stage) })));
+  const noProject = developers.filter((d) => !d.projects.length).length;
+  const funnels = DEAL_TYPES.map((d) => ({ ...d, stages: pipeline.funnels[d.value], counts: pipeline.funnels[d.value].map((s) => ({ stage: s.value, _count: tiles.filter((t) => t.funnel === d.value && t.stage === s.value).length })) }));
   const live = projects.filter((p) => p.visibility !== "DRAFT");
   const count = (g: { stage: string; _count: number }[], s: string) => g.find((x) => x.stage === s)?._count ?? 0;
   const members = count(investors, "APPROVED") + count(investors, "ACTIVE");
@@ -41,7 +45,15 @@ export default async function AdminHome() {
           <Funnel stages={INVESTOR_STAGES} counts={investors} href="/admin/investors?stage=" />
         </Section>
         <Section title="Developer pipeline">
-          <Funnel stages={DEVELOPER_STAGES} counts={pipeline} href="/admin/developers?stage=" />
+          <div className="space-y-5">
+            {funnels.map((f) => (
+              <div key={f.value}>
+                <Link href={`/admin/developers?funnel=${f.value}`} className="mb-2 block text-xs font-semibold uppercase text-slate-500 hover:text-brand-600">{f.label}</Link>
+                <Funnel stages={f.stages} counts={f.counts} href={`/admin/developers?funnel=${f.value}&stage=`} />
+              </div>
+            ))}
+            {noProject > 0 && <p className="text-sm text-slate-500">{noProject} compan{noProject === 1 ? "y has" : "ies have"} no project yet.</p>}
+          </div>
         </Section>
         <Section title="Recent LOIs" action={<Link href="/admin/lois" className="text-sm text-brand-600">All</Link>}>
           <ul className="divide-y divide-slate-100 text-sm">{lois.map((l) => (

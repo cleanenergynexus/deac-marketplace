@@ -65,3 +65,9 @@ Each project has an internal data room (**Listing → 📁 Data room**, or **Dat
 Files are stored in a **private** Vercel Blob store (`BLOB_READ_WRITE_TOKEN`); browsers upload straight to Blob, so there is no 4.5 MB limit. Without a token, local development saves files in `./.data-room`.
 
 Listing documents can point at data room files: **Share on listing** in the data room (pick a tier: Public, After NDA, After LOI, Full data room), or **Add from data room** in the listing editor. Investors open these through `/api/data-room/files/<id>`, which checks their stage on that listing every time; the Blob URL is never exposed. Nothing in the data room is visible to investors until it is shared. Documents can still be plain links (Drive / SharePoint).
+
+## Developer CRM funnels
+
+The Developer CRM board has one funnel per deal type (For Lease, Investment / Financing, For Sale), picked with the tabs above the board. A project shows in the funnel for its deal type; a company with no project yet shows in every funnel. Wide boards scroll sideways with the bar above the columns, the bar below them (it stays pinned to the bottom of the window), the ← → buttons, or the trackpad.
+
+**Developer CRM → Funnels** (or **Edit funnels** on the board) renames, adds, reorders and removes columns for each funnel, or copies another funnel's columns. Settings are saved in the `PipelineSettings` table. Renaming keeps every tile in place; tiles in a removed column move to that funnel's first column when you save. Changing a listing's deal type moves its tile to the new funnel, keeping its column if that funnel has it.

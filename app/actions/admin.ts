@@ -12,7 +12,8 @@ import { parseDocRows, planDocChanges } from "@/lib/documents";
 import { fileUrl } from "@/lib/dataroom";
 import { deleteStored } from "@/lib/storage";
 import { isStage, SECTIONS, STAGE_INFO, stageRank, type Stage } from "@/lib/disclosure";
-import { DEVELOPER_STAGES, stageLabel } from "@/lib/constants";
+import { allStages, funnelStages, normalizePipeline, pipelineLabel, placeStage, projectStage, type PipelineConfig } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -136,7 +137,7 @@ function developerData(f: FormData) {
 export async function createDeveloper(f: FormData) {
   const admin = await requireAdmin();
   const contact = { name: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: s(f, "phone"), title: s(f, "contactTitle") };
-  const d = await db.developer.create({ data: { ...developerData(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: s(f, "stage") ?? "LEAD",
+  const d = await db.developer.create({ data: { ...developerData(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: placeStage(allStages(await getPipeline()), s(f, "stage")),
     contacts: { create: { ...contact, email: contact.email || null, isPrimary: true, source: s(f, "source"), owner: s(f, "owner") ?? admin.name } } } });
   redirect(`/admin/developers/${d.id}`);
 }
@@ -150,8 +151,10 @@ export async function setDeveloperStage(f: FormData) {
   const admin = await requireAdmin();
   const id = String(f.get("id"));
   const stage = String(f.get("stage"));
+  const stages = allStages(await getPipeline());
+  if (!stages.some((s) => s.value === stage)) throw new Error("Unknown stage.");
   await db.developer.update({ where: { id }, data: { stage } });
-  await db.activity.create({ data: { developerId: id, kind: "STAGE", body: `Stage → ${stage}`, by: admin.name } });
+  await db.activity.create({ data: { developerId: id, kind: "STAGE", body: `Stage → ${pipelineLabel(stages, stage)}`, by: admin.name } });
   revalidatePath(`/admin/developers/${id}`);
   revalidatePath("/admin/developers");
 }
@@ -160,10 +163,12 @@ export async function setProjectPipelineStage(f: FormData) {
   const admin = await requireAdmin();
   const id = String(f.get("id"));
   const stage = String(f.get("stage"));
-  if (!DEVELOPER_STAGES.some((s) => s.value === stage)) throw new Error("Unknown stage.");
+  const current = await db.project.findUniqueOrThrow({ where: { id }, select: { dealType: true } });
+  const stages = funnelStages(await getPipeline(), current.dealType);
+  if (!stages.some((s) => s.value === stage)) throw new Error("That stage isn't in this deal type's funnel.");
   const p = await db.project.update({ where: { id }, data: { pipelineStage: stage } });
   const contactId = p.contactId ?? (await db.contact.findFirst({ where: { developerId: p.developerId, isPrimary: true }, select: { id: true } }))?.id ?? null;
-  await db.activity.create({ data: { developerId: p.developerId, contactId, projectId: p.id, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${stageLabel(DEVELOPER_STAGES, stage)}`, by: admin.name } });
+  await db.activity.create({ data: { developerId: p.developerId, contactId, projectId: p.id, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${pipelineLabel(stages, stage)}`, by: admin.name } });
   revalidatePath("/admin/developers", "layout");
   revalidatePath(`/admin/projects/${id}`);
 }
@@ -210,16 +215,16 @@ function projectData(f: FormData) {
     visibility: s(f, "visibility") ?? "DRAFT",
   };
 }
-/** New projects start at Lead on the CRM board unless the form picked another stage. */
-function pipelineStageFrom(f: FormData) {
-  const v = s(f, "pipelineStage");
-  return v && DEVELOPER_STAGES.some((x) => x.value === v) ? v : "LEAD";
+/** New projects start in the first column of their deal type's funnel unless the form picked another stage of that funnel. */
+async function pipelineStageFrom(f: FormData, dealType: string) {
+  const stages = funnelStages(await getPipeline(), dealType);
+  return placeStage(stages, s(f, "pipelineStage"));
 }
 export async function createProject(f: FormData) {
   await requireAdmin();
   const data = projectData(f);
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: pipelineStageFrom(f), code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: await pipelineStageFrom(f, data.dealType), code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
   redirect(`/admin/projects/${p.id}`);
 }
 /** Last step of the import wizard: saves the reviewed listing, creating the developer if it's new. */
@@ -250,7 +255,7 @@ export async function createImportedProject(f: FormData) {
   } catch { /* no hints */ }
 
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: pipelineStageFrom(f), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: await pipelineStageFrom(f, data.dealType), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
   await db.activity.create({ data: { developerId, kind: "SYSTEM", by: admin.name, body: `${p.code} imported from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });
@@ -261,7 +266,10 @@ export async function updateProject(f: FormData) {
   await requireAdmin();
   const id = String(f.get("id"));
   const data = projectData(f);
-  await db.project.update({ where: { id }, data: { ...data, monthsToPower: data.monthsToPower ?? undefined } });
+  const before = await db.project.findUniqueOrThrow({ where: { id }, select: { dealType: true, pipelineStage: true, developer: { select: { stage: true } } } });
+  // A new deal type means a different funnel: keep the column if that funnel has it, otherwise start at its first column.
+  const pipelineStage = before.dealType === data.dealType ? undefined : projectStage(await getPipeline(), { dealType: data.dealType, pipelineStage: before.pipelineStage }, before.developer.stage);
+  await db.project.update({ where: { id }, data: { ...data, pipelineStage, monthsToPower: data.monthsToPower ?? undefined } });
   // The editor sends the whole document list; make the project's documents match it.
   const rows = parseDocRows(f.get("documents"));
   if (rows) {
@@ -339,7 +347,7 @@ export async function saveValuation(projectId: string, inputs: ValuationInputs) 
   const r = evaluate(inputs, await getScoring());
   const p = await db.project.update({ where: { id: projectId }, data: { valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw } });
   const dev = await db.developer.findUnique({ where: { id: p.developerId } });
-  if (dev && ["LEAD", "SCREENING"].includes(dev.stage)) await db.developer.update({ where: { id: dev.id }, data: { stage: "SCORED" } });
+  if (dev && ["LEAD", "SCREENING"].includes(dev.stage) && allStages(await getPipeline()).some((s) => s.value === "SCORED")) await db.developer.update({ where: { id: dev.id }, data: { stage: "SCORED" } });
   await db.activity.create({ data: { developerId: p.developerId, kind: "SYSTEM", body: `${p.code} scored ${r.score} (${r.recommendation.label}); market value $${Math.round(r.adjustedValueMw).toLocaleString()}/MW.` } });
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath("/admin/projects");
@@ -499,4 +507,34 @@ export async function saveScoring(_: ScoringState, f: FormData): Promise<Scoring
   if (cfg.thresholds.negotiate > cfg.thresholds.buy) return { error: "The Negotiate threshold can't be higher than the Buy threshold." };
   const { scored, changed } = await storeScoring(cfg, admin.name);
   return { ok: `Scoring saved. ${scored ? `Re-scored ${scored} listing${scored === 1 ? "" : "s"} (${changed} changed).` : "No listings have saved scores yet."}` };
+}
+
+// ---------- Developer CRM funnels ----------
+type PipelineState = { error?: string; ok?: string; config?: PipelineConfig } | undefined;
+
+/**
+ * Saves the Kanban columns for each deal type (Developer CRM → Edit funnels).
+ * Projects sitting in a column that was removed move to the first column of their funnel.
+ */
+export async function savePipeline(_: PipelineState, f: FormData): Promise<PipelineState> {
+  const admin = await requireAdmin();
+  let cfg: PipelineConfig;
+  try { cfg = normalizePipeline(JSON.parse(String(f.get("config") ?? ""))); } catch { return { error: "Could not read the funnels. Reload the page and try again." }; }
+  const config = JSON.stringify(cfg);
+  await db.pipelineSettings.upsert({ where: { id: "default" }, create: { id: "default", config, updatedBy: admin.name }, update: { config, updatedBy: admin.name } });
+
+  const projects = await db.project.findMany({ select: { id: true, dealType: true, pipelineStage: true, developer: { select: { stage: true } } } });
+  let moved = 0;
+  for (const p of projects) {
+    const now = projectStage(cfg, p, p.developer.stage);
+    if (p.pipelineStage === now) continue;
+    // Write the column down (also for older projects that followed their developer) so a removed column added back later doesn't pull tiles back.
+    await db.project.update({ where: { id: p.id }, data: { pipelineStage: now } });
+    if ((p.pipelineStage ?? p.developer.stage) !== now) moved++;
+  }
+  const companyStages = allStages(cfg);
+  const orphans = await db.developer.updateMany({ where: { projects: { none: {} }, stage: { notIn: companyStages.map((s) => s.value) } }, data: { stage: companyStages[0].value } });
+  revalidatePath("/admin", "layout");
+  const n = moved + orphans.count;
+  return { config: cfg, ok: `Funnels saved.${n ? ` ${n} tile${n === 1 ? "" : "s"} moved to a first column because their column was removed.` : ""}` };
 }

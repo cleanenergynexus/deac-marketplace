@@ -1,9 +1,9 @@
 import type { Developer } from "@prisma/client";
 import { Field, Select } from "@/components/ui";
-import { DEVELOPER_STAGES } from "@/lib/constants";
+import type { PipelineStage } from "@/lib/pipeline";
 import { SaveButton } from "@/components/SaveButton";
 
-export function DeveloperForm({ dev, action }: { dev?: Developer; action: (f: FormData) => Promise<void> }) {
+export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action: (f: FormData) => Promise<void>; stages?: PipelineStage[] }) {
   return (
     <form action={action} className="space-y-4">
       {dev && <input type="hidden" name="id" value={dev.id} />}
@@ -21,7 +21,7 @@ export function DeveloperForm({ dev, action }: { dev?: Developer; action: (f: Fo
         <Field label="MW delivered"><input name="mwDelivered" defaultValue={dev?.mwDelivered ?? ""} className="input" /></Field>
         <Field label="Source"><input name="source" defaultValue={dev?.source ?? ""} className="input" /></Field>
         <Field label="Relationship owner"><input name="owner" defaultValue={dev?.owner ?? ""} className="input" /></Field>
-        {!dev && <Field label="Stage"><Select name="stage" options={DEVELOPER_STAGES} /></Field>}
+        {!dev && stages && <Field label="Stage"><Select name="stage" options={stages} /></Field>}
       </div>
       <Field label="Experience / track record (shown to investors)"><textarea name="experience" rows={4} defaultValue={dev?.experience ?? ""} className="input" /></Field>
       <Field label="Internal notes"><textarea name="notes" rows={2} defaultValue={dev?.notes ?? ""} className="input" /></Field>

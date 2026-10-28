@@ -41,6 +41,7 @@ export const INVESTOR_STAGES = [
   { value: "DECLINED", label: "Declined" },
 ] as const;
 
+/** Starting Developer CRM columns for every funnel. Admins rename and add columns per deal type (lib/pipeline.ts). */
 export const DEVELOPER_STAGES = [
   { value: "LEAD", label: "Lead" },
   { value: "SCREENING", label: "Screening" },
@@ -52,8 +53,6 @@ export const DEVELOPER_STAGES = [
   { value: "PASSED", label: "Passed" },
 ] as const;
 
-/** A project's Developer CRM stage. Projects saved before per-project stages follow their developer's stage. */
-export const projectPipelineStage = (p: { pipelineStage: string | null }, developerStage: string) => p.pipelineStage ?? developerStage;
 
 export const stageLabel = (list: readonly { value: string; label: string }[], v: string) =>
   list.find((s) => s.value === v)?.label ?? v;

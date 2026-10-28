@@ -2,6 +2,8 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { checkPassword, endSession, hashPassword, startSession } from "@/lib/auth";
+import { funnelStages } from "@/lib/pipeline";
+import { getPipeline } from "@/lib/pipeline-db";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 const n = (f: FormData, k: string) => { const v = s(f, k); return v ? Number(v.replace(/[$,]/g, "")) : null; };
@@ -85,7 +87,7 @@ export async function submitProject(_: unknown, f: FormData) {
       monthsToPower: n(f, "monthsToPower") ?? undefined,
       powerRateCents: n(f, "powerRateCents"),
       visibility: "DRAFT",
-      pipelineStage: "LEAD",
+      pipelineStage: funnelStages(await getPipeline(), s(f, "dealType") ?? "FINANCING")[0].value,
     },
   });
   await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? state}" via website.` } });
