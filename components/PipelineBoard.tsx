@@ -5,10 +5,22 @@ import { setDeveloperStage, setProjectPipelineStage } from "@/app/actions/admin"
 import { DEVELOPER_STAGES } from "@/lib/constants";
 import { num } from "@/lib/format";
 
-/** One tile on the Developer CRM board: a project, or a developer that has no projects yet. */
-export type BoardCard =
-  | { kind: "project"; id: string; stage: string; title: string; code: string; mw: number; score: number | null; scoreTone?: "green" | "amber" | "red"; developerId: string; company: string; siblings: number }
-  | { kind: "developer"; id: string; stage: string; company: string; contactName: string };
+type Person = { id: string; name: string; title: string | null; initials: string; lastTouch: string | null; openTasks: number };
+
+/**
+ * One tile on the Developer CRM board. It leads with the contact and their company.
+ * kind "project": one of the company's projects (each moves on its own). kind "company": a company with no project yet.
+ */
+export type BoardCard = {
+  kind: "project" | "company";
+  id: string; // project id, or developer id for "company"
+  stage: string;
+  developerId: string;
+  company: string;
+  contact: Person | null;
+  contacts: number; // people on file at the company
+  project?: { title: string; code: string; mw: number; score: number | null; scoreTone?: "green" | "amber" | "red" };
+};
 
 const key = (c: BoardCard) => `${c.kind}:${c.id}`;
 
@@ -56,9 +68,9 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
                   draggable
                   onDragStart={(e) => { e.dataTransfer.setData("text/plain", key(c)); e.dataTransfer.effectAllowed = "move"; setDragging(key(c)); }}
                   onDragEnd={() => setDragging(null)}
-                  className={`card cursor-grab p-3 text-sm hover:shadow active:cursor-grabbing ${c.kind === "developer" ? "border-dashed" : ""} ${dragging === key(c) ? "opacity-50" : ""}`}
+                  className={`card cursor-grab p-3 text-sm hover:shadow active:cursor-grabbing ${c.kind === "company" ? "border-dashed" : ""} ${dragging === key(c) ? "opacity-50" : ""}`}
                 >
-                  {c.kind === "project" ? <ProjectCard c={c} /> : <DeveloperCard c={c} />}
+                  <Tile c={c} />
                   <select
                     aria-label="Move to stage"
                     value={c.stage}
@@ -77,31 +89,48 @@ export function PipelineBoard({ cards }: { cards: BoardCard[] }) {
   );
 }
 
-function ProjectCard({ c }: { c: Extract<BoardCard, { kind: "project" }> }) {
-  return (
-    <>
-      <Link href={`/admin/projects/${c.id}`} className="font-semibold text-slate-900 hover:text-brand-600">{c.title}</Link>
-      <div className="text-xs text-slate-500">
-        <Link href={`/admin/developers/${c.developerId}`} className="hover:text-brand-600">{c.company}</Link>
-        {c.siblings > 1 && <span> · {c.siblings} projects</span>}
-        <span> · </span><Link href={`/admin/projects/${c.id}/data-room`} className="hover:text-brand-600">Data room</Link>
-      </div>
-      <div className="mt-2 flex items-center justify-between text-xs">
-        <span className="font-mono text-slate-500">{c.code} · {num(c.mw)} MW</span>
-        {c.score != null && c.score > 0 && (
-          <span className={`rounded-full px-2 py-0.5 font-medium ${{ green: "bg-emerald-100 text-emerald-800", amber: "bg-amber-100 text-amber-800", red: "bg-red-100 text-red-700" }[c.scoreTone ?? (c.score >= 70 ? "green" : c.score >= 50 ? "amber" : "red")]}`}>Score {c.score}</span>
-        )}
-      </div>
-    </>
-  );
-}
+const SCORE_TONES = { green: "bg-emerald-100 text-emerald-800", amber: "bg-amber-100 text-amber-800", red: "bg-red-100 text-red-700" };
 
-function DeveloperCard({ c }: { c: Extract<BoardCard, { kind: "developer" }> }) {
+function Tile({ c }: { c: BoardCard }) {
+  const p = c.project;
   return (
     <>
-      <Link href={`/admin/developers/${c.id}`} className="font-semibold text-slate-900 hover:text-brand-600">{c.company}</Link>
-      <div className="text-xs text-slate-500">{c.contactName}</div>
-      <Link href={`/admin/projects/new?developerId=${c.id}`} className="mt-2 block text-xs text-brand-600">No projects yet · Add a project</Link>
+      {/* Who: contact + company */}
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">{c.contact?.initials ?? "?"}</span>
+        <div className="min-w-0">
+          {c.contact
+            ? <Link href={`/admin/developers/contacts/${c.contact.id}`} className="block truncate font-semibold text-slate-900 hover:text-brand-600">{c.contact.name}</Link>
+            : <Link href={`/admin/developers/${c.developerId}#contacts`} className="block font-semibold text-slate-500 hover:text-brand-600">Add a contact</Link>}
+          <Link href={`/admin/developers/${c.developerId}`} className="block truncate text-xs font-medium text-slate-600 hover:text-brand-600" title={c.contact?.title ? `${c.contact.title}, ${c.company}` : c.company}>
+            {c.company}
+          </Link>
+          {c.contact?.title && <div className="truncate text-xs text-slate-400">{c.contact.title}</div>}
+        </div>
+      </div>
+
+      {/* What: the project (secondary) */}
+      {p ? (
+        <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs">
+          <Link href={`/admin/projects/${c.id}`} className="line-clamp-2 text-slate-700 hover:text-brand-600">{p.title}</Link>
+          <div className="mt-1 flex items-center justify-between">
+            <span className="font-mono text-slate-500">{p.code} · {num(p.mw)} MW</span>
+            {p.score != null && p.score > 0 && (
+              <span className={`rounded-full px-2 py-0.5 font-medium ${SCORE_TONES[p.scoreTone ?? (p.score >= 70 ? "green" : p.score >= 50 ? "amber" : "red")]}`}>{p.score}</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <Link href={`/admin/projects/new?developerId=${c.developerId}`} className="mt-2 block text-xs text-brand-600">No projects yet · Add a project</Link>
+      )}
+
+      {/* Communications at a glance */}
+      {c.contact && (
+        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+          <span>{c.contact.lastTouch ? `Last touch ${c.contact.lastTouch}` : "No touchpoints yet"}</span>
+          {c.contact.openTasks > 0 && <Link href={`/admin/developers/contacts/${c.contact.id}?tab=tasks`} className="rounded-full bg-amber-100 px-1.5 font-medium text-amber-800">{c.contact.openTasks} task{c.contact.openTasks === 1 ? "" : "s"}</Link>}
+        </div>
+      )}
     </>
   );
 }

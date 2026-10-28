@@ -74,7 +74,31 @@ async function main() {
 
   for (const [i, body] of [[0, "Intro call — focused on ERCOT large-load sites"], [0, "Sent Abilene teaser"], [1, "Met at PR Investment Summit"], [3, "Connected on LinkedIn, sent overview deck"]] as const)
     await db.activity.create({ data: { investorId: inv[i].id, kind: "NOTE", body, by: "Joaquin" } });
-  await db.activity.create({ data: { developerId: devs[2].id, kind: "CALL", body: "Site walk scheduled; asked for utility will-serve letter", by: "Joaquin" } });
+  // Developer contacts (one primary per company) and a communications history.
+  const contactSeed: [number, string, string, string, string?][] = [
+    [0, "Maria Alvarez", "CEO & Founder", "maria@lonestardi.example", "+1 214 555 0142"],
+    [0, "David Chen", "VP Power & Interconnection", "david@lonestardi.example", "+1 214 555 0177"],
+    [1, "Luis Rivera", "Managing Partner", "luis@caribedp.example", "+1 787 555 0110"],
+    [2, "Tom Becker", "Principal", "tom@apsites.example"],
+    [3, "Aisha Khan", "Founder", "aisha@desertcompute.example"],
+  ];
+  const people: { id: string; developerId: string }[] = [];
+  for (const [i, name, title, email, phone] of contactSeed)
+    people.push(await db.contact.create({ data: { developerId: devs[i].id, name, title, email, phone, isPrimary: !people.some((p) => p.developerId === devs[i].id), owner: "Joaquin" } }));
+  await db.project.update({ where: { id: created[1].id }, data: { contactId: people[1].id } }); // David runs San Antonio
+  const daysAgo = (d: number) => new Date(Date.now() - d * 86_400_000);
+  const log = (c: number, data: { kind: string; body?: string; subject?: string; outcome?: string; dueAt?: Date; createdAt?: Date; projectId?: string }) =>
+    db.activity.create({ data: { developerId: people[c].developerId, contactId: people[c].id, by: "Joaquin", body: "", ...data } });
+  await log(0, { kind: "CALL", outcome: "CONNECTED", body: "Walked through Abilene interconnection timeline. Expansion to 300 MW depends on ERCOT study due in Q1.", createdAt: daysAgo(12), projectId: created[0].id });
+  await log(0, { kind: "EMAIL", outcome: "SENT", subject: "DEAC engagement letter", body: "Sent engagement letter and fee schedule for Abilene.", createdAt: daysAgo(9), projectId: created[0].id });
+  await log(0, { kind: "EMAIL", outcome: "RECEIVED", subject: "RE: DEAC engagement letter", body: "Signed copy attached. Wants a teaser out to infra funds next week.", createdAt: daysAgo(6), projectId: created[0].id });
+  await log(0, { kind: "MEETING", subject: "Investor teaser review", body: "Agreed teaser numbers; Maria to send updated capex budget.", createdAt: daysAgo(3) });
+  await log(0, { kind: "TASK", subject: "Get updated capex budget from Maria", dueAt: daysAgo(-2) });
+  await log(0, { kind: "NOTE", body: "Prefers WhatsApp for quick questions. Decision maker on all Lone Star sites.", createdAt: daysAgo(1) });
+  await log(1, { kind: "CALL", outcome: "VOICEMAIL", body: "Left voicemail about San Antonio tenant improvements.", createdAt: daysAgo(4), projectId: created[1].id });
+  await log(1, { kind: "TASK", subject: "Follow up on San Antonio TI allowance", dueAt: daysAgo(1), projectId: created[1].id });
+  await log(2, { kind: "MEETING", subject: "PR Investment Summit", body: "Met at the summit. Caguas microgrid financing.", createdAt: daysAgo(20) });
+  await log(3, { kind: "CALL", outcome: "CONNECTED", body: "Site walk scheduled; asked for utility will-serve letter", createdAt: daysAgo(7) });
 
   console.log("Seeded. Logins (password deac-demo-2026): admin@deacna.com, investor@deacna.com, applicant@deacna.com");
 }

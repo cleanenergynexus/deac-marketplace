@@ -80,8 +80,35 @@ model Developer {
 
   user       User?
   team       TeamMember[]
+  contacts   Contact[]
   projects   Project[]
   activities Activity[]
+}
+
+// A person at a developer company. The Developer CRM board leads with the contact; projects hang off the company.
+// The primary contact is mirrored into Developer.contactName/email/phone for older screens.
+model Contact {
+  id          String    @id @default(cuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  name        String
+  title       String?
+  email       String?
+  phone       String?
+  mobile      String?
+  linkedin    String?
+  location    String?
+  source      String?
+  owner       String? // team member responsible
+  notes       String?
+  isPrimary   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  projects   Project[]
+  activities Activity[]
+
+  @@index([developerId])
 }
 
 model TeamMember {
@@ -114,6 +141,8 @@ model Project {
   term          String? // e.g. "24 mo", "15-yr lease"
   dealStage     String   @default("MARKETING") // deal pipeline, see DEAL_STAGES in lib/constants.ts
   pipelineStage String? // Developer CRM board stage (DEVELOPER_STAGES). Null = older project, follows its developer's stage.
+  contactId     String? // point of contact at the developer for this project. Null = the developer's primary contact.
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   useOfFunds    String   @default("") // one "Label: amount" per line
   coverImageUrl String?
 
@@ -148,6 +177,7 @@ model Project {
   lois             Loi[]
   dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
+  activities       Activity[]
 }
 
 model Document {
@@ -256,10 +286,20 @@ model Activity {
   investor    Investor?  @relation(fields: [investorId], references: [id], onDelete: Cascade)
   developerId String?
   developer   Developer? @relation(fields: [developerId], references: [id], onDelete: Cascade)
-  kind        String // NOTE | CALL | EMAIL | MEETING | STAGE | SYSTEM
+  contactId   String? // developer contact this touchpoint was with
+  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  projectId   String? // project it was about, if any
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  kind        String // NOTE | CALL | EMAIL | MEETING | TASK | STAGE | SYSTEM
+  subject     String? // email subject / task title / meeting title
   body        String
+  outcome     String? // calls: CONNECTED, VOICEMAIL... emails: SENT | RECEIVED
+  dueAt       DateTime? // tasks
+  doneAt      DateTime? // tasks: completed
   by          String?
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime   @default(now()) // when it happened (can be back-dated when logging)
+
+  @@index([contactId])
 }
 
 // ---------- Outreach ----------
