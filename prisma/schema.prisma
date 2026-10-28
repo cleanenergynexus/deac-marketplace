@@ -21,6 +21,13 @@ model User {
   investor     Investor? @relation(fields: [investorId], references: [id])
   developerId  String?  @unique
   developer    Developer? @relation(fields: [developerId], references: [id])
+  // Staff only (role ADMIN = team login). What a team member can see, see lib/tasks.ts:
+  // ADMIN sees everything, MANAGER sees their own and their direct reports' tasks, SUPPORT sees only their own.
+  staffLevel   String   @default("ADMIN") // ADMIN | MANAGER | SUPPORT
+  managerId    String? // the manager this team member reports to
+  manager      User?    @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
+  reports      User[]   @relation("Reports")
+  tasks        Activity[] @relation("TaskAssignee")
   createdAt    DateTime @default(now())
 }
 
@@ -308,10 +315,13 @@ model Activity {
   outcome     String? // calls: CONNECTED, VOICEMAIL... emails: SENT | RECEIVED
   dueAt       DateTime? // tasks
   doneAt      DateTime? // tasks: completed
+  assigneeId  String? // tasks: team member responsible. Null = unassigned (only Admins see these)
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   by          String?
   createdAt   DateTime   @default(now()) // when it happened (can be back-dated when logging)
 
   @@index([contactId])
+  @@index([assigneeId])
 }
 
 // ---------- Outreach ----------

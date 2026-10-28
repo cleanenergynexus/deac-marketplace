@@ -5,8 +5,15 @@ import { activityTitle, groupByMonth, isLogKind, taskState } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
 import { LocalTime } from "@/components/LocalTime";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { AssigneeSelect, type Assignee } from "@/components/AssigneeSelect";
 
-export type FeedItem = Activity & { contact?: { id: string; name: string } | null; project?: { id: string; code: string; title: string } | null };
+export type FeedItem = Activity & {
+  contact?: { id: string; name: string } | null;
+  project?: { id: string; code: string; title: string } | null;
+  assignee?: Assignee | null;
+};
+/** Lets tasks in the feed be reassigned: who this person can assign to, and whether "Unassigned" is allowed (Admins). */
+export type Assigning = { options: Assignee[]; allowUnassigned: boolean };
 
 const TONE: Record<string, string> = {
   NOTE: "bg-amber-50 text-amber-700", EMAIL: "bg-brand-50 text-brand-600", CALL: "bg-emerald-50 text-emerald-700",
@@ -14,7 +21,7 @@ const TONE: Record<string, string> = {
 };
 
 /** Contact / company timeline grouped by month, newest first. Tasks can be ticked off; logged entries can be deleted. */
-export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet." }: { items: FeedItem[]; showContact?: boolean; empty?: string }) {
+export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet.", assigning }: { items: FeedItem[]; showContact?: boolean; empty?: string; assigning?: Assigning }) {
   if (!items.length) return <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{empty}</p>;
   return (
     <div className="space-y-5">
@@ -50,6 +57,11 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                         </span>
                       )}
                       {a.doneAt && <span className="text-emerald-700">Completed <LocalTime value={a.doneAt} time={false} /></span>}
+                      {a.kind === "TASK" && (assigning && !a.doneAt && (assigning.options.length > 1 || assigning.allowUnassigned) ? (
+                        <span className="inline-flex items-center gap-1">For <AssigneeSelect taskId={a.id} assigneeId={a.assigneeId} options={withCurrent(assigning.options, a.assignee)} allowUnassigned={assigning.allowUnassigned} className="!w-40" /></span>
+                      ) : (
+                        <span>For {a.assignee?.name ?? "nobody yet"}</span>
+                      ))}
                       {showContact && a.contact && <Link href={`/admin/developers/contacts/${a.contact.id}`} className="text-brand-600">{a.contact.name}</Link>}
                       {a.project && <Link href={`/admin/projects/${a.project.id}`} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
                       {a.by && <span>by {a.by}</span>}
@@ -69,4 +81,9 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
       ))}
     </div>
   );
+}
+
+/** Assignee options, keeping the task's current assignee listed even when this person couldn't pick them. */
+export function withCurrent(options: Assignee[], current?: Assignee | null): Assignee[] {
+  return current && !options.some((o) => o.id === current.id) ? [current, ...options] : options;
 }

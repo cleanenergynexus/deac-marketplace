@@ -7,6 +7,7 @@ import { syncPrimaryContact } from "@/lib/contacts-db";
 import { isLogKind, parseWhen } from "@/lib/crm";
 import { phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
+import { findVisibleTask, getTeam, pickAssignee } from "@/lib/tasks-db";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 
@@ -110,6 +111,7 @@ export async function logContactActivity(f: FormData) {
   const when = parseWhen(s(f, "when"), tz);
   const projectId = s(f, "projectId");
   if (projectId && !(await db.project.count({ where: { id: projectId, developerId: c.developerId } }))) throw new Error("That project is not at this contact's company.");
+  const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTeam(), f.get("assigneeId")) : null;
   await db.activity.create({
     data: {
       developerId: c.developerId,
@@ -120,26 +122,72 @@ export async function logContactActivity(f: FormData) {
       body,
       outcome: kind === "CALL" || kind === "EMAIL" ? s(f, "outcome") : null,
       dueAt: kind === "TASK" ? parseWhen(s(f, "dueAt"), tz) : null,
+      assigneeId,
       by: admin.name,
       ...(when && kind !== "TASK" ? { createdAt: when } : {}),
     },
   });
   revalidateCrm(c.developerId, contactId);
+  if (kind === "TASK") revalidatePath("/admin", "layout");
 }
 
 export async function toggleTask(f: FormData) {
-  await requireAdmin();
-  const id = String(f.get("id"));
-  const a = await db.activity.findUniqueOrThrow({ where: { id } });
+  const admin = await requireAdmin();
+  const { task: a } = await findVisibleTask(admin, String(f.get("id")));
   if (a.kind !== "TASK") return;
-  await db.activity.update({ where: { id }, data: { doneAt: a.doneAt ? null : new Date() } });
+  await db.activity.update({ where: { id: a.id }, data: { doneAt: a.doneAt ? null : new Date() } });
   if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  revalidatePath("/admin", "layout");
+}
+
+/** Hands a task to another team member (within what this person can assign). */
+export async function assignTask(f: FormData) {
+  const admin = await requireAdmin();
+  const { task: a, team } = await findVisibleTask(admin, String(f.get("id")));
+  if (a.kind !== "TASK") return;
+  const assigneeId = pickAssignee(admin, team, f.get("assigneeId") ?? "");
+  await db.activity.update({ where: { id: a.id }, data: { assigneeId } });
+  if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  revalidatePath("/admin", "layout");
 }
 
 export async function deleteActivity(f: FormData) {
-  await requireAdmin();
-  const a = await db.activity.findUniqueOrThrow({ where: { id: String(f.get("id")) } });
+  const admin = await requireAdmin();
+  const { task: a } = await findVisibleTask(admin, String(f.get("id")));
   if (!isLogKind(a.kind)) return; // stage changes and system entries stay as history
   await db.activity.delete({ where: { id: a.id } });
   if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  if (a.kind === "TASK") revalidatePath("/admin", "layout");
+}
+
+/** New task from the Tasks page. Linking it to a contact and/or project puts it on that contact's timeline. */
+export async function createTask(f: FormData) {
+  const admin = await requireAdmin();
+  const subject = s(f, "subject");
+  if (!subject) throw new Error("Give the task a title.");
+  const tz = Number(f.get("tz") ?? 0);
+  const contactId = s(f, "contactId");
+  const projectId = s(f, "projectId");
+  const [contact, project] = await Promise.all([
+    contactId ? db.contact.findUniqueOrThrow({ where: { id: contactId } }) : null,
+    projectId ? db.project.findUniqueOrThrow({ where: { id: projectId } }) : null,
+  ]);
+  if (contact && project && contact.developerId !== project.developerId) throw new Error("That project is not at this contact's company.");
+  const developerId = contact?.developerId ?? project?.developerId ?? null;
+  await db.activity.create({
+    data: {
+      kind: "TASK",
+      subject,
+      body: s(f, "body") ?? "",
+      dueAt: parseWhen(s(f, "dueAt"), tz),
+      assigneeId: pickAssignee(admin, await getTeam(), f.get("assigneeId")),
+      // A project task with no contact goes on the project's contact's timeline.
+      contactId: contact?.id ?? project?.contactId ?? null,
+      developerId,
+      projectId: project?.id ?? null,
+      by: admin.name,
+    },
+  });
+  if (developerId) revalidateCrm(developerId, contact?.id ?? project?.contactId);
+  revalidatePath("/admin", "layout");
 }

@@ -17,6 +17,9 @@ import { formatPhone, telHref } from "@/lib/phone";
 import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
+import { requireAdmin } from "@/lib/auth";
+import { staffLevel, visibleStaff } from "@/lib/tasks";
+import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -45,11 +48,14 @@ export default async function ContactRecord({ params, searchParams }: { params: 
   });
   if (!contact) notFound();
   const dev = contact.developer;
-  const [scoring, pipeline] = await Promise.all([getScoring(), getPipeline()]);
+  const [scoring, pipeline, me, team] = await Promise.all([getScoring(), getPipeline(), requireAdmin(), getTeam()]);
+  const assignees = visibleStaff(me, team).map((u) => ({ id: u.id, name: u.name }));
+  const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
 
   // The primary contact also carries company-wide history logged before contact records existed.
-  const where = { OR: [{ contactId: id }, ...(contact.isPrimary ? [{ developerId: dev.id, contactId: null }] : [])] };
-  const all = await db.activity.findMany({ where, include: { contact: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } } }, orderBy: { createdAt: "desc" } });
+  // Tasks only show to the people who may see them (Admin: all, Manager: their team's, Support: their own).
+  const where = { AND: [{ OR: [{ contactId: id }, ...(contact.isPrimary ? [{ developerId: dev.id, contactId: null }] : [])] }, visibleTimelineWhere(me, team)] };
+  const all = await db.activity.findMany({ where, include: { contact: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } });
   const count = (kinds: readonly string[] | null) => (kinds ? all.filter((a) => kinds.includes(a.kind)).length : all.length);
   let items = tab.kinds ? all.filter((a) => (tab.kinds as readonly string[]).includes(a.kind)) : all;
   if (tab.value === "tasks") {
@@ -119,8 +125,8 @@ export default async function ContactRecord({ params, searchParams }: { params: 
             </Link>
           ))}
         </nav>
-        <ActivityComposer key={tab.value} contactId={id} contactEmail={contact.email} initialKind={tab.log} projects={dev.projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))} />
-        <ActivityFeed items={items} empty={tab.value === "activity" ? `Nothing logged with ${contact.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
+        <ActivityComposer key={tab.value} contactId={id} contactEmail={contact.email} initialKind={tab.log} projects={dev.projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))} assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
+        <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} empty={tab.value === "activity" ? `Nothing logged with ${contact.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
       </main>
 
       {/* Right: associations */}
