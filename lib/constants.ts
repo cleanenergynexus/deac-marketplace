@@ -86,8 +86,11 @@ export const DEAL_STAGES = [
   { value: "DILIGENCE", label: "Diligence", status: "In diligence" },
   { value: "TERM_SHEET", label: "Term Sheet", status: "Term sheet" },
   { value: "CLOSING", label: "Closing", status: "Closing" },
+  { value: "CLOSED", label: "Closed", status: "Closed - Sold" },
 ] as const;
 export const dealStageIndex = (v: string) => Math.max(0, DEAL_STAGES.findIndex((s) => s.value === v));
+/** Closed listings drop to a "Closed Deals" section and carry a CLOSED banner on their tile. */
+export const isClosedDeal = (dealStage: string | null | undefined) => dealStage === "CLOSED";
 
 /** "Equipment & EPC: $3.1M" lines -> [label, value] pairs. Lines without a colon are skipped. */
 export function parseUseOfFunds(text: string): [string, string][] {

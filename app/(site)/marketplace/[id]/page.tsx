@@ -8,7 +8,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { Checks } from "@/components/Checks";
 import { Blurred, DealProgress } from "@/components/DealProgress";
 import { Badge, Field, statusTone } from "@/components/ui";
-import { DEAL_STAGES, dealStageIndex, dealTypeLabel, FOCUS_AREAS, parseUseOfFunds } from "@/lib/constants";
+import { DEAL_STAGES, dealStageIndex, dealTypeLabel, isClosedDeal, FOCUS_AREAS, parseUseOfFunds } from "@/lib/constants";
 import { atLeast, docStage, isStage, nextStep, parseDisclosure, STAGES, STAGE_INFO, stageRank, type Stage, type StepStatus } from "@/lib/disclosure";
 import { usd, num, date } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -232,6 +232,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <div className="flex flex-wrap items-center gap-2 pr-32 text-xs">
             <span className="rounded-full border border-white/30 px-2.5 py-0.5 font-semibold uppercase tracking-wide">{dealTypeLabel(p.dealType)}</span>
             <span className="rounded bg-white/15 px-2 py-0.5 font-mono">{p.code}</span>
+            {isClosedDeal(p.dealStage) && <span className="rounded bg-red-600 px-2.5 py-0.5 font-black uppercase tracking-widest text-white shadow">Closed - Sold</span>}
             <span className="rounded bg-emerald-500/30 px-2 py-0.5">{isAdmin && !asStage ? "DEAC team view" : `Your access: ${STAGE_INFO[stage].label}`}</span>
           </div>
           <h1 className="mt-3 text-3xl font-bold">{p.title}</h1>
