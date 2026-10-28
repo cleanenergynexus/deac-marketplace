@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatPhone } from "@/lib/phone";
 import { db } from "@/lib/db";
 import { setInvestorStage } from "@/app/actions/admin";
 import { PageHeader, Empty } from "@/components/ui";
@@ -21,7 +22,7 @@ export default async function AccessRequests() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <Link href={`/admin/investors/${i.id}`} className="text-lg font-semibold text-brand-600">{i.name}</Link>
-                    <div className="text-sm text-slate-600">{[[i.title, i.firm].filter(Boolean).join(", "), i.email, i.phone].filter(Boolean).join(" · ")}</div>
+                    <div className="text-sm text-slate-600">{[[i.title, i.firm].filter(Boolean).join(", "), i.email, formatPhone(i.phone)].filter(Boolean).join(" · ")}</div>
                     <div className="mt-1 text-xs text-slate-500">Applied {date(createdAt)}{i.source ? ` · via ${i.source}` : ""}</div>
                   </div>
                   <div className="flex gap-2">

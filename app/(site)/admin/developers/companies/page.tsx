@@ -5,6 +5,7 @@ import { ago } from "@/lib/crm";
 import { allStages, pipelineLabel, projectStageLabel } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
 import { num, usd } from "@/lib/format";
+import { shortPlace } from "@/lib/address";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,13 @@ export default async function Companies({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const q = sp.q?.trim().toLowerCase();
   const [{ developers, lastTouch }, pipeline] = await Promise.all([loadCrm(), getPipeline()]);
-  const rows = developers.filter((d) => !q || [d.company, d.hq, ...d.contacts.map((c) => c.name)].some((x) => x?.toLowerCase().includes(q)));
+  const rows = developers.filter((d) => !q || [d.company, d.hq, d.city, d.region, ...d.contacts.map((c) => c.name)].some((x) => x?.toLowerCase().includes(q)));
 
   return (
     <div>
       <PageHeader title="Companies" subtitle={`${rows.length} development companies`} action={
         <div className="flex gap-2">
-          <form><input name="q" defaultValue={sp.q} placeholder="Search company, HQ, contact" className="input w-64 py-1.5" /></form>
+          <form><input name="q" defaultValue={sp.q} placeholder="Search company, city, contact" className="input w-64 py-1.5" /></form>
           <Link href="/admin/developers/new" className="btn">Add company</Link>
         </div>} />
       {!rows.length ? <Empty>{q ? "No companies match." : "No companies yet."}</Empty> : (
@@ -31,7 +32,7 @@ export default async function Companies({ searchParams }: { searchParams: Promis
                 const last = d.contacts.map((c) => lastTouch.get(c.id)).filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0];
                 return (
                   <tr key={d.id}>
-                    <td className="td align-top"><Link href={`/admin/developers/${d.id}`} className="font-medium text-brand-600">{d.company}</Link>{d.hq && <div className="text-xs text-slate-500">{d.hq}</div>}</td>
+                    <td className="td align-top"><Link href={`/admin/developers/${d.id}`} className="font-medium text-brand-600">{d.company}</Link>{(shortPlace(d) || d.hq) && <div className="text-xs text-slate-500">{shortPlace(d) || d.hq}</div>}</td>
                     <td className="td align-top">{primary ? <Link href={`/admin/developers/contacts/${primary.id}`} className="hover:text-brand-600">{primary.name}</Link> : "—"}{primary?.title && <div className="text-xs text-slate-500">{primary.title}</div>}</td>
                     <td className="td align-top">{d.contacts.length}</td>
                     <td className="td">

@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { syncPrimaryContact } from "@/lib/contacts-db";
 import { isLogKind, parseWhen } from "@/lib/crm";
+import { phoneFromForm } from "@/lib/phone";
+import { addressFromForm } from "@/lib/address";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 
@@ -15,12 +17,16 @@ function revalidateCrm(developerId: string, contactId?: string | null) {
 }
 
 function contactData(f: FormData) {
+  const address = addressFromForm(f);
+  // A number typed without a country code belongs to the contact's country.
+  const home = address.country ?? "US";
   return {
+    ...address,
     name: s(f, "name") ?? "",
     title: s(f, "title"),
     email: s(f, "email")?.toLowerCase() ?? null,
-    phone: s(f, "phone"),
-    mobile: s(f, "mobile"),
+    phone: phoneFromForm(f, "phone", home),
+    mobile: phoneFromForm(f, "mobile", home),
     linkedin: s(f, "linkedin"),
     location: s(f, "location"),
     source: s(f, "source"),

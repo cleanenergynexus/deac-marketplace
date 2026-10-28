@@ -1,5 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
+import { phoneFromForm } from "@/lib/phone";
 import { db } from "@/lib/db";
 import { checkPassword, endSession, hashPassword, startSession } from "@/lib/auth";
 import { funnelStages } from "@/lib/pipeline";
@@ -36,7 +37,7 @@ export async function applyForAccess(_: unknown, f: FormData) {
     name: s(f, "name") ?? email,
     firm: s(f, "firm"),
     title: s(f, "title"),
-    phone: s(f, "phone"),
+    phone: phoneFromForm(f, "phone"),
     investorType: s(f, "investorType"),
     checkMin: n(f, "checkMin"),
     checkMax: n(f, "checkMax"),
@@ -65,8 +66,8 @@ export async function submitProject(_: unknown, f: FormData) {
   if (!email || !company || !s(f, "state") || !n(f, "mw")) return { error: "Company, email, state and MW are required." };
 
   let dev = await db.developer.findFirst({ where: { email } });
-  if (!dev) dev = await db.developer.create({ data: { company, contactName: s(f, "contactName") ?? "", email, phone: s(f, "phone"), website: s(f, "website"), experience: s(f, "experience"), source: "Website submission",
-    contacts: { create: { name: s(f, "contactName") ?? company, email, phone: s(f, "phone"), source: "Website submission", isPrimary: true } } } });
+  if (!dev) dev = await db.developer.create({ data: { company, contactName: s(f, "contactName") ?? "", email, phone: phoneFromForm(f, "phone"), website: s(f, "website"), experience: s(f, "experience"), source: "Website submission",
+    contacts: { create: { name: s(f, "contactName") ?? company, email, phone: phoneFromForm(f, "phone"), source: "Website submission", isPrimary: true } } } });
 
   const count = await db.project.count();
   const state = s(f, "state")!.toUpperCase();

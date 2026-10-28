@@ -5,6 +5,8 @@ import { extractProject, type ExtractState } from "@/app/actions/import";
 import { createImportedProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Field } from "@/components/ui";
+import { PhoneInput } from "@/components/PhoneInput";
+import { formatPhone } from "@/lib/phone";
 import type { ImportResult } from "@/lib/importer";
 
 const LABELS: Record<string, string> = { title: "Title", state: "State", mw: "Capacity (MW)", facilityType: "Facility type", dealType: "Deal type", fundingNeeded: "Funding needed", projectStatus: "Project status", summary: "Summary" };
@@ -60,7 +62,7 @@ function Steps({ step }: { step: 1 | 2 }) {
 function Review({ result, sourceName, developers, developerId, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; developerId?: string; onRestart: () => void }) {
   // Started from a developer's page: keep that developer, whatever the document names.
   const [devChoice, setDevChoice] = useState(developerId ?? result.developerMatchId ?? (result.developer.company ? "__new__" : ""));
-  const contactsNote = result.contacts.map((c) => [c.name, c.role && `(${c.role})`, c.company, c.email, c.phone].filter(Boolean).join(" ")).join("; ");
+  const contactsNote = result.contacts.map((c) => [c.name, c.role && `(${c.role})`, c.company, c.email, formatPhone(c.phone)].filter(Boolean).join(" ")).join("; ");
   const scoringCount = Object.keys(result.valuation).length;
 
   const developerField = (
@@ -99,7 +101,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
                 <Field label="Company"><input name="devCompany" defaultValue={result.developer.company} required className="input" /></Field>
                 <Field label="Contact name"><input name="devContactName" defaultValue={result.developer.contactName} className="input" /></Field>
                 <Field label="Email"><input name="devEmail" type="email" defaultValue={result.developer.email} className="input" /></Field>
-                <Field label="Phone"><input name="devPhone" defaultValue={result.developer.phone} className="input" /></Field>
+                <Field label="Phone"><PhoneInput name="devPhone" defaultValue={result.developer.phone} /></Field>
                 <Field label="Website"><input name="devWebsite" defaultValue={result.developer.website} className="input" /></Field>
               </div>
             </>
@@ -107,7 +109,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
           {result.contacts.length > 0 && (
             <div className="text-sm">
               <h3 className="font-semibold">Contacts found</h3>
-              <ul className="mt-1 list-disc pl-5 text-slate-600">{result.contacts.map((c, i) => <li key={i}>{[c.name, c.role && `(${c.role})`, c.company, c.email, c.phone].filter(Boolean).join(" · ")}</li>)}</ul>
+              <ul className="mt-1 list-disc pl-5 text-slate-600">{result.contacts.map((c, i) => <li key={i}>{[c.name, c.role && `(${c.role})`, c.company, c.email, formatPhone(c.phone)].filter(Boolean).join(" · ")}</li>)}</ul>
               <p className="mt-1 text-xs text-slate-500">Saved to the developer&apos;s activity log.</p>
             </div>
           )}

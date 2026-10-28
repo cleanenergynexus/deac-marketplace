@@ -2,6 +2,8 @@ import type { Developer } from "@prisma/client";
 import { Field, Select } from "@/components/ui";
 import type { PipelineStage } from "@/lib/pipeline";
 import { SaveButton } from "@/components/SaveButton";
+import { PhoneInput } from "@/components/PhoneInput";
+import { AddressFields } from "@/components/AddressFields";
 
 export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action: (f: FormData) => Promise<void>; stages?: PipelineStage[] }) {
   return (
@@ -14,7 +16,7 @@ export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action
           <Field label="Contact name"><input name="contactName" required className="input" /></Field>
           <Field label="Contact title"><input name="contactTitle" className="input" placeholder="e.g. CEO" /></Field>
           <Field label="Email"><input name="email" type="email" required className="input" /></Field>
-          <Field label="Phone"><input name="phone" className="input" /></Field>
+          <Field label="Phone"><PhoneInput name="phone" /></Field>
         </>}
         <Field label="Website"><input name="website" defaultValue={dev?.website ?? ""} className="input" /></Field>
         <Field label="HQ"><input name="hq" defaultValue={dev?.hq ?? ""} className="input" /></Field>
@@ -23,6 +25,7 @@ export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action
         <Field label="Relationship owner"><input name="owner" defaultValue={dev?.owner ?? ""} className="input" /></Field>
         {!dev && stages && <Field label="Stage"><Select name="stage" options={stages} /></Field>}
       </div>
+      <AddressFields value={dev} className="grid gap-4 sm:grid-cols-3" />
       <Field label="Experience / track record (shown to investors)"><textarea name="experience" rows={4} defaultValue={dev?.experience ?? ""} className="input" /></Field>
       <Field label="Internal notes"><textarea name="notes" rows={2} defaultValue={dev?.notes ?? ""} className="input" /></Field>
       {dev ? <SaveButton label="Save changes" /> : <button className="btn">Create company</button>}

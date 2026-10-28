@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { formatPhone } from "@/lib/phone";
+import { shortPlace } from "@/lib/address";
 import { Badge, Empty, PageHeader } from "@/components/ui";
 import { Avatar } from "@/components/CrmIcons";
 import { loadCrm } from "@/lib/contacts-db";
@@ -13,7 +15,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
   const q = sp.q?.trim().toLowerCase();
   const [{ developers, lastTouch, openTasks }, pipeline] = await Promise.all([loadCrm(), getPipeline()]);
   const rows = developers.flatMap((d) => d.contacts.map((c) => ({ c, d, projects: d.projects.filter((p) => projectContactId(p, d.contacts) === c.id) })))
-    .filter(({ c, d }) => !q || [c.name, c.email, c.title, d.company].some((x) => x?.toLowerCase().includes(q)))
+    .filter(({ c, d }) => !q || [c.name, c.email, c.title, c.city, d.company].some((x) => x?.toLowerCase().includes(q)))
     .sort((a, b) => (lastTouch.get(b.c.id)?.getTime() ?? 0) - (lastTouch.get(a.c.id)?.getTime() ?? 0) || a.c.name.localeCompare(b.c.name));
 
   return (
@@ -33,11 +35,11 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
                   <td className="td">
                     <Link href={`/admin/developers/contacts/${c.id}`} className="flex items-center gap-2">
                       <Avatar name={c.name} initials={initials(c.name)} size="sm" />
-                      <span><span className="block font-medium text-brand-600">{c.name}</span>{c.title && <span className="block text-xs text-slate-500">{c.title}</span>}</span>
+                      <span><span className="block font-medium text-brand-600">{c.name}</span>{c.title && <span className="block text-xs text-slate-500">{c.title}</span>}{shortPlace(c) && <span className="block text-xs text-slate-400">{shortPlace(c)}</span>}</span>
                     </Link>
                   </td>
                   <td className="td"><Link href={`/admin/developers/${d.id}`} className="hover:text-brand-600">{d.company}</Link>{c.isPrimary && <div><Badge tone="blue">Primary</Badge></div>}</td>
-                  <td className="td text-xs">{c.email && <a href={`mailto:${c.email}`} className="block text-brand-600">{c.email}</a>}<span className="text-slate-500">{c.phone ?? c.mobile}</span></td>
+                  <td className="td text-xs">{c.email && <a href={`mailto:${c.email}`} className="block text-brand-600">{c.email}</a>}<span className="whitespace-nowrap text-slate-500">{formatPhone(c.phone ?? c.mobile)}</span></td>
                   <td className="td">
                     <ul className="space-y-0.5 text-xs">{projects.map((p) => (
                       <li key={p.id}><Link href={`/admin/projects/${p.id}`} className="text-slate-700 hover:text-brand-600">{p.code}</Link> <span className="text-slate-500">· {projectStageLabel(pipeline, p, d.stage)}</span></li>

@@ -1,4 +1,5 @@
 import { applyForAccess } from "@/app/actions/public";
+import { PhoneInput } from "@/components/PhoneInput";
 import { ActionForm } from "@/components/ActionForm";
 import { Checks } from "@/components/Checks";
 import { Field, Select } from "@/components/ui";
@@ -16,7 +17,7 @@ export default function Apply() {
           <Field label="Full name"><input name="name" required className="input" /></Field>
           <Field label="Firm"><input name="firm" className="input" /></Field>
           <Field label="Title"><input name="title" className="input" /></Field>
-          <Field label="Phone"><input name="phone" className="input" /></Field>
+          <Field label="Phone"><PhoneInput name="phone" /></Field>
           <Field label="Email"><input name="email" type="email" required className="input" /></Field>
           <Field label="Create password"><input name="password" type="password" minLength={8} required className="input" /></Field>
         </div>

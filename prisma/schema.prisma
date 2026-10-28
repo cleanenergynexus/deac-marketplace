@@ -66,9 +66,15 @@ model Developer {
   company     String
   contactName String
   email       String
-  phone       String?
+  phone       String? // E.164, see lib/phone.ts
   website     String?
   hq          String?
+  // Mailing address. country is a two-letter code (lib/phone.ts COUNTRIES); region is the US state code for US addresses.
+  street      String?
+  city        String?
+  region      String?
+  postalCode  String?
+  country     String?
   experience  String? // track record narrative
   mwDelivered Float?
   stage       String   @default("LEAD") // used on the CRM board only while the developer has no projects; see lib/constants.ts
@@ -98,6 +104,12 @@ model Contact {
   mobile      String?
   linkedin    String?
   location    String?
+  // Mailing address. country is a two-letter code (lib/phone.ts COUNTRIES); region is the US state code for US addresses.
+  street      String?
+  city        String?
+  region      String?
+  postalCode  String?
+  country     String?
   source      String?
   owner       String? // team member responsible
   notes       String?
