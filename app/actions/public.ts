@@ -63,7 +63,8 @@ export async function submitProject(_: unknown, f: FormData) {
   if (!email || !company || !s(f, "state") || !n(f, "mw")) return { error: "Company, email, state and MW are required." };
 
   let dev = await db.developer.findFirst({ where: { email } });
-  if (!dev) dev = await db.developer.create({ data: { company, contactName: s(f, "contactName") ?? "", email, phone: s(f, "phone"), website: s(f, "website"), experience: s(f, "experience"), source: "Website submission" } });
+  if (!dev) dev = await db.developer.create({ data: { company, contactName: s(f, "contactName") ?? "", email, phone: s(f, "phone"), website: s(f, "website"), experience: s(f, "experience"), source: "Website submission",
+    contacts: { create: { name: s(f, "contactName") ?? company, email, phone: s(f, "phone"), source: "Website submission", isPrimary: true } } } });
 
   const count = await db.project.count();
   const state = s(f, "state")!.toUpperCase();

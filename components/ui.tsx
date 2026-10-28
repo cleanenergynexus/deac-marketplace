@@ -9,7 +9,7 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
     blue: "bg-brand-100 text-brand-700",
     purple: "bg-violet-100 text-violet-800",
   };
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
+  return <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
 }
 
 export const statusTone = (s: string) =>

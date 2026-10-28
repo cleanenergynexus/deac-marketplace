@@ -130,11 +130,14 @@ function parseCsv(text: string): string[][] {
 
 // ---------- Developers ----------
 function developerData(f: FormData) {
-  return { company: s(f, "company") ?? "", contactName: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: s(f, "phone"), website: s(f, "website"), hq: s(f, "hq"), experience: s(f, "experience"), mwDelivered: n(f, "mwDelivered"), source: s(f, "source"), owner: s(f, "owner"), notes: s(f, "notes") };
+  return { company: s(f, "company") ?? "", website: s(f, "website"), hq: s(f, "hq"), experience: s(f, "experience"), mwDelivered: n(f, "mwDelivered"), source: s(f, "source"), owner: s(f, "owner"), notes: s(f, "notes") };
 }
+/** New company plus its first (primary) contact. After this, contact details are edited on the contact record. */
 export async function createDeveloper(f: FormData) {
-  await requireAdmin();
-  const d = await db.developer.create({ data: { ...developerData(f), stage: s(f, "stage") ?? "LEAD" } });
+  const admin = await requireAdmin();
+  const contact = { name: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: s(f, "phone"), title: s(f, "contactTitle") };
+  const d = await db.developer.create({ data: { ...developerData(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: s(f, "stage") ?? "LEAD",
+    contacts: { create: { ...contact, email: contact.email || null, isPrimary: true, source: s(f, "source"), owner: s(f, "owner") ?? admin.name } } } });
   redirect(`/admin/developers/${d.id}`);
 }
 export async function updateDeveloper(f: FormData) {
@@ -159,9 +162,9 @@ export async function setProjectPipelineStage(f: FormData) {
   const stage = String(f.get("stage"));
   if (!DEVELOPER_STAGES.some((s) => s.value === stage)) throw new Error("Unknown stage.");
   const p = await db.project.update({ where: { id }, data: { pipelineStage: stage } });
-  await db.activity.create({ data: { developerId: p.developerId, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${stageLabel(DEVELOPER_STAGES, stage)}`, by: admin.name } });
-  revalidatePath("/admin/developers");
-  revalidatePath(`/admin/developers/${p.developerId}`);
+  const contactId = p.contactId ?? (await db.contact.findFirst({ where: { developerId: p.developerId, isPrimary: true }, select: { id: true } }))?.id ?? null;
+  await db.activity.create({ data: { developerId: p.developerId, contactId, projectId: p.id, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${stageLabel(DEVELOPER_STAGES, stage)}`, by: admin.name } });
+  revalidatePath("/admin/developers", "layout");
   revalidatePath(`/admin/projects/${id}`);
 }
 export async function addTeamMember(f: FormData) {
@@ -227,7 +230,8 @@ export async function createImportedProject(f: FormData) {
     const company = s(f, "devCompany");
     if (!company) throw new Error("Enter the developer's company name.");
     const dev = await db.developer.create({
-      data: { company, contactName: s(f, "devContactName") ?? company, email: s(f, "devEmail") ?? "", phone: s(f, "devPhone"), website: s(f, "devWebsite"), source: "Document import", stage: "LEAD", owner: admin.name },
+      data: { company, contactName: s(f, "devContactName") ?? company, email: s(f, "devEmail") ?? "", phone: s(f, "devPhone"), website: s(f, "devWebsite"), source: "Document import", stage: "LEAD", owner: admin.name,
+        contacts: s(f, "devContactName") ? { create: { name: s(f, "devContactName")!, email: s(f, "devEmail")?.toLowerCase(), phone: s(f, "devPhone"), source: "Document import", owner: admin.name, isPrimary: true } } : undefined },
     });
     developerId = dev.id;
   }
