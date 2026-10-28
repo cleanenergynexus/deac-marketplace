@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { usd, num } from "@/lib/format";
-import { dealTypeLabel } from "@/lib/constants";
+import { dealTypeLabel, isClosedDeal } from "@/lib/constants";
+import { ClosedBanner } from "@/components/ClosedBanner";
 
-type P = { id: string; code: string; title: string; mw: number; facilityType: string; fundingNeeded: number; state: string; city: string | null; dealType: string; projectStatus: string; coverImageUrl: string | null };
+type P = { id: string; code: string; title: string; mw: number; facilityType: string; fundingNeeded: number; state: string; city: string | null; dealType: string; projectStatus: string; coverImageUrl: string | null; dealStage?: string | null };
 
 const dealTone: Record<string, string> = { LEASE: "bg-sky-600", FINANCING: "bg-emerald-600", SALE: "bg-amber-600" };
 
 export function ProjectTile({ p, href, hideTitle = false }: { p: P; href: string; hideTitle?: boolean }) {
+  const closed = isClosedDeal(p.dealStage);
   return (
-    <Link href={href} className="card group flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md">
+    <Link href={href} className={`card group relative flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md ${closed ? "bg-slate-100" : ""}`}>
+      {closed && <ClosedBanner />}
+      <div className={`flex flex-1 flex-col ${closed ? "opacity-60 grayscale-[70%]" : ""}`}>
       <div className="relative h-36 bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500">
         {p.coverImageUrl && <img src={p.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" />}
         <span className={`absolute left-3 top-3 rounded px-2 py-0.5 text-xs font-semibold text-white ${dealTone[p.dealType] ?? "bg-slate-600"}`}>{dealTypeLabel(p.dealType)}</span>
@@ -25,7 +29,10 @@ export function ProjectTile({ p, href, hideTitle = false }: { p: P; href: string
           <div><dt className="text-xs text-slate-500">Funding needed</dt><dd className="font-medium">{p.fundingNeeded ? usd(p.fundingNeeded) : "—"}</dd></div>
           <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium">{p.projectStatus}</dd></div>
         </dl>
-        {hideTitle && <div className="mt-auto border-t border-slate-100 pt-3 text-sm font-semibold text-brand-600">🔒 Request access to view details →</div>}
+        {closed ? (
+          <div className="mt-auto border-t border-slate-200 pt-3 text-sm font-semibold text-red-600">Closed - Sold</div>
+        ) : hideTitle && <div className="mt-auto border-t border-slate-100 pt-3 text-sm font-semibold text-brand-600">🔒 Request access to view details →</div>}
+      </div>
       </div>
     </Link>
   );

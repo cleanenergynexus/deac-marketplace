@@ -2,12 +2,16 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { ProjectTile } from "@/components/ProjectTile";
 import { usd, num } from "@/lib/format";
+import { isClosedDeal } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const teasers = await db.project.findMany({ where: { visibility: "TEASER" }, orderBy: { updatedAt: "desc" }, take: 6 });
-  const agg = await db.project.aggregate({ where: { visibility: { in: ["TEASER", "PRIVATE"] } }, _sum: { mw: true, fundingNeeded: true }, _count: true });
+  // Open teasers first; closed ones only fill leftover slots, at the end.
+  const teasers = (await db.project.findMany({ where: { visibility: "TEASER" }, orderBy: { updatedAt: "desc" } }))
+    .sort((a, b) => Number(isClosedDeal(a.dealStage)) - Number(isClosedDeal(b.dealStage)))
+    .slice(0, 6);
+  const agg = await db.project.aggregate({ where: { visibility: { in: ["TEASER", "PRIVATE"] }, dealStage: { not: "CLOSED" } }, _sum: { mw: true, fundingNeeded: true }, _count: true });
   return (
     <div className="space-y-14">
       <section className="overflow-hidden rounded-2xl bg-brand-900 px-8 py-14 text-white">
