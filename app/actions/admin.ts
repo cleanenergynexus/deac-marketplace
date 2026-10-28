@@ -2,7 +2,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { checkPassword, hashPassword, requireAdmin } from "@/lib/auth";
+import { checkPassword, hashPassword, requireAdmin, requireTeamAdmin } from "@/lib/auth";
+import { checkStaffChange } from "@/lib/tasks";
+import { getTeam } from "@/lib/tasks-db";
 import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { normalizeScoring, type ScoringConfig } from "@/lib/scoring";
 import { getScoring } from "@/lib/scoring-db";
@@ -442,27 +444,47 @@ export async function sendCampaign(f: FormData) {
 
 // ---------- Team (DEAC admin logins) ----------
 export async function addTeamAdmin(_: unknown, f: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireTeamAdmin();
   const email = s(f, "email")?.toLowerCase();
   const name = s(f, "name");
   const password = String(f.get("password") ?? "");
+  const level = s(f, "staffLevel") ?? "ADMIN";
+  const managerId = s(f, "managerId");
   if (!email || !name || password.length < 10) return { error: "Name, email and a temporary password of at least 10 characters are required." };
   const existing = await db.user.findUnique({ where: { email } });
   if (existing && existing.role !== "ADMIN") return { error: "That email belongs to an investor or developer account. Use a different email for the team login." };
   if (existing) return { error: "That person is already on the team." };
-  await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED" } });
+  const team = await getTeam();
+  const problem = checkStaffChange([...team, { id: "new", name, staffLevel: level, managerId }], { id: "new", staffLevel: level, managerId });
+  if (problem) return { error: problem };
+  await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED", staffLevel: level, managerId } });
   await sendEmail({ to: email, subject: "Your DEAC Marketplace team login", text: `Hi ${name.split(" ")[0]},\n\n${admin.name} added you to the DEAC Marketplace team.\n\nSign in at ${process.env.PUBLIC_APP_URL ?? ""}/login with this email. ${admin.name} will share your temporary password; please change it under My account after signing in.\n\n— DEAC Team` });
   revalidatePath("/admin/team");
   return { ok: true };
 }
 
-export async function removeTeamAdmin(f: FormData) {
-  const admin = await requireAdmin();
+/** Changes a team member's access level (Admin / Manager / Support) and who they report to. */
+export async function updateTeamMember(_: unknown, f: FormData) {
+  await requireTeamAdmin();
   const id = String(f.get("id"));
-  if (id === admin.id) return; // can't remove yourself
-  if ((await db.user.count({ where: { role: "ADMIN" } })) <= 1) return; // always keep one admin
+  const level = s(f, "staffLevel") ?? "";
+  const managerId = s(f, "managerId");
+  const team = await getTeam();
+  if (!team.some((u) => u.id === id)) return { error: "That person is not on the team." };
+  const problem = checkStaffChange(team, { id, staffLevel: level, managerId });
+  if (problem) return { error: problem };
+  await db.user.update({ where: { id }, data: { staffLevel: level, managerId } });
+  revalidatePath("/admin", "layout");
+  return { ok: true };
+}
+
+export async function removeTeamAdmin(f: FormData) {
+  const admin = await requireTeamAdmin();
+  const id = String(f.get("id"));
+  if (id === admin.id) return; // can't remove yourself, so an Admin always stays
+  // Their tasks become unassigned (Admins see them) and their reports lose their manager.
   await db.user.delete({ where: { id } });
-  revalidatePath("/admin/team");
+  revalidatePath("/admin", "layout");
 }
 
 export async function changeOwnPassword(_: unknown, f: FormData) {

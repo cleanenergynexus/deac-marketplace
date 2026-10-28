@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
 import { COOKIE, readToken, signSession, type Session } from "./session";
+import { staffLevel } from "./tasks";
 import { investorStage, type Stage, type StepStatus } from "./disclosure";
 
 export async function getSession() {
@@ -33,6 +34,13 @@ export async function currentUser() {
 export async function requireAdmin() {
   const u = await currentUser();
   if (!u || u.role !== "ADMIN") redirect("/login");
+  return u;
+}
+
+/** Team member with Admin access level (manages the team). Managers and Support are sent to the dashboard. */
+export async function requireTeamAdmin() {
+  const u = await requireAdmin();
+  if (staffLevel(u.staffLevel) !== "ADMIN") redirect("/admin");
   return u;
 }
 

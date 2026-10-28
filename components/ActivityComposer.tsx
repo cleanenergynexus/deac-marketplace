@@ -5,7 +5,16 @@ import { logContactActivity } from "@/app/actions/contacts";
 import { CALL_OUTCOMES, EMAIL_DIRECTIONS, LOG_KINDS, type LogKind } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
 
-type Props = { contactId: string; contactEmail: string | null; projects: { id: string; label: string }[]; initialKind: LogKind };
+type Props = {
+  contactId: string;
+  contactEmail: string | null;
+  projects: { id: string; label: string }[];
+  initialKind: LogKind;
+  /** Team members this person can assign tasks to, and who they are (the default assignee). */
+  assignees: { id: string; name: string }[];
+  me: string;
+  allowUnassigned: boolean;
+};
 
 const PLACEHOLDER: Record<LogKind, string> = {
   NOTE: "Start typing to leave a note…",
@@ -16,7 +25,7 @@ const PLACEHOLDER: Record<LogKind, string> = {
 };
 
 /** Log box above the contact timeline: pick Note, Email, Call, Meeting or Task, fill it in, save. */
-export function ActivityComposer({ contactId, contactEmail, projects, initialKind }: Props) {
+export function ActivityComposer({ contactId, contactEmail, projects, initialKind, assignees, me, allowUnassigned }: Props) {
   const [kind, setKind] = useState<LogKind>(initialKind);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -62,9 +71,17 @@ export function ActivityComposer({ contactId, contactEmail, projects, initialKin
           </label>
         )}
         {kind === "TASK" ? (
-          <label className="text-xs text-slate-500">Due date
-            <input type="date" name="dueAt" className="input mt-1 w-40 py-1.5" />
-          </label>
+          <>
+            <label className="text-xs text-slate-500">Due date
+              <input type="date" name="dueAt" className="input mt-1 w-40 py-1.5" />
+            </label>
+            <label className="text-xs text-slate-500">Assign to
+              <select name="assigneeId" defaultValue={me} className="input mt-1 w-48 py-1.5">
+                {allowUnassigned && <option value="">Unassigned</option>}
+                {assignees.map((a) => <option key={a.id} value={a.id}>{a.id === me ? `${a.name} (me)` : a.name}</option>)}
+              </select>
+            </label>
+          </>
         ) : (
           <label className="text-xs text-slate-500">When <span className="text-slate-400">(blank = now)</span>
             <input type="datetime-local" name="when" className="input mt-1 w-52 py-1.5" />

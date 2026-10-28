@@ -19,17 +19,20 @@ import { formatPhone } from "@/lib/phone";
 import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
+import { requireAdmin } from "@/lib/auth";
+import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function DeveloperDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await ensureContacts(id);
+  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
   const dev = await db.developer.findUnique({ where: { id }, include: {
     team: { orderBy: { sortOrder: "asc" } },
     projects: true,
     contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
-    activities: { orderBy: { createdAt: "desc" }, take: 50, include: { contact: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } } } },
+    activities: { where: visibleTimelineWhere(me, team), orderBy: { createdAt: "desc" }, take: 50, include: { contact: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } } },
   } });
   if (!dev) notFound();
   const [scoring, pipeline] = await Promise.all([getScoring(), getPipeline()]);

@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
+import { getTeam, visibleTaskWhere } from "@/lib/tasks-db";
 
 /**
  * Developers saved before contact records existed have their one contact on the company row.
@@ -27,9 +29,13 @@ export async function syncPrimaryContact(developerId: string) {
 
 const LOGGED = ["NOTE", "EMAIL", "CALL", "MEETING", "TASK"];
 
-/** Everything the Developer CRM lists need: companies with their contacts and projects, plus last touch and open tasks per contact. */
+/**
+ * Everything the Developer CRM lists need: companies with their contacts and projects, plus last touch and open tasks per contact.
+ * Open task counts only include the tasks the signed-in team member may see.
+ */
 export async function loadCrm() {
   await ensureContacts();
+  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
   const [developers, touches, tasks] = await Promise.all([
     db.developer.findMany({
       orderBy: { updatedAt: "desc" },
@@ -39,7 +45,7 @@ export async function loadCrm() {
       },
     }),
     db.activity.groupBy({ by: ["contactId"], where: { contactId: { not: null }, kind: { in: LOGGED } }, _max: { createdAt: true } }),
-    db.activity.groupBy({ by: ["contactId"], where: { contactId: { not: null }, kind: "TASK", doneAt: null }, _count: true }),
+    db.activity.groupBy({ by: ["contactId"], where: { ...visibleTaskWhere(me, team), contactId: { not: null }, doneAt: null }, _count: true }),
   ]);
   const lastTouch = new Map(touches.map((t) => [t.contactId!, t._max.createdAt]));
   const openTasks = new Map(tasks.map((t) => [t.contactId!, t._count]));
