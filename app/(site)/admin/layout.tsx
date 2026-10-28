@@ -15,7 +15,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/tasks", label: "Tasks", count: myTasks },
     { href: "/admin/access", label: "Access requests", count: applied },
-    { href: "/admin/investors", label: "Investor CRM" },
+    {
+      href: "/admin/investors",
+      label: "Investor CRM",
+      children: [
+        { href: "/admin/investors/companies", label: "Companies" },
+        { href: "/admin/investors/contacts", label: "Contacts" },
+        { href: "/admin/investors/listings", label: "Listings" },
+        { href: "/admin/investors/funnels", label: "Funnels" },
+      ],
+    },
     {
       href: "/admin/developers",
       label: "Developer CRM",

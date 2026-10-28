@@ -2,25 +2,50 @@
 import Link from "next/link";
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { setDeveloperStage, setProjectPipelineStage } from "@/app/actions/admin";
+import { setInterestStage } from "@/app/actions/investors";
 import type { PipelineStage } from "@/lib/pipeline";
 import { num } from "@/lib/format";
 
 type Person = { id: string; name: string; title: string | null; initials: string; lastTouch: string | null; openTasks: number };
 
 /**
- * One tile on the Developer CRM board. It leads with the contact and their company.
- * kind "project": one of the company's projects (each moves on its own). kind "company": a company with no project yet.
+ * One tile on a CRM board. It leads with the contact and their company; the project or listing is secondary.
+ * Developer CRM: kind "project" is one of the company's projects (each moves on its own), kind "company" a company with no project yet.
+ * Investor CRM: kind "interest" is one investor contact working one listing.
  */
 export type BoardCard = {
-  kind: "project" | "company";
-  id: string; // project id, or developer id for "company"
+  kind: "project" | "company" | "interest";
+  id: string; // project id, developer id for "company", InvestorInterest id for "interest"
   stage: string;
-  developerId: string;
+  companyId: string | null; // developer id, or investor firm id (null = investor with no company on file)
   company: string;
   contact: Person | null;
   contacts: number; // people on file at the company
-  project?: { title: string; code: string; mw: number; score: number | null; scoreTone?: "green" | "amber" | "red" };
+  projectId?: string;
+  project?: { title: string; code: string; mw: number; score: number | null; scoreTone?: "green" | "amber" | "red"; note?: string | null };
 };
+
+/** Where a tile's names link to, per CRM. */
+function links(c: BoardCard) {
+  if (c.kind === "interest") {
+    return {
+      contact: c.contact ? `/admin/investors/${c.contact.id}` : null,
+      tasks: c.contact ? `/admin/investors/${c.contact.id}?tab=tasks` : null,
+      company: c.companyId ? `/admin/investors/companies/${c.companyId}` : null,
+      addContact: null,
+      project: `/admin/projects/${c.projectId}`,
+      addProject: null,
+    };
+  }
+  return {
+    contact: c.contact ? `/admin/developers/contacts/${c.contact.id}` : null,
+    tasks: c.contact ? `/admin/developers/contacts/${c.contact.id}?tab=tasks` : null,
+    company: `/admin/developers/${c.companyId}`,
+    addContact: `/admin/developers/${c.companyId}#contacts`,
+    project: `/admin/projects/${c.projectId ?? c.id}`,
+    addProject: `/admin/projects/new?developerId=${c.companyId}`,
+  };
+}
 
 const key = (c: BoardCard) => `${c.kind}:${c.id}`;
 
@@ -38,7 +63,7 @@ export function PipelineBoard({ cards, stages }: { cards: BoardCard[]; stages: P
     f.set("stage", stage);
     startTransition(async () => {
       move({ key: key(c), stage });
-      await (c.kind === "project" ? setProjectPipelineStage(f) : setDeveloperStage(f));
+      await (c.kind === "interest" ? setInterestStage(f) : c.kind === "project" ? setProjectPipelineStage(f) : setDeveloperStage(f));
     });
   };
 
@@ -173,42 +198,44 @@ const SCORE_TONES = { green: "bg-emerald-100 text-emerald-800", amber: "bg-amber
 
 function Tile({ c }: { c: BoardCard }) {
   const p = c.project;
+  const to = links(c);
   return (
     <>
       {/* Who: contact + company */}
       <div className="flex items-start gap-2">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">{c.contact?.initials ?? "?"}</span>
         <div className="min-w-0">
-          {c.contact
-            ? <Link href={`/admin/developers/contacts/${c.contact.id}`} className="block truncate font-semibold text-slate-900 hover:text-brand-600">{c.contact.name}</Link>
-            : <Link href={`/admin/developers/${c.developerId}#contacts`} className="block font-semibold text-slate-500 hover:text-brand-600">Add a contact</Link>}
-          <Link href={`/admin/developers/${c.developerId}`} className="block truncate text-xs font-medium text-slate-600 hover:text-brand-600" title={c.contact?.title ? `${c.contact.title}, ${c.company}` : c.company}>
-            {c.company}
-          </Link>
+          {c.contact && to.contact
+            ? <Link href={to.contact} className="block truncate font-semibold text-slate-900 hover:text-brand-600">{c.contact.name}</Link>
+            : to.addContact ? <Link href={to.addContact} className="block font-semibold text-slate-500 hover:text-brand-600">Add a contact</Link> : <span className="block font-semibold text-slate-500">No contact</span>}
+          {to.company
+            ? <Link href={to.company} className="block truncate text-xs font-medium text-slate-600 hover:text-brand-600" title={c.contact?.title ? `${c.contact.title}, ${c.company}` : c.company}>{c.company}</Link>
+            : <span className="block truncate text-xs text-slate-400">{c.company}</span>}
           {c.contact?.title && <div className="truncate text-xs text-slate-400">{c.contact.title}</div>}
         </div>
       </div>
 
-      {/* What: the project (secondary) */}
+      {/* What: the project or listing (secondary) */}
       {p ? (
         <div className="mt-2 rounded-md bg-slate-50 px-2 py-1.5 text-xs">
-          <Link href={`/admin/projects/${c.id}`} className="line-clamp-2 text-slate-700 hover:text-brand-600">{p.title}</Link>
+          <Link href={to.project} className="line-clamp-2 text-slate-700 hover:text-brand-600">{p.title}</Link>
           <div className="mt-1 flex items-center justify-between">
             <span className="font-mono text-slate-500">{p.code} · {num(p.mw)} MW</span>
             {p.score != null && p.score > 0 && (
               <span className={`rounded-full px-2 py-0.5 font-medium ${SCORE_TONES[p.scoreTone ?? (p.score >= 70 ? "green" : p.score >= 50 ? "amber" : "red")]}`}>{p.score}</span>
             )}
           </div>
+          {p.note && <div className="mt-1 text-[11px] text-slate-500">{p.note}</div>}
         </div>
-      ) : (
-        <Link href={`/admin/projects/new?developerId=${c.developerId}`} className="mt-2 block text-xs text-brand-600">No projects yet · Add a project</Link>
-      )}
+      ) : to.addProject ? (
+        <Link href={to.addProject} className="mt-2 block text-xs text-brand-600">No projects yet · Add a project</Link>
+      ) : null}
 
       {/* Communications at a glance */}
       {c.contact && (
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
           <span>{c.contact.lastTouch ? `Last touch ${c.contact.lastTouch}` : "No touchpoints yet"}</span>
-          {c.contact.openTasks > 0 && <Link href={`/admin/developers/contacts/${c.contact.id}?tab=tasks`} className="rounded-full bg-amber-100 px-1.5 font-medium text-amber-800">{c.contact.openTasks} task{c.contact.openTasks === 1 ? "" : "s"}</Link>}
+          {c.contact.openTasks > 0 && to.tasks && <Link href={to.tasks} className="rounded-full bg-amber-100 px-1.5 font-medium text-amber-800">{c.contact.openTasks} task{c.contact.openTasks === 1 ? "" : "s"}</Link>}
         </div>
       )}
     </>

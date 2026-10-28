@@ -28,9 +28,9 @@ export default async function Developers({ searchParams }: { searchParams: Promi
       return c ? { id: c.id, name: c.name, title: c.title, initials: initials(c.name), lastTouch: ago(lastTouch.get(c.id)), openTasks: openTasks.get(c.id) ?? 0 } : null;
     };
     // A company with no project yet has no deal type, so it shows in every funnel.
-    if (!d.projects.length) return [{ kind: "company", id: d.id, stage: placeStage(stages, d.stage), developerId: d.id, company: d.company, contact: person(projectContactId({ contactId: null }, d.contacts)), contacts: d.contacts.length }];
+    if (!d.projects.length) return [{ kind: "company", id: d.id, stage: placeStage(stages, d.stage), companyId: d.id, company: d.company, contact: person(projectContactId({ contactId: null }, d.contacts)), contacts: d.contacts.length }];
     return d.projects.filter((p) => funnelKey(p.dealType) === funnel).map((p) => ({
-      kind: "project", id: p.id, stage: projectStage(pipeline, p, d.stage), developerId: d.id, company: d.company, contact: person(projectContactId(p, d.contacts)), contacts: d.contacts.length,
+      kind: "project", id: p.id, projectId: p.id, stage: projectStage(pipeline, p, d.stage), companyId: d.id, company: d.company, contact: person(projectContactId(p, d.contacts)), contacts: d.contacts.length,
       project: { title: p.title, code: p.code, mw: p.mw, score: p.valueScore, scoreTone: p.valueScore != null ? recommendation(p.valueScore, scoring).tone : undefined },
     }));
   }).filter((c) => (!sp.stage || c.stage === sp.stage) && (!q || [c.contact?.name, c.company, c.project?.title, c.project?.code].some((x) => x?.toLowerCase().includes(q))));

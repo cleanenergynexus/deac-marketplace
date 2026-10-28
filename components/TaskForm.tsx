@@ -8,11 +8,13 @@ type Props = {
   me: string;
   allowUnassigned: boolean;
   contacts: { id: string; name: string; company: string; developerId: string }[];
+  /** Investor CRM contacts, ids prefixed "inv:". Any listing can be picked with them. */
+  investors?: { id: string; name: string; company: string; developerId: string }[];
   projects: { id: string; label: string; developerId: string }[];
 };
 
 /** New task on the Tasks page: title, due date, who it's for, and the CRM contact / project it's about. */
-export function TaskForm({ assignees, me, allowUnassigned, contacts, projects }: Props) {
+export function TaskForm({ assignees, me, allowUnassigned, contacts, investors = [], projects }: Props) {
   const [contactId, setContactId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -46,7 +48,12 @@ export function TaskForm({ assignees, me, allowUnassigned, contacts, projects }:
       <label className="text-xs text-slate-500">Contact
         <select name="contactId" value={contactId} onChange={(e) => setContactId(e.target.value)} className="input mt-1">
           <option value="">—</option>
-          {contacts.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.company}</option>)}
+          {investors.length > 0 ? (
+            <>
+              <optgroup label="Developer CRM">{contacts.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.company}</option>)}</optgroup>
+              <optgroup label="Investor CRM">{investors.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.company}</option>)}</optgroup>
+            </>
+          ) : contacts.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.company}</option>)}
         </select>
       </label>
       <label className="text-xs text-slate-500">Project

@@ -71,3 +71,11 @@ Listing documents can point at data room files: **Share on listing** in the data
 The Developer CRM board has one funnel per deal type (For Lease, Investment / Financing, For Sale), picked with the tabs above the board. A project shows in the funnel for its deal type; a company with no project yet shows in every funnel. Wide boards scroll sideways with the bar above the columns, the bar below them (it stays pinned to the bottom of the window), the ← → buttons, or the trackpad.
 
 **Developer CRM → Funnels** (or **Edit funnels** on the board) renames, adds, reorders and removes columns for each funnel, or copies another funnel's columns. Settings are saved in the `PipelineSettings` table. Renaming keeps every tile in place; tiles in a removed column move to that funnel's first column when you save. Changing a listing's deal type moves its tile to the new funnel, keeping its column if that funnel has it.
+
+## Investor CRM
+
+Works like the Developer CRM. **Investor CRM → Companies** are investor firms (funds, family offices, lenders); **Contacts** are the people at them, each with a contact record (notes, emails, calls, meetings, tasks, profile and mandate); **Listings** shows every listing with the investors working it.
+
+The board has one tile per investor per listing (contact and company first, listing second), with one funnel per deal type. Pick a listing in the menu above the board to see only that listing's investors, add investors to it, and see who else fits its mandate. **Investor CRM → Funnels** edits the columns (saved in `PipelineSettings` row `investor`).
+
+Tiles are created and moved forward on their own when an investor signs a listing's NDA, sends an LOI, has an LOI approved, gets diligence access or sends an intake request (never backwards). Existing NDAs, LOIs and intake requests become tiles the first time a CRM page loads, and investors' free-text firm names become companies.

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { PageHeader, Stat, Section, Badge, statusTone } from "@/components/ui";
 import { DEAL_TYPES, INVESTOR_STAGES } from "@/lib/constants";
-import { funnelKey, projectStage } from "@/lib/pipeline";
-import { getPipeline } from "@/lib/pipeline-db";
+import { funnelKey, funnelStages, placeStage, projectStage } from "@/lib/pipeline";
+import { getInvestorPipeline, getPipeline } from "@/lib/pipeline-db";
 import { usd, num, date } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 import { taskState } from "@/lib/crm";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
   const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
-  const [investors, developers, projects, lois, activity, pendingAccess, pipeline] = await Promise.all([
+  const [investors, developers, projects, lois, activity, pendingAccess, pipeline, interests, investorPipeline] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
     db.developer.findMany({ select: { stage: true, projects: { select: { dealType: true, pipelineStage: true } } } }),
     db.project.findMany({ select: { mw: true, fundingNeeded: true, visibility: true } }),
@@ -21,6 +21,8 @@ export default async function AdminHome() {
     db.activity.findMany({ where: visibleTimelineWhere(me, team), include: { investor: true, developer: true }, orderBy: { createdAt: "desc" }, take: 10 }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
     getPipeline(),
+    db.investorInterest.findMany({ select: { stage: true, project: { select: { dealType: true } } } }),
+    getInvestorPipeline(),
   ]);
   const myTasks = await db.activity.findMany({ where: { kind: "TASK", assigneeId: me.id, doneAt: null }, select: { dueAt: true, doneAt: true } });
   const myOverdue = myTasks.filter((t) => taskState(t) === "overdue").length;
@@ -29,6 +31,10 @@ export default async function AdminHome() {
   const tiles = developers.flatMap((d) => d.projects.map((p) => ({ funnel: funnelKey(p.dealType), stage: projectStage(pipeline, p, d.stage) })));
   const noProject = developers.filter((d) => !d.projects.length).length;
   const funnels = DEAL_TYPES.map((d) => ({ ...d, stages: pipeline.funnels[d.value], counts: pipeline.funnels[d.value].map((s) => ({ stage: s.value, _count: tiles.filter((t) => t.funnel === d.value && t.stage === s.value).length })) }));
+  // Investor CRM board tiles (one investor on one listing) per deal type funnel.
+  const investorTiles = interests.map((it) => ({ funnel: funnelKey(it.project.dealType), stage: placeStage(funnelStages(investorPipeline, it.project.dealType), it.stage) }));
+  const investorFunnels = DEAL_TYPES.map((d) => ({ ...d, stages: investorPipeline.funnels[d.value], counts: investorPipeline.funnels[d.value].map((s) => ({ stage: s.value, _count: investorTiles.filter((t) => t.funnel === d.value && t.stage === s.value).length })) }))
+    .filter((f) => investorTiles.some((t) => t.funnel === f.value));
   const live = projects.filter((p) => p.visibility !== "DRAFT");
   const count = (g: { stage: string; _count: number }[], s: string) => g.find((x) => x.stage === s)?._count ?? 0;
   const members = count(investors, "APPROVED") + count(investors, "ACTIVE");
@@ -55,7 +61,18 @@ export default async function AdminHome() {
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
         <Section title="Investor pipeline">
-          <Funnel stages={INVESTOR_STAGES} counts={investors} href="/admin/investors?stage=" />
+          <div className="space-y-5">
+            {investorFunnels.map((f) => (
+              <div key={f.value}>
+                <Link href={`/admin/investors?funnel=${f.value}`} className="mb-2 block text-xs font-semibold uppercase text-slate-500 hover:text-brand-600">{f.label}</Link>
+                <Funnel stages={f.stages} counts={f.counts} href={`/admin/investors?funnel=${f.value}&stage=`} />
+              </div>
+            ))}
+            <div>
+              <Link href="/admin/investors/contacts" className="mb-2 block text-xs font-semibold uppercase text-slate-500 hover:text-brand-600">Membership</Link>
+              <Funnel stages={INVESTOR_STAGES} counts={investors} href="/admin/investors/contacts?stage=" />
+            </div>
+          </div>
         </Section>
         <Section title="Developer pipeline">
           <div className="space-y-5">

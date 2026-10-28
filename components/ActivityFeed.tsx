@@ -9,6 +9,7 @@ import { AssigneeSelect, type Assignee } from "@/components/AssigneeSelect";
 
 export type FeedItem = Activity & {
   contact?: { id: string; name: string } | null;
+  investor?: { id: string; name: string } | null;
   project?: { id: string; code: string; title: string } | null;
   assignee?: Assignee | null;
 };
@@ -63,6 +64,7 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                         <span>For {a.assignee?.name ?? "nobody yet"}</span>
                       ))}
                       {showContact && a.contact && <Link href={`/admin/developers/contacts/${a.contact.id}`} className="text-brand-600">{a.contact.name}</Link>}
+                      {showContact && a.investor && <Link href={`/admin/investors/${a.investor.id}`} className="text-brand-600">{a.investor.name}</Link>}
                       {a.project && <Link href={`/admin/projects/${a.project.id}`} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
                       {a.by && <span>by {a.by}</span>}
                       {isLogKind(a.kind) && (

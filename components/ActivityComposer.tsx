@@ -2,11 +2,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { logContactActivity } from "@/app/actions/contacts";
+import { logInvestorActivity } from "@/app/actions/investors";
 import { CALL_OUTCOMES, EMAIL_DIRECTIONS, LOG_KINDS, type LogKind } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
 
 type Props = {
+  /** Developer CRM contact id, or the investor id when `investor` is set. */
   contactId: string;
+  /** Logs on an Investor CRM contact instead of a developer contact. */
+  investor?: boolean;
+  /** Label of the "about" menu: "project" (Developer CRM) or "listing" (Investor CRM). */
+  about?: string;
   contactEmail: string | null;
   projects: { id: string; label: string }[];
   initialKind: LogKind;
@@ -25,7 +31,7 @@ const PLACEHOLDER: Record<LogKind, string> = {
 };
 
 /** Log box above the contact timeline: pick Note, Email, Call, Meeting or Task, fill it in, save. */
-export function ActivityComposer({ contactId, contactEmail, projects, initialKind, assignees, me, allowUnassigned }: Props) {
+export function ActivityComposer({ contactId, investor = false, about = "project", contactEmail, projects, initialKind, assignees, me, allowUnassigned }: Props) {
   const [kind, setKind] = useState<LogKind>(initialKind);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -38,10 +44,10 @@ export function ActivityComposer({ contactId, contactEmail, projects, initialKin
   return (
     <form
       id="composer"
-      action={async (f) => { await logContactActivity(f); setSubject(""); setBody(""); }}
+      action={async (f) => { await (investor ? logInvestorActivity(f) : logContactActivity(f)); setSubject(""); setBody(""); }}
       className="card space-y-3 p-4"
     >
-      <input type="hidden" name="contactId" value={contactId} />
+      <input type="hidden" name={investor ? "investorId" : "contactId"} value={contactId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="tz" ref={tz} defaultValue="0" />
       <div role="tablist" aria-label="What are you logging?" className="flex flex-wrap gap-1">
@@ -88,7 +94,7 @@ export function ActivityComposer({ contactId, contactEmail, projects, initialKin
           </label>
         )}
         {projects.length > 0 && (
-          <label className="text-xs text-slate-500">About project
+          <label className="text-xs text-slate-500">About {about}
             <select name="projectId" defaultValue="" className="input mt-1 w-56 py-1.5">
               <option value="">—</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
