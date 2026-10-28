@@ -1,60 +1,171 @@
 import Link from "next/link";
+import { addInterest } from "@/app/actions/investors";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
+import { PipelineBoard, type BoardCard } from "@/components/PipelineBoard";
+import { Badge, Empty, PageHeader, statusTone } from "@/components/ui";
 import { db } from "@/lib/db";
-import { importInvestors } from "@/app/actions/admin";
-import { Badge, PageHeader, Empty } from "@/components/ui";
-import { INVESTOR_STAGES, INVESTOR_TYPES, stageLabel } from "@/lib/constants";
-import { usd, date } from "@/lib/format";
-import { marketSummary } from "@/lib/regions";
-import type { Prisma } from "@prisma/client";
+import { DEAL_TYPES, dealTypeLabel } from "@/lib/constants";
+import { ago, initials } from "@/lib/crm";
+import { fitsMandate } from "@/lib/investor-crm";
+import { loadInvestorCrm } from "@/lib/investor-crm-db";
+import { FUNNEL_KEYS, funnelKey, pipelineLabel, placeStage } from "@/lib/pipeline";
+import { getInvestorPipeline } from "@/lib/pipeline-db";
+import { getScoring } from "@/lib/scoring-db";
+import { num, usd } from "@/lib/format";
+import { recommendation } from "@/lib/valuation";
 
 export const dynamic = "force-dynamic";
 
-export default async function Investors({ searchParams }: { searchParams: Promise<{ q?: string; stage?: string; type?: string; imported?: string }> }) {
+type Search = { funnel?: string; listing?: string; stage?: string; q?: string };
+
+/**
+ * Investor CRM board. Each tile is an investor contact and their company working one listing, so the same investor
+ * can be in diligence on one listing and passed on another. Funnels per deal type, like the Developer CRM.
+ * Picking a listing shows only that listing's investors, plus who else fits it.
+ */
+export default async function InvestorBoard({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
-  const where: Prisma.InvestorWhereInput = {};
-  if (sp.stage) where.stage = sp.stage;
-  if (sp.type) where.investorType = sp.type;
-  if (sp.q) where.OR = (["name", "firm", "email", "tags"] as const).map((k) => ({ [k]: { contains: sp.q, mode: "insensitive" } }));
-  const investors = await db.investor.findMany({ where, orderBy: { updatedAt: "desc" }, include: { _count: { select: { lois: true } } } });
+  const [{ firms, investors, lastTouch, openTasks }, pipeline, scoring, listings] = await Promise.all([
+    loadInvestorCrm(),
+    getInvestorPipeline(),
+    getScoring(),
+    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, state: true, city: true, dealType: true, facilityType: true, fundingNeeded: true, visibility: true, valueScore: true, developer: { select: { id: true, company: true } } }, orderBy: { code: "asc" } }),
+  ]);
+  const q = sp.q?.trim().toLowerCase();
+  const listing = listings.find((p) => p.id === sp.listing) ?? null;
+  const tiles = investors.flatMap((i) => i.interests.map((it) => ({ i, it })));
+  const perFunnel = Object.fromEntries(FUNNEL_KEYS.map((k) => [k, tiles.filter((t) => funnelKey(t.it.project.dealType) === k).length]));
+  // One listing picked: its deal type decides the funnel. Otherwise default to the first funnel with tiles.
+  const funnel = listing ? funnelKey(listing.dealType) : sp.funnel && FUNNEL_KEYS.includes(sp.funnel) ? sp.funnel : FUNNEL_KEYS.find((k) => perFunnel[k] > 0) ?? FUNNEL_KEYS[0];
+  const stages = pipeline.funnels[funnel];
+  const firmName = new Map(firms.map((f) => [f.id, f.name]));
+  const people = new Map<string, number>();
+  for (const i of investors) if (i.firmId) people.set(i.firmId, (people.get(i.firmId) ?? 0) + 1);
+  const scoreOf = new Map(listings.map((p) => [p.id, p.valueScore]));
+
+  const cards: BoardCard[] = tiles
+    .filter(({ it }) => funnelKey(it.project.dealType) === funnel && (!listing || it.projectId === listing.id))
+    .map(({ i, it }) => {
+      const score = scoreOf.get(it.projectId) ?? null;
+      return {
+        kind: "interest", id: it.id, projectId: it.projectId, stage: placeStage(stages, it.stage),
+        companyId: i.firmId, company: (i.firmId && firmName.get(i.firmId)) || i.firm || "No company on file", contacts: i.firmId ? people.get(i.firmId) ?? 1 : 1,
+        contact: { id: i.id, name: i.name, title: i.title, initials: initials(i.name), lastTouch: ago(lastTouch.get(i.id) ?? i.lastContactAt), openTasks: openTasks.get(i.id) ?? 0 },
+        project: { title: it.project.title, code: it.project.code, mw: it.project.mw, score, scoreTone: score != null ? recommendation(score, scoring).tone : undefined, note: i.checkMin || i.checkMax ? `Check ${usd(i.checkMin)}–${usd(i.checkMax)}` : null },
+      } satisfies BoardCard;
+    })
+    .filter((c) => (!sp.stage || c.stage === sp.stage) && (!q || [c.contact?.name, c.company, c.project?.title, c.project?.code].some((x) => x?.toLowerCase().includes(q))));
+
+  const unlinked = investors.filter((i) => !i.interests.length).length;
+  const params = (next: Partial<Search>) => {
+    const p = new URLSearchParams(Object.entries({ funnel: listing ? undefined : funnel, listing: listing?.id, q: sp.q, ...next }).filter(([, v]) => v) as [string, string][]);
+    return `?${p}`;
+  };
+
+  // Listing view: who is on it, and who fits it but isn't yet.
+  const onListing = listing ? new Set(tiles.filter((t) => t.it.projectId === listing.id).map((t) => t.i.id)) : new Set<string>();
+  const others = listing ? investors.filter((i) => !onListing.has(i.id)).sort((a, b) => Number(fitsMandate(b, listing)) - Number(fitsMandate(a, listing)) || a.name.localeCompare(b.name)) : [];
+  const suggested = listing ? others.filter((i) => fitsMandate(i, listing) && i.stage !== "DECLINED").slice(0, 6) : [];
+  const perStage = listing ? stages.map((s) => ({ ...s, n: tiles.filter((t) => t.it.projectId === listing.id && placeStage(stages, t.it.stage) === s.value).length })) : [];
+
   return (
     <div>
-      <PageHeader title="Investor CRM" subtitle={`${investors.length} contacts`} action={<Link href="/admin/investors/new" className="btn">Add investor</Link>} />
-      {sp.imported && <p className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-800">Imported {sp.imported} new contacts.</p>}
-      <form className="card mb-4 flex flex-wrap gap-3 p-3">
-        <input name="q" defaultValue={sp.q} placeholder="Search name, firm, email, tag" className="input max-w-xs" />
-        <select name="stage" defaultValue={sp.stage ?? ""} className="input max-w-[180px]"><option value="">All stages</option>{INVESTOR_STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
-        <select name="type" defaultValue={sp.type ?? ""} className="input max-w-[200px]"><option value="">All types</option>{INVESTOR_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-        <button className="btn-ghost">Filter</button>
-      </form>
-      {investors.length ? (
-        <div className="card overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-slate-200"><tr><th className="th">Name</th><th className="th">Type</th><th className="th">Check size</th><th className="th">Markets</th><th className="th">Stage</th><th className="th">LOIs</th><th className="th">Last contact</th></tr></thead>
-            <tbody className="divide-y divide-slate-100">
-              {investors.map((i) => (
-                <tr key={i.id} className="hover:bg-slate-50">
-                  <td className="td"><Link href={`/admin/investors/${i.id}`} className="font-medium text-brand-600">{i.name}</Link><div className="text-xs text-slate-500">{i.firm}</div></td>
-                  <td className="td">{i.investorType ?? "—"}</td>
-                  <td className="td">{i.checkMin || i.checkMax ? `${usd(i.checkMin)}–${usd(i.checkMax)}` : "—"}</td>
-                  <td className="td max-w-[220px] text-xs">{marketSummary(i.preferredStates, i.preferredRegions)}</td>
-                  <td className="td"><Badge tone={i.stage === "APPLIED" ? "amber" : ["APPROVED", "ACTIVE"].includes(i.stage) ? "green" : i.stage === "DECLINED" ? "red" : "slate"}>{stageLabel(INVESTOR_STAGES, i.stage)}</Badge></td>
-                  <td className="td">{i._count.lois}</td>
-                  <td className="td text-xs">{date(i.lastContactAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : <Empty>No investors found.</Empty>}
+      <PageHeader title="Investor CRM" subtitle={`${firms.length} companies · ${investors.length} contacts · ${tiles.length} investor-listing links${sp.stage ? ` · ${pipelineLabel(stages, sp.stage)}` : ""}`} action={
+        <div className="flex flex-wrap gap-2">
+          <form className="flex gap-2">
+            {listing ? <input type="hidden" name="listing" value={listing.id} /> : <input type="hidden" name="funnel" value={funnel} />}
+            {sp.stage && <input type="hidden" name="stage" value={sp.stage} />}
+            <input name="q" defaultValue={sp.q} placeholder="Search investor, company, listing" className="input w-64 py-1.5" />
+          </form>
+          {(sp.stage || q) && <Link href={params({ q: undefined, stage: undefined })} className="btn-ghost">Clear</Link>}
+          <Link href="/admin/investors/funnels" className="btn-ghost">Edit funnels</Link>
+          <Link href={`/admin/investors/new${listing ? `?projectId=${listing.id}` : ""}`} className="btn">Add investor</Link>
+        </div>} />
 
-      <details className="card mt-6 p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Import contacts from CSV</summary>
-        <p className="mt-2 text-xs text-slate-500">Columns (any order): name, email, firm, title, phone, investorType, states, source, tags. Existing emails are skipped. Works with exports from LinkedIn Sales Navigator, Apollo, HubSpot, Mailchimp.</p>
-        <form action={importInvestors} className="mt-3 flex flex-wrap items-center gap-3">
-          <input type="file" name="file" accept=".csv,text/csv" className="text-sm" />
-          <button className="btn-ghost">Import</button>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <nav aria-label="Funnel" className="inline-flex rounded-lg bg-slate-100 p-1 text-sm">
+          {DEAL_TYPES.map((d) => (
+            <Link key={d.value} href={`?funnel=${d.value}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ""}`} aria-current={!listing && d.value === funnel ? "page" : undefined}
+              className={`rounded-md px-3 py-1.5 font-medium ${d.value === funnel ? (listing ? "bg-white/60 text-slate-500" : "bg-white text-slate-900 shadow-sm") : "text-slate-500 hover:text-slate-800"}`}>
+              {d.label} <span className="ml-1 text-xs text-slate-400">{perFunnel[d.value]}</span>
+            </Link>
+          ))}
+        </nav>
+        <form className="flex items-center gap-2">
+          {sp.q && <input type="hidden" name="q" value={sp.q} />}
+          <AutoSubmitSelect name="listing" label="Show one listing" defaultValue={listing?.id} className="w-80"
+            options={[{ value: "", label: "All listings" }, ...listings.map((p) => ({ value: p.id, label: `${p.code} · ${p.title}` }))]} />
+          <noscript><button className="btn-ghost">Show</button></noscript>
         </form>
-      </details>
+        <span className="text-sm text-slate-500">{stages.length} columns · <Link href={`/admin/investors/funnels?funnel=${funnel}`} className="text-brand-600">rename or add columns</Link></span>
+      </div>
+
+      {listing && (
+        <section className="card mb-4 p-4" aria-label="Listing">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/admin/projects/${listing.id}`} className="text-lg font-semibold text-slate-900 hover:text-brand-600">{listing.title}</Link>
+                <Badge tone={statusTone(listing.visibility)}>{listing.visibility}</Badge>
+              </div>
+              <div className="text-sm text-slate-500">
+                <span className="font-mono">{listing.code}</span> · {num(listing.mw)} MW {listing.facilityType} · {[listing.city, listing.state].filter(Boolean).join(", ")} · {dealTypeLabel(listing.dealType)}{listing.fundingNeeded ? ` · ${usd(listing.fundingNeeded)}` : ""} · <Link href={`/admin/developers/${listing.developer.id}`} className="text-brand-600">{listing.developer.company}</Link>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                {perStage.filter((s) => s.n).map((s) => <Link key={s.value} href={params({ stage: sp.stage === s.value ? undefined : s.value })} className={`rounded-full px-2 py-0.5 ${sp.stage === s.value ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>{s.label} {s.n}</Link>)}
+                {!onListing.size && <span className="text-slate-500">No investors on this listing yet.</span>}
+              </div>
+            </div>
+            <Link href={`?funnel=${funnel}`} className="btn-ghost">All listings</Link>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <form action={addInterest} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="projectId" value={listing.id} />
+              <label className="min-w-0 flex-1 text-xs text-slate-500">Add an investor to this listing
+                <select name="investorId" required defaultValue="" className="input mt-1 py-1.5">
+                  <option value="" disabled>Pick an investor…</option>
+                  {others.map((i) => <option key={i.id} value={i.id}>{i.name}{i.firm ? ` · ${i.firm}` : ""}{fitsMandate(i, listing) ? " ✓ fits mandate" : ""}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-slate-500">Starting column
+                <select name="stage" defaultValue={stages[0].value} className="input mt-1 w-40 py-1.5">{stages.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+              </label>
+              <button className="btn">Add</button>
+            </form>
+            {suggested.length > 0 && (
+              <div>
+                <div className="mb-1 text-xs text-slate-500">Fits their mandate, not on this listing yet</div>
+                <ul className="flex flex-wrap gap-2">
+                  {suggested.map((i) => (
+                    <li key={i.id}>
+                      <form action={addInterest} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white py-0.5 pl-3 pr-1 text-xs">
+                        <input type="hidden" name="projectId" value={listing.id} />
+                        <input type="hidden" name="investorId" value={i.id} />
+                        <Link href={`/admin/investors/${i.id}`} className="font-medium text-slate-800 hover:text-brand-600">{i.name}</Link>
+                        <span className="text-slate-400">{i.firm}</span>
+                        <button className="rounded-full bg-brand-50 px-2 py-0.5 font-medium text-brand-700 hover:bg-brand-100" aria-label={`Add ${i.name} to ${listing.code}`}>+ Add</button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {!investors.length ? <Empty>No investors yet. <Link href="/admin/investors/new" className="text-brand-600">Add one</Link> or import a CSV on the Contacts page.</Empty> : (
+        <>
+          <p className="mb-3 text-sm text-slate-500">
+            Each tile is an investor and their company working one listing. Listings show in the funnel for their deal type; pick a listing above to see only its investors. Drag a tile to another column or pick a stage on it.
+            {unlinked > 0 && <> {" "}<Link href="/admin/investors/contacts?linked=none" className="text-brand-600">{unlinked} investor{unlinked === 1 ? " isn't" : "s aren't"} on a listing yet.</Link></>}
+          </p>
+          {!cards.length && !q && !sp.stage
+            ? <Empty>{listing ? "Add investors to this listing above, or they appear here when they sign its NDA or send an LOI." : `No investors on ${dealTypeLabel(funnel).toLowerCase()} listings yet. Link investors to a listing from their record or from a listing view.`}</Empty>
+            : <PipelineBoard key={`${funnel}:${listing?.id ?? ""}`} cards={cards} stages={stages} />}
+        </>
+      )}
     </div>
   );
 }

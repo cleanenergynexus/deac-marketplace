@@ -18,6 +18,7 @@ import { allStages, funnelStages, normalizePipeline, pipelineLabel, placeStage, 
 import { getPipeline } from "@/lib/pipeline-db";
 import { normalizePhone, phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
+import { firmIdFor, touchInterest } from "@/lib/investor-crm-db";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -27,11 +28,17 @@ const list = (f: FormData, k: string) => f.getAll(k).map(String).filter(Boolean)
 
 // ---------- Investors ----------
 function investorData(f: FormData) {
+  const address = addressFromForm(f);
+  // A number typed without a country code belongs to the contact's country.
+  const home = address.country ?? "US";
   return {
+    ...address,
     name: s(f, "name") ?? "",
-    firm: s(f, "firm"),
+    firm: s(f, "firm")?.replace(/\s+/g, " ") ?? null,
     title: s(f, "title"),
-    phone: phoneFromForm(f, "phone"),
+    phone: phoneFromForm(f, "phone", home),
+    mobile: phoneFromForm(f, "mobile", home),
+    linkedin: s(f, "linkedin"),
     investorType: s(f, "investorType"),
     checkMin: n(f, "checkMin"),
     checkMax: n(f, "checkMax"),
@@ -50,18 +57,31 @@ function investorData(f: FormData) {
   };
 }
 
+/** The Investor CRM company for the typed firm name (found or created), with the name kept on the contact too. */
+async function withFirm(data: ReturnType<typeof investorData>) {
+  const firmId = await firmIdFor(data.firm, data.investorType);
+  const firm = firmId ? (await db.investorFirm.findUnique({ where: { id: firmId }, select: { name: true } }))?.name ?? data.firm : null;
+  return { ...data, firm, firmId };
+}
+
 export async function createInvestor(f: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const email = s(f, "email")!.toLowerCase();
-  const inv = await db.investor.create({ data: { email, stage: s(f, "stage") ?? "PROSPECT", ...investorData(f) } });
+  if (await db.investor.count({ where: { email } })) throw new Error("An investor with that email is already in the CRM.");
+  const data = await withFirm(investorData(f));
+  const inv = await db.investor.create({ data: { email, stage: s(f, "stage") ?? "PROSPECT", ...data, owner: data.owner ?? admin.name } });
+  // Added from a listing's board: link them to it straight away.
+  const projectId = s(f, "projectId");
+  if (projectId) await touchInterest(inv.id, projectId, "ADDED", admin.name);
+  revalidatePath("/admin/investors", "layout");
   redirect(`/admin/investors/${inv.id}`);
 }
 
 export async function updateInvestor(f: FormData) {
   await requireAdmin();
   const id = String(f.get("id"));
-  await db.investor.update({ where: { id }, data: investorData(f) });
-  revalidatePath(`/admin/investors/${id}`);
+  await db.investor.update({ where: { id }, data: await withFirm(investorData(f)) });
+  revalidatePath("/admin/investors", "layout");
 }
 
 export async function setInvestorStage(f: FormData) {
@@ -111,10 +131,12 @@ export async function importInvestors(f: FormData) {
     if (!email) continue;
     const exists = await db.investor.findUnique({ where: { email } });
     if (exists) continue;
-    await db.investor.create({ data: { email, name: col(r, "name") ?? email, firm: col(r, "firm"), title: col(r, "title"), phone: normalizePhone(col(r, "phone")), investorType: col(r, "investorType"), preferredStates: (col(r, "states") ?? "").replace(/[;| ]+/g, ","), source: col(r, "source") ?? "CSV import", tags: col(r, "tags") ?? "" } });
+    const firm = col(r, "firm");
+    await db.investor.create({ data: { email, name: col(r, "name") ?? email, firm, firmId: await firmIdFor(firm, col(r, "investorType")), title: col(r, "title"), phone: normalizePhone(col(r, "phone")), investorType: col(r, "investorType"), preferredStates: (col(r, "states") ?? "").replace(/[;| ]+/g, ","), source: col(r, "source") ?? "CSV import", tags: col(r, "tags") ?? "" } });
     created++;
   }
-  redirect(`/admin/investors?imported=${created}`);
+  revalidatePath("/admin/investors", "layout");
+  redirect(`/admin/investors/contacts?imported=${created}`);
 }
 
 function parseCsv(text: string): string[][] {
@@ -339,7 +361,9 @@ export async function grantStage(f: FormData) {
   if (want("LOI")) await db.loi.upsert({ where: { projectId_investorId: { projectId, investorId } }, create: { projectId, investorId, status: "APPROVED", reviewedAt: now }, update: { status: "APPROVED", reviewedAt: now } });
   else await db.loi.updateMany({ where: { projectId, investorId, status: "APPROVED" }, data: { status: "DECLINED", reviewedAt: now } });
   const p = await db.project.findUnique({ where: { id: projectId } });
-  await db.activity.create({ data: { investorId, kind: "SYSTEM", by: admin.name, body: `Access to ${p?.code} set to ${STAGE_INFO[target].label}.` } });
+  await db.activity.create({ data: { investorId, projectId, kind: "SYSTEM", by: admin.name, body: `Access to ${p?.code} set to ${STAGE_INFO[target].label}.` } });
+  await touchInterest(investorId, projectId, target === "DILIGENCE" ? "DILIGENCE" : target === "LOI" ? "LOI_APPROVED" : target === "NDA" ? "NDA" : "ADDED", admin.name);
+  revalidatePath("/admin/investors", "layout");
   revalidatePath(`/admin/projects/${projectId}`);
   revalidatePath(`/marketplace/${projectId}`);
   revalidatePath("/admin/lois");
@@ -369,7 +393,9 @@ export async function reviewLoi(f: FormData) {
   const id = String(f.get("id"));
   const status = String(f.get("status")); // APPROVED | DECLINED
   const loi = await db.loi.update({ where: { id }, data: { status, reviewedAt: new Date() }, include: { project: true, investor: true } });
-  await db.activity.create({ data: { investorId: loi.investorId, kind: "SYSTEM", body: `LOI for ${loi.project.code} ${status.toLowerCase()}${status === "APPROVED" ? " — LOI stage unlocked" : ""}.`, by: admin.name } });
+  await db.activity.create({ data: { investorId: loi.investorId, projectId: loi.projectId, kind: "SYSTEM", body: `LOI for ${loi.project.code} ${status.toLowerCase()}${status === "APPROVED" ? " — LOI stage unlocked" : ""}.`, by: admin.name } });
+  if (status === "APPROVED") await touchInterest(loi.investorId, loi.projectId, "LOI_APPROVED", admin.name);
+  revalidatePath("/admin/investors", "layout");
   if (status === "APPROVED") {
     if (loi.investor.stage === "APPROVED") await db.investor.update({ where: { id: loi.investorId }, data: { stage: "ACTIVE" } });
     await sendEmail({ to: loi.investor.email, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The LOI-level details and documents are now open in your DEAC Marketplace portal. When you're ready to go deeper, confirm your interest on the listing to request the full data room.\n\n— DEAC Team` });
@@ -385,7 +411,9 @@ export async function reviewDealStep(f: FormData) {
   if (status !== "APPROVED" && status !== "DECLINED") return;
   const d = await db.dealStep.update({ where: { id: String(f.get("id")) }, data: { status, reviewedAt: new Date() }, include: { project: true, investor: true } });
   const what = d.step === "NDA" ? "NDA" : "full diligence access";
-  await db.activity.create({ data: { investorId: d.investorId, kind: "SYSTEM", by: admin.name, body: `${what} for ${d.project.code} ${status.toLowerCase()}.` } });
+  await db.activity.create({ data: { investorId: d.investorId, projectId: d.projectId, kind: "SYSTEM", by: admin.name, body: `${what} for ${d.project.code} ${status.toLowerCase()}.` } });
+  if (status === "APPROVED") await touchInterest(d.investorId, d.projectId, d.step === "NDA" ? "NDA" : "DILIGENCE", admin.name);
+  revalidatePath("/admin/investors", "layout");
   if (status === "APPROVED") {
     const next = d.step === "NDA"
       ? "Your NDA has been confirmed. The confidential project details and NDA-level documents are now open, and you can submit a letter of interest."

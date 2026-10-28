@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 type Search = { scope?: string; status?: string; who?: string };
 
-/** Everyone's tasks from the Developer CRM, limited by access level: Admin all, Manager their team, Support their own. */
+/** Everyone's tasks from the Developer and Investor CRMs, limited by access level: Admin all, Manager their team, Support their own. */
 export default async function Tasks({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
@@ -36,11 +36,12 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
   const assigneeFilter: Prisma.ActivityWhereInput = who === "none" ? { assigneeId: null } : who ? { assigneeId: who } : ids ? { assigneeId: { in: ids } } : {};
   const where: Prisma.ActivityWhereInput = { AND: [visibleTaskWhere(me, team), assigneeFilter] };
 
-  const [open, done, contacts, projects] = await Promise.all([
+  const [open, done, contacts, projects, investors] = await Promise.all([
     db.activity.findMany({ where: { ...where, doneAt: null }, include: taskInclude }),
     status === "done" ? db.activity.findMany({ where: { ...where, doneAt: { not: null } }, include: taskInclude, orderBy: { doneAt: "desc" }, take: 200 }) : [],
     db.contact.findMany({ select: { id: true, name: true, developerId: true, developer: { select: { company: true } } }, orderBy: { name: "asc" } }),
     db.project.findMany({ select: { id: true, code: true, title: true, developerId: true }, orderBy: { code: "asc" } }),
+    db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
   ]);
   const overdue = open.filter((t) => taskState(t) === "overdue");
   const shown = sortTasks(status === "done" ? done : status === "overdue" ? overdue : open);
@@ -60,7 +61,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
     <div className="space-y-5">
       <PageHeader
         title="Tasks"
-        subtitle={level === "ADMIN" ? "Every task in the Developer CRM. You can assign tasks to anyone on the team." : level === "MANAGER" ? "Your tasks and your team's. You can assign tasks to yourself and the people who report to you." : "Tasks assigned to you."}
+        subtitle={level === "ADMIN" ? "Every task in the Developer and Investor CRMs. You can assign tasks to anyone on the team." : level === "MANAGER" ? "Your tasks and your team's. You can assign tasks to yourself and the people who report to you." : "Tasks assigned to you."}
         action={<Badge tone="slate">{staffLevelLabel(level)} access</Badge>}
       />
 
@@ -69,6 +70,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
         <div className="mt-4">
           <TaskForm assignees={assignees} me={me.id} allowUnassigned={allowUnassigned}
             contacts={contacts.map((c) => ({ id: c.id, name: c.name, company: c.developer.company, developerId: c.developerId }))}
+            investors={investors.map((i) => ({ id: `inv:${i.id}`, name: i.name, company: i.firm ?? "Investor", developerId: "" }))}
             projects={projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}`, developerId: p.developerId }))} />
         </div>
       </details>
@@ -135,8 +137,17 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
                       {t.doneAt || (assignees.length < 2 && !allowUnassigned) ? <span className="whitespace-nowrap text-sm">{t.assignee?.name ?? "Unassigned"}</span>
                         : <AssigneeSelect taskId={t.id} assigneeId={t.assigneeId} options={withCurrent(assignees, t.assignee)} allowUnassigned={allowUnassigned} className="!w-44 text-sm" />}
                     </td>
-                    <td className="td text-sm">{t.contact ? <Link href={`/admin/developers/contacts/${t.contact.id}?tab=tasks`} className="text-brand-600">{t.contact.name}</Link> : <span className="text-slate-400">—</span>}</td>
-                    <td className="td text-sm">{t.developer ? <Link href={`/admin/developers/${t.developer.id}`} className="text-slate-700 hover:text-brand-600">{t.developer.company}</Link> : <span className="text-slate-400">—</span>}</td>
+                    <td className="td text-sm">
+                      {t.contact ? <Link href={`/admin/developers/contacts/${t.contact.id}?tab=tasks`} className="text-brand-600">{t.contact.name}</Link>
+                        : t.investor ? <Link href={`/admin/investors/${t.investor.id}?tab=tasks`} className="text-brand-600">{t.investor.name}</Link>
+                        : <span className="text-slate-400">—</span>}
+                      {t.investor && <div className="text-[11px] text-slate-400">Investor</div>}
+                    </td>
+                    <td className="td text-sm">
+                      {t.developer ? <Link href={`/admin/developers/${t.developer.id}`} className="text-slate-700 hover:text-brand-600">{t.developer.company}</Link>
+                        : t.investor?.firmId ? <Link href={`/admin/investors/companies/${t.investor.firmId}`} className="text-slate-700 hover:text-brand-600">{t.investor.firm}</Link>
+                        : <span className="text-slate-400">—</span>}
+                    </td>
                     <td className="td text-sm">{t.project ? <Link href={`/admin/projects/${t.project.id}`} title={t.project.title} className="whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600 hover:text-brand-600">{t.project.code}</Link> : <span className="text-slate-400">—</span>}</td>
                     <td className="td text-right">
                       <form action={deleteActivity}>
@@ -159,5 +170,6 @@ const taskInclude = {
   assignee: { select: { id: true, name: true } },
   contact: { select: { id: true, name: true } },
   developer: { select: { id: true, company: true } },
+  investor: { select: { id: true, name: true, firm: true, firmId: true } },
   project: { select: { id: true, code: true, title: true } },
 } satisfies Prisma.ActivityInclude;

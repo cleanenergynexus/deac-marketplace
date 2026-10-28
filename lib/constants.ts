@@ -53,6 +53,21 @@ export const DEVELOPER_STAGES = [
   { value: "PASSED", label: "Passed" },
 ] as const;
 
+/**
+ * Starting Investor CRM columns for every funnel (one tile per investor per listing). Admins rename and add columns.
+ * Marketplace steps move a tile forward on their own when its funnel still has the matching column (lib/interests.ts).
+ */
+export const INVESTOR_PIPELINE_STAGES = [
+  { value: "INTERESTED", label: "Interested" },
+  { value: "TEASER_SENT", label: "Teaser Sent" },
+  { value: "NDA_SIGNED", label: "NDA Signed" },
+  { value: "LOI_SUBMITTED", label: "LOI Submitted" },
+  { value: "LOI_ACCEPTED", label: "LOI Accepted" },
+  { value: "IN_DILIGENCE", label: "In Diligence" },
+  { value: "TERM_SHEET", label: "Term Sheet" },
+  { value: "CLOSED", label: "Closed" },
+  { value: "PASSED", label: "Passed" },
+] as const;
 
 export const stageLabel = (list: readonly { value: string; label: string }[], v: string) =>
   list.find((s) => s.value === v)?.label ?? v;

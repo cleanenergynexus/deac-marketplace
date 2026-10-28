@@ -4,7 +4,7 @@ import { savePipeline } from "@/app/actions/admin";
 import { FunnelEditor } from "@/components/FunnelEditor";
 import { PageHeader } from "@/components/ui";
 import { DEAL_TYPES } from "@/lib/constants";
-import { FUNNEL_KEYS, funnelKey, parsePipeline, projectStage } from "@/lib/pipeline";
+import { DEFAULT_PIPELINE, FUNNEL_KEYS, funnelKey, parsePipeline, projectStage } from "@/lib/pipeline";
 import { date } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function Funnels({ searchParams }: { searchParams: Promise<
         title="Funnels"
         subtitle={<>The columns on the <Link href="/admin/developers" className="text-brand-600">Developer CRM board</Link>, one funnel per deal type. Rename, add, reorder or remove columns; renaming keeps every tile where it is. {row ? `Last saved ${date(row.updatedAt)}${row.updatedBy ? ` by ${row.updatedBy}` : ""}.` : "Not edited yet."}</>}
       />
-      <FunnelEditor initial={cfg} funnels={DEAL_TYPES.map((d) => ({ value: d.value, label: d.label }))} start={start} tiles={tiles} action={savePipeline} />
+      <FunnelEditor initial={cfg} defaults={DEFAULT_PIPELINE} board="/admin/developers" funnels={DEAL_TYPES.map((d) => ({ value: d.value, label: d.label }))} start={start} tiles={tiles} action={savePipeline} />
     </div>
   );
 }

@@ -17,6 +17,12 @@ function revalidateCrm(developerId: string, contactId?: string | null) {
   if (contactId) revalidatePath(`/admin/developers/contacts/${contactId}`);
 }
 
+/** After a timeline entry changes: refresh whichever CRM it belongs to (developer contact or investor). */
+function revalidateEntry(a: { developerId: string | null; contactId: string | null; investorId: string | null }) {
+  if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  if (a.investorId) revalidatePath("/admin/investors", "layout");
+}
+
 function contactData(f: FormData) {
   const address = addressFromForm(f);
   // A number typed without a country code belongs to the contact's country.
@@ -136,7 +142,7 @@ export async function toggleTask(f: FormData) {
   const { task: a } = await findVisibleTask(admin, String(f.get("id")));
   if (a.kind !== "TASK") return;
   await db.activity.update({ where: { id: a.id }, data: { doneAt: a.doneAt ? null : new Date() } });
-  if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  revalidateEntry(a);
   revalidatePath("/admin", "layout");
 }
 
@@ -147,7 +153,7 @@ export async function assignTask(f: FormData) {
   if (a.kind !== "TASK") return;
   const assigneeId = pickAssignee(admin, team, f.get("assigneeId") ?? "");
   await db.activity.update({ where: { id: a.id }, data: { assigneeId } });
-  if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  revalidateEntry(a);
   revalidatePath("/admin", "layout");
 }
 
@@ -156,7 +162,7 @@ export async function deleteActivity(f: FormData) {
   const { task: a } = await findVisibleTask(admin, String(f.get("id")));
   if (!isLogKind(a.kind)) return; // stage changes and system entries stay as history
   await db.activity.delete({ where: { id: a.id } });
-  if (a.developerId) revalidateCrm(a.developerId, a.contactId);
+  revalidateEntry(a);
   if (a.kind === "TASK") revalidatePath("/admin", "layout");
 }
 
@@ -166,14 +172,19 @@ export async function createTask(f: FormData) {
   const subject = s(f, "subject");
   if (!subject) throw new Error("Give the task a title.");
   const tz = Number(f.get("tz") ?? 0);
-  const contactId = s(f, "contactId");
+  const picked = s(f, "contactId");
+  // Investor CRM contacts are listed as "inv:<id>" next to developer contacts.
+  const investorId = picked?.startsWith("inv:") ? picked.slice(4) : null;
+  const contactId = investorId ? null : picked;
   const projectId = s(f, "projectId");
+  if (investorId && !(await db.investor.count({ where: { id: investorId } }))) throw new Error("That investor is no longer in the CRM.");
   const [contact, project] = await Promise.all([
     contactId ? db.contact.findUniqueOrThrow({ where: { id: contactId } }) : null,
     projectId ? db.project.findUniqueOrThrow({ where: { id: projectId } }) : null,
   ]);
   if (contact && project && contact.developerId !== project.developerId) throw new Error("That project is not at this contact's company.");
-  const developerId = contact?.developerId ?? project?.developerId ?? null;
+  // An investor task about a listing stays on the investor's timeline, not the developer's.
+  const developerId = investorId ? null : contact?.developerId ?? project?.developerId ?? null;
   await db.activity.create({
     data: {
       kind: "TASK",
@@ -182,12 +193,14 @@ export async function createTask(f: FormData) {
       dueAt: parseWhen(s(f, "dueAt"), tz),
       assigneeId: pickAssignee(admin, await getTeam(), f.get("assigneeId")),
       // A project task with no contact goes on the project's contact's timeline.
-      contactId: contact?.id ?? project?.contactId ?? null,
+      contactId: investorId ? null : contact?.id ?? project?.contactId ?? null,
+      investorId,
       developerId,
       projectId: project?.id ?? null,
       by: admin.name,
     },
   });
   if (developerId) revalidateCrm(developerId, contact?.id ?? project?.contactId);
+  if (investorId) revalidatePath("/admin/investors", "layout");
   revalidatePath("/admin", "layout");
 }

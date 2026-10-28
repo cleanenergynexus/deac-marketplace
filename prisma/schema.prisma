@@ -32,13 +32,47 @@ model User {
 }
 
 // ---------- Investor CRM ----------
+// An investor firm (fund, family office, lender...). Its people are Investor rows; the board tracks each person's interest in each listing.
+model InvestorFirm {
+  id           String   @id @default(cuid())
+  name         String
+  investorType String? // INVESTOR_TYPES in lib/constants.ts
+  website      String?
+  linkedin     String?
+  aum          Float? // assets under management, USD
+  // Mailing address. country is a two-letter code (lib/phone.ts COUNTRIES); region is the US state code for US addresses.
+  street       String?
+  city         String?
+  region       String?
+  postalCode   String?
+  country      String?
+  source       String?
+  owner        String? // team member responsible
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  investors Investor[]
+}
+
+// A person at an investor firm (the Investor CRM contact). Their login, NDAs and LOIs hang off this row.
 model Investor {
   id              String   @id @default(cuid())
   name            String
-  firm            String?
+  firm            String? // company name, mirrored from firmId's InvestorFirm for older screens and email templates
+  firmId          String?
+  company         InvestorFirm? @relation(fields: [firmId], references: [id], onDelete: SetNull)
   email           String   @unique
-  phone           String?
+  phone           String? // E.164, see lib/phone.ts
+  mobile          String?
+  linkedin        String?
   title           String?
+  // Mailing address. country is a two-letter code; region is the US state code for US addresses.
+  street          String?
+  city            String?
+  region          String?
+  postalCode      String?
+  country         String?
   investorType    String? // Family Office, Infrastructure Fund, PE, Strategic, Hyperscaler, Lender, HNWI
   checkMin        Float?
   checkMax        Float?
@@ -65,6 +99,26 @@ model Investor {
   activities       Activity[]
   analysisRequests AnalysisRequest[]
   campaignSends    CampaignRecipient[]
+  interests        InvestorInterest[]
+
+  @@index([firmId])
+}
+
+// One tile on the Investor CRM board: an investor contact working one listing. Its column comes from the
+// investor funnel for the listing's deal type (lib/pipeline.ts, PipelineSettings row "investor").
+model InvestorInterest {
+  id         String   @id @default(cuid())
+  investorId String
+  investor   Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage      String
+  source     String? // how they came to the listing: Added by team, NDA, LOI, Intake request...
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([investorId, projectId])
+  @@index([projectId])
 }
 
 // ---------- Developer CRM ----------
@@ -197,6 +251,7 @@ model Project {
   dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
   activities       Activity[]
+  interests        InvestorInterest[]
 }
 
 model Document {
@@ -356,7 +411,7 @@ model ScoringSettings {
   updatedAt DateTime @updatedAt
 }
 
-// Developer CRM funnels: Kanban columns per deal type (lib/pipeline.ts). One row, id "default".
+// CRM funnels: Kanban columns per deal type (lib/pipeline.ts). Row "default" = Developer CRM, row "investor" = Investor CRM.
 model PipelineSettings {
   id        String   @id @default("default")
   config    String // JSON

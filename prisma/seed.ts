@@ -9,7 +9,7 @@ async function main() {
   await db.$transaction([
     db.campaignRecipient.deleteMany(), db.campaign.deleteMany(), db.activity.deleteMany(), db.analysisRequest.deleteMany(), db.dealStep.deleteMany(),
     db.loi.deleteMany(), db.document.deleteMany(), db.project.deleteMany(), db.teamMember.deleteMany(), db.user.deleteMany(),
-    db.developer.deleteMany(), db.investor.deleteMany(),
+    db.developer.deleteMany(), db.investor.deleteMany(), db.investorFirm.deleteMany(), db.pipelineSettings.deleteMany(),
   ]);
   const pw = await bcrypt.hash("deac-demo-2026", 10);
 
@@ -99,6 +99,32 @@ async function main() {
   await log(1, { kind: "TASK", subject: "Follow up on San Antonio TI allowance", dueAt: daysAgo(1), projectId: created[1].id });
   await log(2, { kind: "MEETING", subject: "PR Investment Summit", body: "Met at the summit. Caguas microgrid financing.", createdAt: daysAgo(20) });
   await log(3, { kind: "CALL", outcome: "CONNECTED", body: "Site walk scheduled; asked for utility will-serve letter", createdAt: daysAgo(7) });
+
+  // Investor CRM: firms come from each investor's firm name; tiles = investor x listing.
+  const firm = async (name: string, data: { investorType?: string; city?: string; region?: string; country?: string; website?: string; aum?: number }) => (await db.investorFirm.create({ data: { name, ...data } })).id;
+  const firmIds = [
+    await firm("Meridian Infrastructure Partners", { investorType: "Infrastructure Fund", city: "New York", region: "NY", country: "US", website: "meridian.example", aum: 12e9 }),
+    await firm("Méndez Family Office", { investorType: "Family Office", city: "San Juan", region: "PR", country: "US" }),
+    await firm("Northgate Real Estate Fund IV", { investorType: "Real Estate Fund", city: "Chicago", region: "IL", country: "US" }),
+    await firm("Bluewater Credit", { investorType: "Lender", city: "Boston", region: "MA", country: "US", aum: 4.5e9 }),
+    await firm("Atlas Strategic Capital", { investorType: "Private Equity", city: "Houston", region: "TX", country: "US" }),
+    await firm("Dunn Holdings", { investorType: "HNWI" }),
+  ];
+  for (const [k, i] of inv.entries()) await db.investor.update({ where: { id: i.id }, data: { firmId: firmIds[k] } });
+  const daniel = await db.investor.create({ data: { name: "Daniel Park", title: "Vice President", firm: "Meridian Infrastructure Partners", firmId: firmIds[0], email: "dpark@meridian.example", phone: "+12125550188", investorType: "Infrastructure Fund", checkMin: 25e6, checkMax: 150e6, dealTypes: "LEASE,FINANCING", stage: "APPROVED", source: "Referral", owner: "Joaquin" } });
+  const interest = (investorId: string, projectId: string, stage: string, source = "Added by team") => db.investorInterest.create({ data: { investorId, projectId, stage, source } });
+  await interest(inv[0].id, created[0].id, "LOI_ACCEPTED", "Letter of interest");
+  await interest(inv[0].id, created[2].id, "NDA_SIGNED", "NDA");
+  await interest(inv[1].id, created[2].id, "LOI_SUBMITTED", "Letter of interest");
+  await interest(inv[3].id, created[0].id, "TEASER_SENT");
+  await interest(inv[3].id, created[2].id, "INTERESTED");
+  await interest(inv[4].id, created[0].id, "INTERESTED");
+  await interest(daniel.id, created[1].id, "TEASER_SENT");
+  await interest(inv[2].id, created[1].id, "IN_DILIGENCE");
+  await interest(inv[2].id, created[3].id, "INTERESTED");
+  await db.activity.create({ data: { investorId: inv[3].id, projectId: created[0].id, kind: "CALL", outcome: "CONNECTED", body: "Interested in senior construction debt on Abilene once NTP is in sight.", by: "Joaquin", createdAt: daysAgo(5) } });
+  await db.activity.create({ data: { investorId: daniel.id, projectId: created[1].id, kind: "EMAIL", outcome: "SENT", subject: "San Antonio powered shell teaser", body: "Sent the teaser and lease summary.", by: "Joaquin", createdAt: daysAgo(2) } });
+  await db.activity.create({ data: { investorId: inv[0].id, projectId: created[0].id, kind: "TASK", subject: "Send Jennifer the capex sensitivity", body: "", dueAt: daysAgo(-3), by: "Joaquin" } });
 
   console.log("Seeded. Logins (password deac-demo-2026): admin@deacna.com, investor@deacna.com, applicant@deacna.com");
 }

@@ -1,9 +1,10 @@
-import { DEAL_TYPES, DEVELOPER_STAGES } from "./constants";
+import { DEAL_TYPES, DEVELOPER_STAGES, INVESTOR_PIPELINE_STAGES } from "./constants";
 
 /**
- * Developer CRM funnels. Each deal type (lease, financing, sale) has its own list of Kanban columns,
- * edited in Admin → Developer CRM → Edit funnels and saved as JSON in PipelineSettings.
- * A stage's `value` is what projects store; renaming a column only changes its `label`.
+ * CRM funnels. Each deal type (lease, financing, sale) has its own list of Kanban columns, edited on the
+ * Funnels page of the Developer CRM and of the Investor CRM, and saved as JSON in PipelineSettings
+ * (row "default" for developers, row "investor" for investors).
+ * A stage's `value` is what projects / investor interests store; renaming a column only changes its `label`.
  */
 export type PipelineStage = { value: string; label: string };
 export type PipelineConfig = { funnels: Record<string, PipelineStage[]> };
@@ -14,8 +15,13 @@ export const MAX_LABEL = 40;
 
 const copy = (list: readonly PipelineStage[]) => list.map((s) => ({ value: s.value, label: s.label }));
 
-/** Until someone edits them, every funnel starts with the original eight CRM stages. */
-export const DEFAULT_PIPELINE: PipelineConfig = { funnels: Object.fromEntries(FUNNEL_KEYS.map((k) => [k, copy(DEVELOPER_STAGES)])) };
+const everyFunnel = (list: readonly PipelineStage[]): PipelineConfig => ({ funnels: Object.fromEntries(FUNNEL_KEYS.map((k) => [k, copy(list)])) });
+
+/** Until someone edits them, every Developer CRM funnel starts with the original eight CRM stages. */
+export const DEFAULT_PIPELINE: PipelineConfig = everyFunnel(DEVELOPER_STAGES);
+
+/** Starting Investor CRM funnels: the same investor journey for every deal type until someone edits them. */
+export const DEFAULT_INVESTOR_PIPELINE: PipelineConfig = everyFunnel(INVESTOR_PIPELINE_STAGES);
 
 /** "Term sheet out!" -> "TERM_SHEET_OUT", made unique against `taken`. */
 export function stageValue(label: string, taken: Set<string>) {
@@ -41,14 +47,15 @@ export function normalizeStages(raw: unknown, fallback: readonly PipelineStage[]
   return out.length ? out : copy(fallback);
 }
 
-export function normalizePipeline(raw: unknown): PipelineConfig {
+/** `defaults` fills in any funnel that is missing or empty (DEFAULT_PIPELINE for developers, DEFAULT_INVESTOR_PIPELINE for investors). */
+export function normalizePipeline(raw: unknown, defaults: PipelineConfig = DEFAULT_PIPELINE): PipelineConfig {
   const funnels = (raw as { funnels?: Record<string, unknown> } | null)?.funnels ?? {};
-  return { funnels: Object.fromEntries(FUNNEL_KEYS.map((k) => [k, normalizeStages(funnels[k], DEFAULT_PIPELINE.funnels[k])])) };
+  return { funnels: Object.fromEntries(FUNNEL_KEYS.map((k) => [k, normalizeStages(funnels[k], defaults.funnels[k])])) };
 }
 
-export function parsePipeline(json: string | null | undefined): PipelineConfig {
-  if (!json) return DEFAULT_PIPELINE;
-  try { return normalizePipeline(JSON.parse(json)); } catch { return DEFAULT_PIPELINE; }
+export function parsePipeline(json: string | null | undefined, defaults: PipelineConfig = DEFAULT_PIPELINE): PipelineConfig {
+  if (!json) return defaults;
+  try { return normalizePipeline(JSON.parse(json), defaults); } catch { return defaults; }
 }
 
 /** Which funnel a deal type uses. Unknown deal types use the financing funnel. */

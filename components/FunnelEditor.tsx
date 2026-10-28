@@ -2,7 +2,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DEFAULT_PIPELINE, MAX_LABEL, MAX_STAGES, type PipelineConfig, type PipelineStage } from "@/lib/pipeline";
+import { MAX_LABEL, MAX_STAGES, type PipelineConfig, type PipelineStage } from "@/lib/pipeline";
 
 type State = { error?: string; ok?: string; config?: PipelineConfig } | undefined;
 type Row = PipelineStage & { key: string };
@@ -12,11 +12,14 @@ let seq = 0;
 const rows = (list: readonly PipelineStage[]): Row[] => list.map((s) => ({ ...s, key: `r${seq++}` }));
 
 /**
- * Edits the Developer CRM columns for each deal type: rename, add, reorder, remove, or copy another funnel's columns.
+ * Edits a CRM's columns for each deal type: rename, add, reorder, remove, or copy another funnel's columns.
  * `tiles` is how many board tiles sit in each column today, per funnel, so removing a busy column is a deliberate choice.
+ * `defaults` is what "Restore defaults" puts back; `board` is the board's address (the funnel is added to it).
  */
-export function FunnelEditor({ initial, funnels, start: startFunnel, tiles, action }: {
+export function FunnelEditor({ initial, defaults, board, funnels, start: startFunnel, tiles, action }: {
   initial: PipelineConfig;
+  defaults: PipelineConfig;
+  board: string;
   funnels: Funnel[];
   start: string;
   tiles: Record<string, Record<string, number>>;
@@ -90,7 +93,7 @@ export function FunnelEditor({ initial, funnels, start: startFunnel, tiles, acti
             <option value="">Copy columns from…</option>
             {funnels.filter((f) => f.value !== active).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
-          <button type="button" className="btn-ghost" onClick={() => confirm("Put this funnel back to the original eight columns?") && set(rows(DEFAULT_PIPELINE.funnels[active]))}>Restore defaults</button>
+          <button type="button" className="btn-ghost" onClick={() => confirm(`Put this funnel back to the original ${defaults.funnels[active].length} columns?`) && set(rows(defaults.funnels[active]))}>Restore defaults</button>
         </div>
       </div>
 
@@ -122,7 +125,7 @@ export function FunnelEditor({ initial, funnels, start: startFunnel, tiles, acti
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn" disabled={pending || !dirty}>{pending ? "Saving…" : "Save funnels"}</button>
         {dirty && !pending && <span className="text-sm text-amber-700">Unsaved changes</span>}
-        {state?.ok && <span className="text-sm text-emerald-700" role="status">{state.ok} <Link href={`/admin/developers?funnel=${active}`} className="font-medium underline">Open the board</Link></span>}
+        {state?.ok && <span className="text-sm text-emerald-700" role="status">{state.ok} <Link href={`${board}?funnel=${active}`} className="font-medium underline">Open the board</Link></span>}
         {state?.error && <span className="text-sm text-red-600" role="alert">{state.error}</span>}
       </div>
     </form>
