@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getSession } from "@/lib/auth";
 
 export async function Nav() {
@@ -6,8 +7,9 @@ export async function Nav() {
   return (
     <header className="bg-brand-900 text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-          <span className="rounded bg-brand-500 px-1.5 py-0.5 text-xs">DEAC</span> Marketplace
+        <Link href="/" className="flex shrink-0 items-center gap-3 font-semibold tracking-tight" aria-label="DEAC Marketplace home">
+          <Image src="/brand/deac-logo-white.png" alt="DEAC — Distributed Energy and Compute" width={1200} height={351} priority className="h-9 w-auto" />
+          <span className="hidden border-l border-white/25 pl-3 text-sm text-slate-200 sm:inline">Marketplace</span>
         </Link>
         <nav className="flex items-center gap-5 text-sm text-slate-200">
           {s && (s.role === "ADMIN" || s.status === "APPROVED") && <Link href="/marketplace">Opportunities</Link>}
