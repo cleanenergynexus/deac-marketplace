@@ -13,7 +13,7 @@ test("inline styles and links", () => {
 test("blocks: headings, lists, tables, quotes", () => {
   const b = parseMarkdown("# Title\n\nIntro line one\nline two\n\n## Key Terms\n\n| Item | Detail |\n|---|---|\n| MW | 120 |\n| State | TX |\n\n- one\n- two\n  continued\n\n1. first\n2. second\n\n> note\n\n---");
   assert.deepEqual(b.map((x) => x.type), ["heading", "paragraph", "heading", "table", "list", "list", "quote", "rule"]);
-  assert.equal(spansText((b[1] as { spans: never[] }).spans), "Intro line one line two");
+  assert.equal(spansText((b[1] as Extract<(typeof b)[number], { type: "paragraph" }>).spans), "Intro line one line two");
   const t = b[3] as Extract<(typeof b)[number], { type: "table" }>;
   assert.equal(t.rows.length, 2);
   assert.equal(spansText(t.rows[0][1]), "120");
