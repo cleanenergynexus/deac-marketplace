@@ -3,7 +3,8 @@ import { promises as fs, createReadStream } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
-import { del, get, head } from "@vercel/blob";
+import { del, get, head, put } from "@vercel/blob";
+import { storagePath } from "@/lib/dataroom";
 
 // Data room files live in a private Vercel Blob store in production (Vercel has no persistent disk).
 // Without a store, local development keeps them in ./.data-room on disk.
@@ -63,6 +64,27 @@ export async function openStored(key: string): Promise<ReadableStream<Uint8Array
   }
   const r = await get(key, { access: "private" });
   return r && r.statusCode === 200 ? r.stream : null;
+}
+
+/** Reads a whole stored file into memory (the Document Wizard sends files to Claude). */
+export async function readStored(key: string): Promise<Buffer | null> {
+  const stream = await openStored(key);
+  if (!stream) return null;
+  return Buffer.from(await new Response(stream).arrayBuffer());
+}
+
+/** Saves a file the app generated (Document Wizard output) and returns its storage key. */
+export async function saveGenerated(projectId: string, name: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  const mode = storageMode();
+  if (mode === "missing") throw new Error("File storage isn't connected. Connect a Vercel Blob store first (see the data room page).");
+  if (mode === "local") {
+    const rel = path.join(projectId.replace(/[^\w-]/g, ""), randomUUID());
+    await fs.mkdir(path.dirname(path.join(localRoot(), rel)), { recursive: true });
+    await fs.writeFile(path.join(localRoot(), rel), bytes);
+    return LOCAL_PREFIX + rel;
+  }
+  const r = await put(storagePath(projectId, name), Buffer.from(bytes), { access: "private", contentType, addRandomSuffix: true });
+  return r.pathname;
 }
 
 /** Best-effort removal; a leftover blob is harmless (nothing links to it). */

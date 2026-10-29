@@ -52,7 +52,7 @@ Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Op
 1. **Vercel:** Add New → Project → import `cleanenergynexus/deac-marketplace`.
 2. **Database:** in the Vercel project, Storage → add a Neon Postgres database. This sets `DATABASE_URL`.
 3. **Data room file storage:** Storage → Create → **Blob**, choose **Private** access, connect it to the project. This sets `BLOB_READ_WRITE_TOKEN`.
-4. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
+4. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard and the Document Wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
 5. **Deploy.** The build creates the database tables automatically.
 6. **First admin:** open `/setup` on the live site, enter the `SETUP_TOKEN`, and create your login (the page shuts off once an admin exists; then delete `SETUP_TOKEN`). Add the rest of your staff under **Admin → Team**. Alternative from a terminal: `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
 7. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
@@ -65,6 +65,12 @@ Each project has an internal data room (**Listing → 📁 Data room**, or **Dat
 Files are stored in a **private** Vercel Blob store (`BLOB_READ_WRITE_TOKEN`); browsers upload straight to Blob, so there is no 4.5 MB limit. Without a token, local development saves files in `./.data-room`.
 
 Listing documents can point at data room files: **Share on listing** in the data room (pick a tier: Public, After NDA, After LOI, Full data room), or **Add from data room** in the listing editor. Investors open these through `/api/data-room/files/<id>`, which checks their stage on that listing every time; the Blob URL is never exposed. Nothing in the data room is visible to investors until it is shared. Documents can still be plain links (Drive / SharePoint).
+
+### Document Wizard
+
+**Data room → ✨ Document Wizard** has Claude (`claude-opus-5-5`) write a first draft from the files you tick in that data room: a **Project Teaser** (optionally blind: no sponsor, address or city), a **Project Report** (full analysis with risks, gaps and DEAC's internal valuation), a **Pitch Deck** (10 to 14 slides), or a **Custom report** from your own brief (summarize documents, compare options, answer a question). It reads PDFs, images, text, Word (.docx), Excel (.xlsx, cached values) and PowerPoint (.pptx); older Office formats and drawings are skipped with a reason. **Research the internet too** adds Claude web search and web fetch, with every web fact linked. Files are read server-side from storage, so the 4.4 MB upload limit doesn't apply; PDFs and images are capped at 22 MB per run (Claude's 32 MB request limit).
+
+Claude writes in the background (`after()`, within the page's 300 s limit); the draft page refreshes itself. Drafts are Markdown, edited side by side with a live preview, then **Save to data room** files a branded PDF (decks: 16:9 PDF and an editable .pptx) in "08 Marketing & Teaser" or "09 Reports & Analysis" (an existing matching folder is reused). Saving again replaces the same file, so listing shares keep working. Code: `lib/wizard.ts` (prompts, limits), `lib/wizard-run.ts` (Claude call), `lib/office.ts` (Office text), `lib/wizard-export.ts` (PDF / PowerPoint). Needs `ANTHROPIC_API_KEY`.
 
 ## Developer CRM funnels
 

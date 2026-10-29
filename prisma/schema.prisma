@@ -247,6 +247,7 @@ model Project {
   documents        Document[]
   dataRoomFolders  DataRoomFolder[]
   dataRoomFiles    DataRoomFile[]
+  wizardDocs       WizardDocument[]
   lois             Loi[]
   dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
@@ -297,6 +298,31 @@ model DataRoomFile {
   documents   Document[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+
+  @@index([projectId])
+}
+
+// Document Wizard draft (teaser, report, pitch deck or custom report) written by Claude from the data room.
+// The team edits the Markdown, then saves it into the data room as PDF (decks also as PowerPoint).
+model WizardDocument {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        String // TEASER | REPORT | DECK | CUSTOM (lib/wizard.ts)
+  title       String
+  status      String   @default("GENERATING") // GENERATING | READY | FAILED
+  error       String?
+  markdown    String   @default("")
+  options     String   @default("{}") // JSON WizardOptions: anonymous, webResearch, instructions, audience
+  sourceIds   String   @default("[]") // JSON array of data room file ids chosen as sources
+  sourceNotes String   @default("[]") // JSON: files read and files skipped (with reasons)
+  webSources  String   @default("[]") // JSON: [{ title, url }] pages found by web research
+  fileId      String? // saved PDF in the data room (kept on re-save so listing links stay valid)
+  pptxFileId  String? // pitch decks: the PowerPoint version
+  savedAt     DateTime?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([projectId])
 }
