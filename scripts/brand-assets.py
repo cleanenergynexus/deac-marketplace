@@ -1,7 +1,7 @@
 """Builds the DEAC logo and icon files from the source PNGs in scripts/brand-src.
 
-Run: python3 scripts/brand-assets.py  (needs Pillow). Writes public/brand/*, app/icon.png,
-app/apple-icon.png, app/favicon.ico and lib/brand-assets.ts (base64 copies for PDF/PowerPoint export).
+Run: python3 scripts/brand-assets.py  (needs Pillow). Writes public/brand/*, the public/ favicon and
+app icons, and lib/brand-assets.ts (base64 copies for PDF/PowerPoint export).
 """
 import base64, io, os
 from PIL import Image
@@ -62,15 +62,32 @@ mark_white = logo_white.crop((lb[0], lb[1], lb[0] + (lb[3] - lb[1]), lb[3]))
 save_png(mark, os.path.join(pub, "deac-mark.png"), 512)
 save_png(mark_white, os.path.join(pub, "deac-mark-white.png"), 512)
 
-# App icons from the favicon artwork, cleaned to flat colours on the off-white background.
+# Browser-tab and app icons, served from public/ with a version query (see app/layout.tsx) so
+# browsers drop any cached icon. The mark fills almost the whole tile so it reads at 16 px.
 fav = knockout(Image.open(os.path.join(SRC, "deac-favicon-source.png")))
-fav = crop(fav, 0.08)
+fav = crop(fav, 0.03)
 side = max(fav.size)
 square = Image.new("RGBA", (side, side), (*BG, 255))
 square.alpha_composite(fav, ((side - fav.width) // 2, (side - fav.height) // 2))
-save_png(square, os.path.join(ROOT, "app", "icon.png"), 512)
-save_png(square.convert("RGB"), os.path.join(ROOT, "app", "apple-icon.png"), 180)
-square.save(os.path.join(ROOT, "app", "favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48)])
+for n in (32, 48, 192, 512):
+    save_png(square, os.path.join(ROOT, "public", f"icon-{n}.png"), n)
+save_png(square.convert("RGB"), os.path.join(ROOT, "public", "apple-touch-icon.png"), 180)
+
+# 16 px drawn pixel by pixel: a downscaled mark turns to mush at this size.
+tiny = Image.new("RGBA", (16, 16), (*NAVY, 255))
+px = tiny.load()
+for y in range(2, 14):
+    for x in range(2, 14):
+        px[x, y] = (*BG, 255)
+for i, y0 in enumerate((3, 7, 11)):
+    for j, x0 in enumerate((3, 9)):
+        for y in (y0, y0 + 1):
+            for x in range(x0, x0 + 4):
+                px[x, y] = (*(BLUE if (i, j) == (0, 1) else NAVY), 255)
+tiny.save(os.path.join(ROOT, "public", "icon-16.png"))
+# favicon.ico: the hand-drawn 16 px plus downscaled 32 and 48 px frames.
+square.resize((48, 48), Image.LANCZOS).save(os.path.join(ROOT, "public", "favicon.ico"), sizes=[(16, 16), (32, 32), (48, 48)],
+                                            append_images=[tiny, square.resize((32, 32), Image.LANCZOS)])
 
 # Base64 copies for the Document Wizard exports (serverless functions can't rely on reading public/).
 def b64(img, width):
