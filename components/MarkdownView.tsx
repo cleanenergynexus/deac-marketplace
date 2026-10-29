@@ -54,7 +54,7 @@ export function MarkdownView({ markdown, deck = false }: { markdown: string; dec
   return (
     <div className="space-y-4">
       <div className="flex aspect-video flex-col justify-center rounded-lg bg-brand-900 p-8 text-white shadow">
-        <div className="mb-auto text-sm font-bold">DEAC</div>
+        <img src="/brand/deac-logo-white.png" alt="DEAC" className="mb-auto h-8 w-auto self-start" />
         <div className="mb-3 h-1 w-12 bg-brand-500" />
         <div className="text-2xl font-bold">{title || "Untitled deck"}</div>
         <div className="mt-2 text-sm text-slate-300">{cover.map((b, i) => (b.type === "paragraph" ? <Inline key={i} spans={b.spans} /> : null))}</div>

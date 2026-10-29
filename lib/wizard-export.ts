@@ -4,9 +4,11 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB }
 import PptxGenJS from "pptxgenjs";
 import JSZip from "jszip";
 import { parseMarkdown, splitSlides, spansText, type Block, type Span } from "@/lib/markdown";
+import { logo, logoWhite, type BrandImage } from "@/lib/brand-assets";
 
-const NAVY = rgb(11 / 255, 31 / 255, 58 / 255);
-const BLUE = rgb(24 / 255, 89 / 255, 196 / 255);
+// DEAC logo colours.
+const NAVY = rgb(10 / 255, 28 / 255, 66 / 255);
+const BLUE = rgb(31 / 255, 107 / 255, 255 / 255);
 const INK = rgb(0.12, 0.14, 0.18);
 const MUTED = rgb(0.42, 0.45, 0.5);
 const LINE = rgb(0.85, 0.87, 0.9);
@@ -200,6 +202,16 @@ class Flow {
   }
 }
 
+/** Embeds a logo PNG once per PDF; draw it with `drawLogo`. */
+const embedLogo = (doc: PDFDocument, img: BrandImage) => doc.embedPng(Buffer.from(img.base64, "base64"));
+type Embedded = Awaited<ReturnType<typeof embedLogo>>;
+/** Draws a logo `h` points tall with its bottom-left corner at (x, y); returns its width. */
+function drawLogo(page: PDFPage, img: Embedded, x: number, y: number, h: number) {
+  const w = (img.width / img.height) * h;
+  page.drawImage(img, { x, y, width: w, height: h });
+  return w;
+}
+
 export type ExportMeta = { kindLabel: string; code: string; confidential?: boolean; date?: Date };
 
 const dateLabel = (d = new Date()) => d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -210,14 +222,15 @@ export async function documentPdf(markdown: string, meta: ExportMeta): Promise<U
   const fonts = await loadFonts(doc);
   const W = 612, H = 792, M = 54;
   const pages: PDFPage[] = [];
+  const mark = await embedLogo(doc, logo);
   const add = () => {
     const page = doc.addPage([W, H]);
     pages.push(page);
     page.drawRectangle({ x: 0, y: H - 6, width: W, height: 6, color: NAVY });
-    page.drawText("DEAC", { x: M, y: H - 34, size: 12, font: fonts.bold, color: NAVY });
-    page.drawText(pdfSafe(meta.kindLabel.toUpperCase()), { x: M + 42, y: H - 33.5, size: 8, font: fonts.regular, color: MUTED });
+    const lw = drawLogo(page, mark, M, H - 37, 24);
+    page.drawText(pdfSafe(meta.kindLabel.toUpperCase()), { x: M + lw + 12, y: H - 30, size: 8, font: fonts.regular, color: MUTED });
     const right = pdfSafe(`${meta.code} · ${dateLabel(meta.date)}`);
-    page.drawText(right, { x: W - M - fonts.regular.widthOfTextAtSize(right, 8), y: H - 33.5, size: 8, font: fonts.regular, color: MUTED });
+    page.drawText(right, { x: W - M - fonts.regular.widthOfTextAtSize(right, 8), y: H - 30, size: 8, font: fonts.regular, color: MUTED });
     page.drawLine({ start: { x: M, y: H - 42 }, end: { x: W - M, y: H - 42 }, thickness: 0.6, color: LINE });
     return { page, top: H - 64 };
   };
@@ -243,11 +256,12 @@ export async function deckPdf(markdown: string, meta: ExportMeta): Promise<Uint8
   const doc = await PDFDocument.create();
   const fonts = await loadFonts(doc);
   const total = slides.length + 1;
+  const [mark, markWhite] = await Promise.all([embedLogo(doc, logo), embedLogo(doc, logoWhite)]);
 
   const c = doc.addPage([SW, SH]);
   c.drawRectangle({ x: 0, y: 0, width: SW, height: SH, color: NAVY });
   c.drawRectangle({ x: SM, y: SH / 2 + 8, width: 64, height: 4, color: BLUE });
-  c.drawText("DEAC", { x: SM, y: SH - SM - 14, size: 18, font: fonts.bold, color: WHITE });
+  drawLogo(c, markWhite, SM, SH - SM - 44, 52);
   const coverFlow = new Flow(c, fonts, SM, SW - SM * 2, SH / 2 - 8, SM, 1, true, null);
   coverFlow.text([{ text: title || meta.kindLabel }], { size: 34, bold: true, color: WHITE, lead: 40, gapAfter: 10 });
   const sub = cover.flatMap((b) => (b.type === "paragraph" || b.type === "quote" ? [spansText(b.spans)] : []))[0];
@@ -270,15 +284,15 @@ export async function deckPdf(markdown: string, meta: ExportMeta): Promise<Uint8
       if (probe.y >= bottom) break;
     }
     new Flow(page, fonts, SM, SW - SM * 2, top, bottom, scale, true, null).blocks(s.blocks, "slide");
-    page.drawText("DEAC", { x: SM, y: 22, size: 9, font: fonts.bold, color: NAVY });
-    page.drawText(pdfSafe(`${meta.code} · Confidential`), { x: SM + 34, y: 22, size: 8, font: fonts.regular, color: MUTED });
+    const lw = drawLogo(page, mark, SM, 16, 18);
+    page.drawText(pdfSafe(`${meta.code} · Confidential`), { x: SM + lw + 10, y: 22, size: 8, font: fonts.regular, color: MUTED });
     const n = `${i + 2} / ${total}`;
     page.drawText(n, { x: SW - SM - fonts.regular.widthOfTextAtSize(n, 8), y: 22, size: 8, font: fonts.regular, color: MUTED });
   });
   return doc.save();
 }
 
-const hex = { navy: "0B1F3A", blue: "1859C4", ink: "1F232E", muted: "6B7280", tint: "EEF6FF", line: "D9DEE5" };
+const hex = { navy: "0A1C42", blue: "1F6BFF", ink: "1F232E", muted: "6B7280", tint: "EEF6FF", line: "D9DEE5" };
 
 /** One PowerPoint paragraph: paragraph options (bullet, spacing) go on its first run, the line break on its last. */
 const pptPara = (spans: Span[], para: PptxGenJS.TextPropsOptions = {}, run: PptxGenJS.TextPropsOptions = {}): PptxGenJS.TextProps[] => {
@@ -300,7 +314,8 @@ export async function deckPptx(markdown: string, meta: ExportMeta): Promise<Buff
 
   const c = pptx.addSlide();
   c.background = { color: hex.navy };
-  c.addText("DEAC", { x: 0.6, y: 0.5, w: 4, h: 0.5, fontFace: font, fontSize: 20, bold: true, color: "FFFFFF" });
+  const logoH = (img: BrandImage, h: number) => ({ data: `image/png;base64,${img.base64}`, h, w: (img.width / img.height) * h });
+  c.addImage({ ...logoH(logoWhite, 0.75), x: 0.6, y: 0.5, altText: "DEAC" });
   c.addShape("rect", { x: 0.6, y: 3.05, w: 0.9, h: 0.06, fill: { color: hex.blue }, line: { color: hex.blue } });
   c.addText(title || meta.kindLabel, { x: 0.6, y: 3.2, w: 12, h: 1.4, fontFace: font, fontSize: 40, bold: true, color: "FFFFFF", valign: "top" });
   const sub = cover.flatMap((b) => (b.type === "paragraph" || b.type === "quote" ? [spansText(b.spans)] : []))[0];
@@ -313,7 +328,9 @@ export async function deckPptx(markdown: string, meta: ExportMeta): Promise<Buff
     slide.addShape("rect", { x: 0, y: 0, w: 13.33, h: 0.12, fill: { color: hex.navy }, line: { color: hex.navy } });
     slide.addText(s.title, { x: 0.6, y: 0.35, w: 12.1, h: 0.8, fontFace: font, fontSize: 28, bold: true, color: hex.navy, valign: "middle" });
     slide.addShape("rect", { x: 0.6, y: 1.15, w: 0.8, h: 0.05, fill: { color: hex.blue }, line: { color: hex.blue } });
-    slide.addText(`DEAC   ${meta.code} · Confidential`, { x: 0.6, y: 7.0, w: 8, h: 0.3, fontFace: font, fontSize: 9, color: hex.muted });
+    const foot = logoH(logo, 0.26);
+    slide.addImage({ ...foot, x: 0.6, y: 7.02, altText: "DEAC" });
+    slide.addText(`${meta.code} · Confidential`, { x: 0.6 + foot.w + 0.12, y: 7.0, w: 7, h: 0.3, fontFace: font, fontSize: 9, color: hex.muted });
     slide.addText(`${i + 2} / ${slides.length + 1}`, { x: 11.2, y: 7.0, w: 1.5, h: 0.3, fontFace: font, fontSize: 9, color: hex.muted, align: "right" });
 
     const tables = s.blocks.filter((b): b is Extract<Block, { type: "table" }> => b.type === "table");
