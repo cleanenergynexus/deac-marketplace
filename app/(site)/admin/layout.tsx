@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         { href: "/admin/developers/funnels", label: "Funnels" },
       ],
     },
-    { href: "/admin/projects", label: "Listings" },
+    { href: "/admin/projects", label: "Listings", children: [{ href: "/admin/data-room-template", label: "Data room template" }] },
     { href: "/admin/lois", label: "NDAs & LOIs", count: pendingLois + pendingSteps },
     { href: "/admin/requests", label: "Intake requests", count: openReqs },
     { href: "/admin/outreach", label: "Outreach" },

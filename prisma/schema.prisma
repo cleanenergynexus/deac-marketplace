@@ -484,3 +484,12 @@ model PipelineSettings {
   updatedBy String?
   updatedAt DateTime @updatedAt
 }
+
+// Folder set that "Create standard folders" adds to a project's data room (Admin → Data room template). One row, id "default".
+// JSON shape: TemplateNode[] in lib/dataroom.ts.
+model DataRoomTemplate {
+  id        String   @id @default("default")
+  config    String // JSON
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

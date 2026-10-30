@@ -3,7 +3,7 @@
 export type DrFolder = { id: string; parentId: string | null; name: string };
 export type DrFile = { id: string; folderId: string | null; name: string };
 
-/** Starter structure offered on an empty data room. */
+/** Built-in starter structure. Admins can replace it under Admin → Data room template. */
 export const STANDARD_FOLDERS = [
   "01 Corporate & Sponsor",
   "02 Site & Real Estate",
@@ -14,6 +14,41 @@ export const STANDARD_FOLDERS = [
   "07 Legal & Contracts",
   "08 Marketing & Teaser",
 ];
+
+/** One folder of the data room template, with its subfolders. */
+export type TemplateNode = { name: string; children: TemplateNode[] };
+export const DEFAULT_TEMPLATE: TemplateNode[] = STANDARD_FOLDERS.map((name) => ({ name, children: [] }));
+export const TEMPLATE_MAX_DEPTH = 5;
+export const TEMPLATE_MAX_FOLDERS = 300;
+
+/** Cleans a template: valid names only, no duplicate names among siblings, limited depth and size. */
+export function normalizeTemplate(raw: unknown): TemplateNode[] {
+  let count = 0;
+  const walk = (list: unknown, depth: number): TemplateNode[] => {
+    if (!Array.isArray(list) || depth > TEMPLATE_MAX_DEPTH) return [];
+    const seen = new Set<string>();
+    const out: TemplateNode[] = [];
+    for (const item of list) {
+      if (!item || typeof item !== "object" || count >= TEMPLATE_MAX_FOLDERS) continue;
+      const o = item as Record<string, unknown>;
+      const name = cleanName(typeof o.name === "string" ? o.name : "");
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      count++;
+      out.push({ name, children: walk(o.children, depth + 1) });
+    }
+    return out;
+  };
+  return walk(raw, 1);
+}
+
+/** Saved template JSON -> template. Missing or unreadable falls back to the built-in set. */
+export function parseTemplate(json?: string | null): TemplateNode[] {
+  if (!json) return DEFAULT_TEMPLATE;
+  try { return normalizeTemplate(JSON.parse(json)); } catch { return DEFAULT_TEMPLATE; }
+}
+
+export const countTemplate = (nodes: TemplateNode[]): number => nodes.reduce((n, x) => n + 1 + countTemplate(x.children), 0);
 
 /** Link stored on a listing document that points at a data room file. Access is checked on download. */
 export const fileUrl = (fileId: string) => `/api/data-room/files/${fileId}`;
