@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canMoveFolder, cleanName, descendantIds, docNameFromFile, fileKind, filePathLabel, folderPath, formatBytes, inlineSafe, storagePath, uniqueName, uploadDirs } from "./dataroom";
+import { DEFAULT_TEMPLATE, countTemplate, normalizeTemplate, parseTemplate, canMoveFolder, cleanName, descendantIds, docNameFromFile, fileKind, filePathLabel, folderPath, formatBytes, inlineSafe, storagePath, uniqueName, uploadDirs } from "./dataroom";
 
 const folders = [
   { id: "a", parentId: null, name: "Power" },
@@ -70,4 +70,23 @@ test("storage paths are safe", () => {
   assert.equal(storagePath("p1", "../../etc"), "data-room/p1/etc");
   assert.equal(storagePath("p1", "日本"), "data-room/p1/file");
   assert.equal(storagePath("p1", "a.pdf", "u1"), "data-room/p1/u1-a.pdf");
+});
+
+test("data room template is cleaned and falls back to the default", () => {
+  assert.equal(parseTemplate(null), DEFAULT_TEMPLATE);
+  assert.equal(parseTemplate("not json"), DEFAULT_TEMPLATE);
+  assert.deepEqual(parseTemplate("[]"), []);
+  assert.deepEqual(normalizeTemplate([
+    { name: " Power ", children: [{ name: "Studies" }, { name: "studies" }, { name: "" }] },
+    { name: "power" },
+    { name: "Legal/Contracts", children: "x" },
+    "junk",
+  ]), [
+    { name: "Power", children: [{ name: "Studies", children: [] }] },
+    { name: "Legal-Contracts", children: [] },
+  ]);
+  let deep: { name: string; children: unknown[] } = { name: "L7", children: [] };
+  for (let i = 6; i >= 1; i--) deep = { name: `L${i}`, children: [deep] };
+  assert.equal(countTemplate(normalizeTemplate([deep])), 5);
+  assert.equal(countTemplate(DEFAULT_TEMPLATE), 8);
 });

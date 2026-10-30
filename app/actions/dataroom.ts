@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { isStage, type Stage } from "@/lib/disclosure";
-import { canMoveFolder, cleanName, docNameFromFile, fileUrl, STANDARD_FOLDERS, uniqueName } from "@/lib/dataroom";
+import { canMoveFolder, cleanName, docNameFromFile, fileUrl, countTemplate, normalizeTemplate, parseTemplate, type TemplateNode, uniqueName } from "@/lib/dataroom";
 import { deleteStored, verifyStored } from "@/lib/storage";
 
 type Result = { error?: string };
@@ -41,12 +41,27 @@ export async function createFolder(projectId: string, parentId: string | null, n
   return { id: f.id, name: f.name };
 }
 
+/** Adds the folders of the data room template (Admin → Data room template). Folders that already exist are kept and filled in. */
 export async function createStandardFolders(projectId: string): Promise<Result> {
   await requireAdmin();
-  const taken = await siblingNames(projectId, null);
-  const lower = new Set(taken.map((t) => t.toLowerCase()));
-  const missing = STANDARD_FOLDERS.filter((n) => !lower.has(n.toLowerCase()));
-  await db.dataRoomFolder.createMany({ data: missing.map((name) => ({ projectId, parentId: null, name })) });
+  const row = await db.dataRoomTemplate.findUnique({ where: { id: "default" } });
+  const template = parseTemplate(row?.config);
+  if (!template.length) return { error: "The data room template is empty. Add folders under Admin → Data room template." };
+  const add = async (nodes: TemplateNode[], parentId: string | null) => {
+    const existing = await db.dataRoomFolder.findMany({ where: { projectId, parentId }, select: { id: true, name: true } });
+    const taken = await siblingNames(projectId, parentId);
+    for (const n of nodes) {
+      let folder = existing.find((f) => f.name.toLowerCase() === n.name.toLowerCase());
+      if (!folder) {
+        // A file with the same name can sit there; keep both, like Explorer.
+        const name = uniqueName(n.name, taken);
+        taken.push(name);
+        folder = await db.dataRoomFolder.create({ data: { projectId, parentId, name }, select: { id: true, name: true } });
+      }
+      if (n.children.length) await add(n.children, folder.id);
+    }
+  };
+  await add(template, null);
   refresh(projectId);
   return {};
 }
@@ -178,4 +193,15 @@ export async function unshareFromListing(projectId: string, fileIds: string[]): 
   await db.document.deleteMany({ where: { projectId, fileId: { in: fileIds } } });
   refresh(projectId);
   return {};
+}
+
+/** Saves the folder set used by "Create standard folders" (Admin → Data room template). Existing data rooms don't change. */
+export async function saveDataRoomTemplate(_: { error?: string; ok?: string } | undefined, f: FormData): Promise<{ error?: string; ok?: string }> {
+  const admin = await requireAdmin();
+  let nodes: TemplateNode[];
+  try { nodes = normalizeTemplate(JSON.parse(String(f.get("config") ?? ""))); } catch { return { error: "Could not read the folders. Reload the page and try again." }; }
+  const config = JSON.stringify(nodes);
+  await db.dataRoomTemplate.upsert({ where: { id: "default" }, create: { id: "default", config, updatedBy: admin.name }, update: { config, updatedBy: admin.name } });
+  revalidatePath("/admin/data-room-template");
+  return { ok: `Template saved: ${countTemplate(nodes)} folder${countTemplate(nodes) === 1 ? "" : "s"}. New data rooms will use it.` };
 }

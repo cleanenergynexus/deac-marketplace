@@ -73,7 +73,7 @@ Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Op
 
 ## Project data rooms
 
-Each project has an internal data room (**Listing → 📁 Data room**, or **Data room** on its Developer CRM tile) that works like Windows Explorer: folder tree, address bar with back/forward/up, details or icons view, sort, search, multi-select (Ctrl/Shift), right-click menu, rename (F2), cut/paste (Ctrl+X / Ctrl+V), Move to…, drag to move, and upload of files or whole folders (button or drag from the desktop). A name clash on upload keeps both ("Report (2).pdf"). An empty data room offers a standard folder set.
+Each project has an internal data room (**Listing → 📁 Data room**, or **Data room** on its Developer CRM tile) that works like Windows Explorer: folder tree, address bar with back/forward/up, details or icons view, sort, search, multi-select (Ctrl/Shift), right-click menu, rename (F2), cut/paste (Ctrl+X / Ctrl+V), Move to…, drag to move, and upload of files or whole folders (button or drag from the desktop). A name clash on upload keeps both ("Report (2).pdf"). An empty data room offers a standard folder set, which admins edit under **Admin → Listings → Data room template** (folders and subfolders; changes apply to data rooms set up afterwards, and the right-click menu at the top level can add the template to an existing one).
 
 Files are stored in a **private** Vercel Blob store (`BLOB_READ_WRITE_TOKEN`); browsers upload straight to Blob, so there is no 4.5 MB limit. Without a token, local development saves files in `./.data-room`.
 

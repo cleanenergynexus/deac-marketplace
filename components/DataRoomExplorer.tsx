@@ -493,6 +493,7 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
               <MenuItem onClick={() => { setMenu(null); dirInput.current?.click(); }} disabled={!canUpload}>Upload folder…</MenuItem>
               <MenuSep />
               <MenuItem onClick={() => { setMenu(null); paste(); }} disabled={!cut}>Paste</MenuItem>
+              {cwd === null && !searching && <MenuItem onClick={() => { setMenu(null); run(() => createStandardFolders(projectId)); }}>Add standard folders</MenuItem>}
               <MenuItem onClick={() => { setMenu(null); setSelected(new Set(items.map((i) => i.key))); }}>Select all</MenuItem>
               <MenuItem onClick={() => { setMenu(null); startTransition(() => router.refresh()); }}>Refresh</MenuItem>
             </>
@@ -607,6 +608,7 @@ function EmptyState({ searching, isRoot, hasAny, canUpload, onStandard, onUpload
         {isRoot && !hasAny && <button type="button" onClick={onStandard} className="btn-ghost">Create standard folders</button>}
         {canUpload && <button type="button" onClick={onUpload} className="btn">Upload files</button>}
       </div>
+      {isRoot && !hasAny && <a href="/admin/data-room-template" className="text-xs text-brand-600">Edit the standard folders</a>}
     </div>
   );
 }
