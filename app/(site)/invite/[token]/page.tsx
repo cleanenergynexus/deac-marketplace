@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Where an invited investor sets their password. The token in the link is the only proof needed. */
 export default async function AcceptInvite({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const user = await db.user.findUnique({ where: { inviteTokenHash: hashInviteToken(token) }, select: { name: true, email: true, role: true, inviteExpiresAt: true } });
+  const user = await db.user.findFirst({ where: { inviteTokenHash: hashInviteToken(token) }, select: { name: true, email: true, role: true, inviteExpiresAt: true } });
   if (!user || user.role !== "INVESTOR" || inviteExpired(user.inviteExpiresAt)) {
     return (
       <div className="mx-auto max-w-sm card p-6">

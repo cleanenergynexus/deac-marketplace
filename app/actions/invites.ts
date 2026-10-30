@@ -60,7 +60,7 @@ export async function acceptInvite(_: { error?: string } | undefined, f: FormDat
   const password = String(f.get("password") ?? "");
   if (password.length < 8) return { error: "Choose a password of at least 8 characters." };
   if (password !== String(f.get("confirm") ?? "")) return { error: "The two passwords don't match." };
-  const user = token ? await db.user.findUnique({ where: { inviteTokenHash: hashInviteToken(token) } }) : null;
+  const user = token ? await db.user.findFirst({ where: { inviteTokenHash: hashInviteToken(token) } }) : null;
   if (!user || user.role !== "INVESTOR" || inviteExpired(user.inviteExpiresAt)) return { error: "This invite link has expired or was already used. Ask the DEAC team for a new one." };
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), inviteTokenHash: null, inviteExpiresAt: null } });
   if (user.investorId) await db.activity.create({ data: { investorId: user.investorId, kind: "SYSTEM", by: user.name, body: "Accepted the marketplace invite and set a password." } });
