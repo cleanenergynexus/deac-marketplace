@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-slate-50 text-slate-900 antialiased; }
+body { @apply bg-[#F5F7FB] text-slate-900 antialiased; font-family: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif; }
+h1, h2, h3 { font-family: "Poppins", "Segoe UI", system-ui, sans-serif; letter-spacing: -0.01em; }
 .input { @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500; }
 .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500; }
 .btn { @apply inline-flex items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50; }
