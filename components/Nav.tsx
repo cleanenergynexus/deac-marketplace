@@ -1,26 +1,34 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getSession } from "@/lib/auth";
+import { COMPANY_URL, COMPANY_LINKS } from "@/lib/site";
 
+// Same header as the company website (deacna.com): logo, main menu, then marketplace account links.
 export async function Nav() {
   const s = await getSession();
+  const link = "text-[15px] font-medium text-[#A9B6D3] hover:text-white";
   return (
-    <header className="bg-brand-900 text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex shrink-0 items-center gap-3 font-semibold tracking-tight" aria-label="DEAC Marketplace home">
-          <Image src="/brand/deac-logo-white.png" alt="DEAC — Distributed Energy and Compute" width={1200} height={351} priority className="h-9 w-auto" />
-          <span className="hidden border-l border-white/25 pl-3 text-sm text-slate-200 sm:inline">Marketplace</span>
-        </Link>
-        <nav className="flex items-center gap-5 text-sm text-slate-200">
-          {s && (s.role === "ADMIN" || s.status === "APPROVED") && <Link href="/marketplace">Opportunities</Link>}
-          {s?.role === "INVESTOR" && <Link href="/portal">My Portal</Link>}
-          {s?.role === "ADMIN" && <Link href="/admin">Admin</Link>}
-          {!s && <Link href="/developers/submit">Submit a Project</Link>}
-          {!s && <Link href="/apply">Request Access</Link>}
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-brand-900 text-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-4 py-3.5">
+        <a href={COMPANY_URL} className="flex shrink-0 items-center" aria-label="DEAC home">
+          <Image src="/brand/deac-logo-white.png" alt="DEAC — Distributed Energy and Compute" width={1200} height={351} priority className="h-[38px] w-auto" />
+        </a>
+        <nav className="flex items-center gap-6">
+          {COMPANY_LINKS.map(([label, href]) => (
+            <a key={label} href={href} className={`hidden xl:inline ${link}`}>{label}</a>
+          ))}
+          <Link href="/" className="text-[15px] font-semibold text-white">Marketplace</Link>
+          {s && (s.role === "ADMIN" || s.status === "APPROVED") && <Link href="/marketplace" className={link}>Opportunities</Link>}
+          {s?.role === "INVESTOR" && <Link href="/portal" className={link}>My Portal</Link>}
+          {s?.role === "ADMIN" && <Link href="/admin" className={link}>Admin</Link>}
+          {!s && <Link href="/developers/submit" className={`hidden md:inline ${link}`}>Submit a project</Link>}
           {s ? (
-            <form action="/logout" method="post"><button className="text-slate-300 hover:text-white">Sign out</button></form>
+            <form action="/logout" method="post"><button className={link}>Sign out</button></form>
           ) : (
-            <Link href="/login" className="rounded-md bg-white/10 px-3 py-1.5 hover:bg-white/20">Sign in</Link>
+            <>
+              <Link href="/login" className={`hidden sm:inline ${link}`}>Sign in</Link>
+              <Link href="/apply" className="rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-[#3B7FFF]">Request access</Link>
+            </>
           )}
         </nav>
       </div>
