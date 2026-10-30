@@ -12,6 +12,7 @@ import { DEAL_STAGES, dealStageIndex, dealTypeLabel, isClosedDeal, FOCUS_AREAS, 
 import { atLeast, docStage, isStage, nextStep, parseDisclosure, STAGES, STAGE_INFO, stageRank, type Stage, type StepStatus } from "@/lib/disclosure";
 import { usd, num, date } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
   const status = { nda: access.nda?.status as StepStatus | undefined, loi: access.loi?.status as StepStatus | undefined, diligence: access.diligence?.status as StepStatus | undefined };
   const next = nextStep(stage, status);
+  const favorite = u.investorId ? !!(await db.favorite.findUnique({ where: { investorId_projectId: { investorId: u.investorId, projectId: id } } })) : false;
   const requests = u.investorId && tab === "documents" ? await db.analysisRequest.findMany({ where: { projectId: id, investorId: u.investorId }, orderBy: { createdAt: "desc" } }) : [];
 
   const docs = p.documents.map((d) => ({ ...d, stage: docStage(d.access) })).sort((a, b) => stageRank(a.stage) - stageRank(b.stage));
@@ -234,8 +236,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
       <div className="card overflow-hidden">
         <div className="relative bg-gradient-to-br from-brand-900 to-brand-600 p-8 text-white">
+          {u.investorId && !isClosedDeal(p.dealStage) && <FavoriteButton projectId={p.id} initial={favorite} variant="button" className="absolute right-6 top-6" />}
           {isAdmin && <Link href={`/admin/projects/${p.id}`} className="absolute right-6 top-6 rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-brand-900 shadow hover:bg-brand-50">✎ Edit Listing</Link>}
-          <div className="flex flex-wrap items-center gap-2 pr-32 text-xs">
+          <div className="flex flex-wrap items-center gap-2 pr-48 text-xs">
             <span className="rounded-full border border-white/30 px-2.5 py-0.5 font-semibold uppercase tracking-wide">{dealTypeLabel(p.dealType)}</span>
             <span className="rounded bg-white/15 px-2 py-0.5 font-mono">{p.code}</span>
             {isClosedDeal(p.dealStage) && <span className="rounded bg-red-600 px-2.5 py-0.5 font-black uppercase tracking-widest text-white shadow">Closed - Sold</span>}
