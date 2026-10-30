@@ -20,7 +20,7 @@ export async function login(_: unknown, f: FormData) {
   const next = s(f, "next");
   if (user.role === "ADMIN") redirect(next?.startsWith("/") ? next : "/admin");
   if (user.role === "AGENT") {
-    redirect(next?.startsWith("/agent") ? next : "/agent");
+    redirect(next && /^\/(agent|marketplace)(\/|$)/.test(next) ? next : "/agent");
   }
   if (user.status !== "APPROVED") redirect("/pending");
   redirect(next?.startsWith("/") ? next : "/marketplace");

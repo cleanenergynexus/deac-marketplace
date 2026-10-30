@@ -10,6 +10,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
     { href: "/agent/developers", label: "Developer contacts" },
     { href: "/agent/investors", label: "Investor contacts" },
     { href: "/agent/listings", label: "Listings & data rooms", children: [{ href: "/agent/import", label: "Import a listing" }] },
+    { href: "/marketplace", label: "Opportunities" },
     { href: "/agent/refer", label: "Refer a contact" },
     { href: "/agent/account", label: "My account" },
   ];

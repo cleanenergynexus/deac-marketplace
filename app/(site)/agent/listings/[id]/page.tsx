@@ -56,7 +56,8 @@ export default async function AgentListing({ params, searchParams }: { params: P
   return (
     <div className="space-y-6">
       <Link href="/agent/listings" className="text-sm text-brand-600">← Listings</Link>
-      <PageHeader title={p.title} subtitle={<><span className="font-mono">{p.code}</span> · {p.developer.company}</>} />
+      <PageHeader title={p.title} subtitle={<><span className="font-mono">{p.code}</span> · {p.developer.company}</>}
+        action={p.visibility !== "DRAFT" ? <Link href={`/marketplace/${p.id}`} className="btn-ghost">Open on the marketplace</Link> : undefined} />
       {created && <p className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-800">Listing created as a draft. Your DEAC partner has been asked to review it. Add the supporting documents to its data room below.</p>}
       <div className="grid gap-3 sm:grid-cols-4">
         <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">Size</div><div className="mt-1 font-semibold">{num(p.mw)} MW · {p.state}{p.city ? ` · ${p.city}` : ""}</div></div>
