@@ -27,7 +27,7 @@ export function InvestorForm({ inv, action, firms = [], firm, projectId, agents 
           <datalist id="investor-firms">{firms.map((f) => <option key={f} value={f} />)}</datalist>
         </Field>
         <Field label="Job title"><input name="title" defaultValue={inv?.title ?? ""} className="input" /></Field>
-        {!inv && <Field label="Email"><input name="email" type="email" required className="input" /></Field>}
+        <Field label="Email"><input name="email" type="email" defaultValue={inv?.email} required className="input" /></Field>
         <Field label="Phone"><PhoneInput name="phone" defaultValue={inv?.phone} defaultCountry={home} /></Field>
         <Field label="Mobile"><PhoneInput name="mobile" defaultValue={inv?.mobile} defaultCountry={home} /></Field>
         <Field label="LinkedIn"><input name="linkedin" defaultValue={inv?.linkedin ?? ""} className="input" placeholder="https://linkedin.com/in/…" /></Field>

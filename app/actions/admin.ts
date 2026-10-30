@@ -80,11 +80,30 @@ export async function createInvestor(f: FormData) {
 }
 
 export async function updateInvestor(f: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = String(f.get("id"));
-  await db.investor.update({ where: { id }, data: { ...(await withFirm(investorData(f))), referredById: await referrerFromForm(f) } });
+  const inv = await db.investor.findUnique({ where: { id }, select: { email: true } });
+  if (!inv) return;
+  // Email can be corrected (e.g. a typo from a referral agent). Their marketplace login moves with it.
+  const email = s(f, "email")?.toLowerCase() ?? inv.email;
+  const changed = email !== inv.email;
+  if (changed) {
+    const back = (error: string) => redirect(`/admin/investors/${id}?tab=profile&emailError=${error}`);
+    if (!isEmail(email)) back("invalid");
+    if (await db.investor.count({ where: { email, id: { not: id } } })) back("crm");
+    if (await db.user.count({ where: { email, OR: [{ investorId: null }, { investorId: { not: id } }] } })) back("login");
+  }
+  await db.$transaction([
+    db.investor.update({ where: { id }, data: { ...(await withFirm(investorData(f))), email, referredById: await referrerFromForm(f) } }),
+    ...(changed ? [
+      db.user.updateMany({ where: { investorId: id }, data: { email } }),
+      db.activity.create({ data: { investorId: id, kind: "SYSTEM", by: admin.name, body: `Email changed from ${inv.email} to ${email} by ${admin.name}.` } }),
+    ] : []),
+  ]);
   revalidatePath("/admin/investors", "layout");
 }
+
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 export async function setInvestorStage(f: FormData) {
   const admin = await requireAdmin();
