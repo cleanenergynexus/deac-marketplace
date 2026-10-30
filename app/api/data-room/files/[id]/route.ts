@@ -17,11 +17,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!u) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(req.nextUrl.pathname)}`, req.url));
   const file = await db.dataRoomFile.findUnique({ where: { id }, include: { documents: { select: { access: true } }, project: { select: { visibility: true } } } });
   if (!file) return new NextResponse("Not found", { status: 404 });
-  // Referral agents can add files to a data room but never open or download them.
-  if (u.role === "AGENT") return new NextResponse("Referral agents can upload to the data room but not download from it.", { status: 403 });
+  // Referral agents never open the internal data room. Like investors, they open only files shared on a live listing,
+  // at their level: Teaser everywhere, everything on listings they originated (see listingAccess).
 
   if (u.role !== "ADMIN") {
-    const member = u.role === "INVESTOR" && u.status === "APPROVED";
+    const member = (u.role === "INVESTOR" || u.role === "AGENT") && u.status === "APPROVED";
     if (!member || file.project.visibility === "DRAFT" || !file.documents.length) return new NextResponse("Not found", { status: 404 });
     const { stage } = await listingAccess(file.projectId, u);
     if (!file.documents.some((d) => atLeast(stage, docStage(d.access)))) return new NextResponse("This document unlocks at a later stage of the deal.", { status: 403 });

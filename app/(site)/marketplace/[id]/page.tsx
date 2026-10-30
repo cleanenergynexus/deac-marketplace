@@ -57,7 +57,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (!p || (p.visibility === "DRAFT" && u.role !== "ADMIN")) notFound();
 
   const isAdmin = u.role === "ADMIN";
+  const isAgent = u.role === "AGENT";
   const access = await listingAccess(id, u);
+  const originated = "originated" in access && !!access.originated;
   // Admins can preview the listing as an investor at any stage.
   const asStage = isAdmin && isStage(sp.as) ? sp.as : null;
   const stage: Stage = asStage ?? access.stage;
@@ -206,7 +208,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       <div className="space-y-6">
         <DealProgress stage={stage} pending={next.status === "PENDING" ? next.step : null} />
         <div className="border-t border-slate-200 pt-5">
-          <NextStep projectId={p.id} ndaUrl={p.ndaUrl} next={next} isInvestor={!!u.investorId} preview={isAdmin} access={access} />
+          {isAgent ? (
+            <p className="text-sm text-slate-600">{originated
+              ? "You originated this listing, so you see all of it. Investors move through NDA, letter of interest and diligence here; your DEAC partner keeps you posted."
+              : "As a referral agent you see this listing at the Teaser level. Your DEAC partner can share more with you or your investors."}</p>
+          ) : <NextStep projectId={p.id} ndaUrl={p.ndaUrl} next={next} isInvestor={!!u.investorId} preview={isAdmin} access={access} />}
         </div>
       </div>
     );
@@ -233,7 +239,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <span className="rounded-full border border-white/30 px-2.5 py-0.5 font-semibold uppercase tracking-wide">{dealTypeLabel(p.dealType)}</span>
             <span className="rounded bg-white/15 px-2 py-0.5 font-mono">{p.code}</span>
             {isClosedDeal(p.dealStage) && <span className="rounded bg-red-600 px-2.5 py-0.5 font-black uppercase tracking-widest text-white shadow">Closed - Sold</span>}
-            <span className="rounded bg-emerald-500/30 px-2 py-0.5">{isAdmin && !asStage ? "DEAC team view" : `Your access: ${STAGE_INFO[stage].label}`}</span>
+            <span className="rounded bg-emerald-500/30 px-2 py-0.5">{isAdmin && !asStage ? "DEAC team view" : originated ? "Your listing: full access" : `Your access: ${STAGE_INFO[stage].label}`}</span>
           </div>
           <h1 className="mt-3 text-3xl font-bold">{p.title}</h1>
           <p className="mt-1 text-slate-200">{[location, p.facilityType].filter(Boolean).join(" · ")}</p>

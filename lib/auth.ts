@@ -6,6 +6,7 @@ import { db } from "./db";
 import { COOKIE, readToken, readViewAs, signSession, VIEW_AS_COOKIE, type Session } from "./session";
 import { staffLevel } from "./tasks";
 import { investorStage, type Stage, type StepStatus } from "./disclosure";
+import { agentProjectWhere } from "./agents";
 
 export async function getSession() {
   const c = await cookies();
@@ -79,17 +80,28 @@ export async function requireAgentToAct() {
   return v.agent;
 }
 
-/** Approved investor (or admin, who can preview everything). */
+/** Approved investor, active referral agent (teaser level, see listingAccess), or admin, who can preview everything. */
 export async function requireMember() {
   const u = await currentUser();
   if (!u) redirect("/login");
   if (u.role === "ADMIN") return u;
+  if (u.role === "AGENT") {
+    if (u.status !== "APPROVED") redirect("/login");
+    return u;
+  }
   if (u.role !== "INVESTOR" || u.status !== "APPROVED") redirect("/pending");
   return u;
 }
 
-/** Where an investor stands on one listing. Admins see everything. */
-export async function listingAccess(projectId: string, u: { role: string; investorId: string | null; investor?: { ndaSigned: boolean } | null }) {
+/**
+ * Where an investor stands on one listing. Admins see everything. Referral agents see every live listing at the
+ * Teaser level, and everything on listings they originated (projects of developers they brought in, see lib/agents.ts).
+ */
+export async function listingAccess(projectId: string, u: { id?: string; role: string; investorId: string | null; investor?: { ndaSigned: boolean } | null }) {
+  if (u.role === "AGENT" && u.id) {
+    const originated = await isOriginator(u.id, projectId);
+    return { stage: (originated ? "DILIGENCE" : "TEASER") as Stage, nda: undefined, loi: null, diligence: undefined, masterNda: false, originated };
+  }
   if (u.role === "ADMIN" || !u.investorId) {
     return { stage: (u.role === "ADMIN" ? "DILIGENCE" : "TEASER") as Stage, nda: undefined, loi: null, diligence: undefined, masterNda: false };
   }
@@ -103,4 +115,9 @@ export async function listingAccess(projectId: string, u: { role: string; invest
   const masterNda = !!u.investor?.ndaSigned;
   const stage = investorStage({ masterNda, nda: nda?.status as StepStatus | undefined, loi: loi?.status as StepStatus | undefined, diligence: diligence?.status as StepStatus | undefined });
   return { stage, nda, loi, diligence, masterNda };
+}
+
+/** Did this referral agent originate the listing (it belongs to a developer company they brought to DEAC)? */
+export async function isOriginator(agentId: string, projectId: string) {
+  return (await db.project.count({ where: { AND: [{ id: projectId }, agentProjectWhere(agentId)] } })) > 0;
 }
