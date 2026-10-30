@@ -26,7 +26,8 @@ export async function middleware(req: NextRequest) {
   const to = (path: string) => NextResponse.redirect(new URL(path, req.url));
   if (!s) return to(`/login?next=${encodeURIComponent(p)}`);
   if (/^\/admin(\/|$)/.test(p) && s.role !== "ADMIN") return to("/");
-  if (/^\/agent(\/|$)/.test(p) && s.role !== "AGENT") return to("/");
+  // Team members may open /agent to preview an agent's portal ("View as agent"); the pages check the preview.
+  if (/^\/agent(\/|$)/.test(p) && s.role !== "AGENT" && s.role !== "ADMIN") return to("/");
   // Referral agents only use their own portal.
   if (s.role === "AGENT" && !/^\/agent(\/|$)/.test(p)) return to("/agent");
   return NextResponse.next();

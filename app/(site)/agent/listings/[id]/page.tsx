@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireAgent } from "@/lib/auth";
+import { agentView } from "@/lib/auth";
 import { agentContactWhere, agentProjectWhere } from "@/lib/agents";
 import { AGENT_LINKS } from "@/lib/agent-portal";
 import { blobUploadMethod, storageMode } from "@/lib/storage";
@@ -23,7 +23,7 @@ const VIS: Record<string, string> = { DRAFT: "Draft: the DEAC team is reviewing 
 export default async function AgentListing({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const { id } = await params;
   const created = (await searchParams).created;
-  const me = await requireAgent();
+  const { agent: me, preview } = await agentView();
   const p = await db.project.findFirst({
     where: { AND: [{ id }, agentProjectWhere(me.id)] },
     include: {
@@ -69,7 +69,8 @@ export default async function AgentListing({ params, searchParams }: { params: P
       <div id="data-room" className="scroll-mt-4">
         <Section title="Data room">
           <p className="mb-4 text-sm text-slate-600">Add documents for this project (site plans, utility letters, financials…). The DEAC team reviews and organizes them. Uploads go one way: files in the data room can&apos;t be opened or downloaded from here. It holds {p._count.dataRoomFiles} file{p._count.dataRoomFiles === 1 ? "" : "s"} in total.</p>
-          <AgentUploader projectId={p.id} folders={folders} storage={storageMode()} uploadMethod={blobUploadMethod()} />
+          {preview ? <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">The agent sees an upload box here. It&apos;s turned off in the preview.</p>
+            : <AgentUploader projectId={p.id} folders={folders} storage={storageMode()} uploadMethod={blobUploadMethod()} />}
           <h3 className="mb-2 mt-6 text-sm font-semibold">Your uploads ({p.dataRoomFiles.length})</h3>
           {p.dataRoomFiles.length ? (
             <ul className="divide-y divide-slate-100 text-sm">

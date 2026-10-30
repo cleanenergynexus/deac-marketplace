@@ -1,6 +1,9 @@
 "use server";
 // Team side of referral agents: Admins add agents, assign their DEAC partner, suspend or remove them.
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { signViewAs, VIEW_AS_COOKIE } from "@/lib/session";
 import { db } from "@/lib/db";
 import { hashPassword, requireAdmin, requireTeamAdmin } from "@/lib/auth";
 import { isAgentStatus } from "@/lib/agents";
@@ -60,6 +63,21 @@ export async function updateAgent(_: State, f: FormData): Promise<State> {
   }
   refresh();
   return { ok: true };
+}
+
+/** "View as agent": opens the agent's portal as they see it, without their password. Read-only, ends after 2 hours or on Exit. */
+export async function viewAsAgent(f: FormData) {
+  const me = await requireAdmin();
+  const agent = await db.user.findFirst({ where: { id: String(f.get("id")), role: "AGENT" }, select: { id: true } });
+  if (!agent) redirect("/admin/agents");
+  (await cookies()).set(VIEW_AS_COOKIE, await signViewAs({ admin: me.id, agent: agent.id }), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 2 * 60 * 60 });
+  redirect("/agent");
+}
+
+/** Leaves the preview and goes back to the Referral agents page. */
+export async function exitAgentView() {
+  (await cookies()).delete(VIEW_AS_COOKIE);
+  redirect("/admin/agents");
 }
 
 /** Deletes the agent's login. The contacts they referred stay in the CRM, without a referral agent. */

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { checkPassword, hashPassword, requireAgent } from "@/lib/auth";
+import { checkPassword, hashPassword, requireAgentToAct, PREVIEW_MESSAGE } from "@/lib/auth";
 import { agentCompanyWhere, agentContactWhere, meetingRequest, referralSource } from "@/lib/agents";
 import { agentProject } from "@/lib/agents-db";
 import { cleanName, uniqueName } from "@/lib/dataroom";
@@ -16,9 +16,18 @@ import { importedValuation, projectData } from "@/lib/project-form";
 import { sendEmail } from "@/lib/email";
 
 type State = { error?: string; ok?: boolean } | undefined;
-type Agent = Awaited<ReturnType<typeof requireAgent>>;
+type Agent = Awaited<ReturnType<typeof requireAgentToAct>>;
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
+/** The signed-in agent, or null during a team member's read-only preview. */
+async function actor(): Promise<Agent | null> {
+  try {
+    return await requireAgentToAct();
+  } catch (e) {
+    if (e instanceof Error && e.message === PREVIEW_MESSAGE) return null;
+    throw e;
+  }
+}
 const appUrl = () => process.env.PUBLIC_APP_URL ?? "";
 
 /** The agent's DEAC partner, if one is assigned. */
@@ -36,7 +45,8 @@ async function taskForPartner(agent: Agent, task: { subject: string; body: strin
 
 /** Refers a development company and its contact. A contact already in the CRM goes to the partner to confirm instead of being duplicated. */
 export async function referDeveloper(_: State, f: FormData): Promise<State> {
-  const agent = await requireAgent();
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
   const company = s(f, "company");
   const name = s(f, "name");
   const email = s(f, "email")?.toLowerCase() ?? null;
@@ -68,7 +78,8 @@ export async function referDeveloper(_: State, f: FormData): Promise<State> {
 
 /** Refers an investor contact. Emails are unique in the Investor CRM, so an existing one goes to the partner to confirm. */
 export async function referInvestor(_: State, f: FormData): Promise<State> {
-  const agent = await requireAgent();
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
   const name = s(f, "name");
   const email = s(f, "email")?.toLowerCase();
   if (!name || !email) return { error: "Enter the investor's name and email." };
@@ -95,7 +106,8 @@ export async function referInvestor(_: State, f: FormData): Promise<State> {
 
 /** Asks the agent's DEAC partner for a meeting. It lands as a task for the partner, on the contact's timeline when one is picked. */
 export async function requestMeeting(_: State, f: FormData): Promise<State> {
-  const agent = await requireAgent();
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
   const topic = s(f, "topic");
   if (!topic) return { error: "Say what the meeting is about." };
   const about = s(f, "about") ?? "";
@@ -121,7 +133,8 @@ export async function requestMeeting(_: State, f: FormData): Promise<State> {
 
 /** Records a file the agent uploaded into a project's data room. Agents add files; they can't open, move or delete them. */
 export async function agentRegisterFile(input: { projectId: string; folderId: string | null; name: string; storageKey: string; contentType?: string }): Promise<{ error?: string }> {
-  const agent = await requireAgent();
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
   const { projectId, folderId } = input;
   if (!(await agentProject(agent.id, projectId))) return { error: "That project isn't one of yours." };
   if (folderId && !(await db.dataRoomFolder.count({ where: { id: folderId, projectId } }))) return { error: "That folder no longer exists. Refresh the page." };
@@ -141,7 +154,7 @@ export async function agentRegisterFile(input: { projectId: string; folderId: st
 
 /** Tells the partner once a batch of uploads is done, so new files get reviewed. */
 export async function agentUploadsDone(projectId: string, names: string[]): Promise<void> {
-  const agent = await requireAgent();
+  const agent = await requireAgentToAct();
   const p = await agentProject(agent.id, projectId);
   if (!p || !names.length) return;
   await db.activity.create({ data: { developerId: p.developerId, contactId: p.contactId, projectId, kind: "SYSTEM", by: agent.name, body: `${agent.name} added ${names.length} file${names.length === 1 ? "" : "s"} to the ${p.code} data room: ${names.slice(0, 10).join(", ")}${names.length > 10 ? "…" : ""}` } });
@@ -151,7 +164,7 @@ export async function agentUploadsDone(projectId: string, names: string[]): Prom
 
 /** Last step of the import wizard for an agent: the listing is saved as a Draft for the DEAC team to review. */
 export async function createAgentListing(f: FormData) {
-  const agent = await requireAgent();
+  const agent = await requireAgentToAct();
   const partner = await partnerOf(agent);
   let developerId = String(f.get("developerId") ?? "");
   if (developerId === "__new__") {
@@ -189,7 +202,8 @@ export async function createAgentListing(f: FormData) {
 // ---------- Account ----------
 
 export async function changeAgentPassword(_: State, f: FormData): Promise<State> {
-  const agent = await requireAgent();
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
   const next = String(f.get("next") ?? "");
   if (next.length < 10) return { error: "New password must be at least 10 characters." };
   if (!(await checkPassword(String(f.get("current") ?? ""), agent.passwordHash))) return { error: "Current password is incorrect." };
