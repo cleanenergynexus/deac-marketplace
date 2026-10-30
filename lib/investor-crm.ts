@@ -51,12 +51,12 @@ export function stepFromHistory(h: { nda?: string | null; loi?: string | null; d
 }
 
 type Mandate = { preferredStates: string; preferredRegions: string; dealTypes: string; facilityTypes: string; mwMin: number | null; mwMax: number | null };
-type Listing = { state: string; dealType: string; facilityType: string; mw: number };
+type Listing = { state: string; country: string; dealType: string; facilityType: string; mw: number };
 
 /** Does a listing fit an investor's stated mandate (markets, deal types, facility types, size)? Empty preferences match anything. */
 export function fitsMandate(inv: Mandate, p: Listing): boolean {
   const deals = csv(inv.dealTypes), types = csv(inv.facilityTypes);
-  return marketMatches(csv(inv.preferredStates), csv(inv.preferredRegions), p.state)
+  return marketMatches(csv(inv.preferredStates), csv(inv.preferredRegions), p.state, p.country)
     && (!deals.length || deals.includes(p.dealType))
     && (!types.length || types.includes(p.facilityType))
     && (inv.mwMin == null || p.mw >= inv.mwMin)

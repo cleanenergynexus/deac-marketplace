@@ -240,7 +240,9 @@ model Project {
   title         String
   developerId   String
   developer     Developer @relation(fields: [developerId], references: [id])
-  state         String // 2-letter
+  country       String    @default("US") // two-letter code (lib/phone.ts COUNTRIES)
+  state         String    @default("") // US: 2-letter state code. Elsewhere: free-text state / province. Optional ("").
+  county        String?
   city          String?
   mw            Float
   facilityType  String // see lib/constants.ts

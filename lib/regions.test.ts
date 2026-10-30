@@ -33,3 +33,18 @@ test("summary", () => {
   assert.equal(marketSummary("TX,VA", "MEXICO"), "TX, VA; Mexico");
   assert.equal(marketSummary(US_STATES.join(","), ""), "All US states");
 });
+
+test("listings outside the US match their region", () => {
+  assert.ok(marketMatches([], ["EMEA"], "", "DE"));
+  assert.ok(marketMatches([], ["CANADA"], "Ontario", "CA"));
+  assert.ok(!marketMatches([], ["MEXICO"], "Ontario", "CA"));
+  assert.ok(!marketMatches(["TX"], [], "", "MX"));
+  assert.ok(marketMatches([], ["LATAM_CARIB"], "", "PR"));
+  assert.ok(!marketMatches([], ["EMEA"], "", "XX")); // unknown country only matches open mandates
+  assert.ok(marketMatches([], [], "", "XX"));
+});
+
+test("a US listing without a state matches any US preference", () => {
+  assert.ok(marketMatches(["TX"], [], "", "US"));
+  assert.ok(!marketMatches([], ["EMEA"], "", "US"));
+});

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
@@ -24,7 +25,7 @@ export default async function AgentInvestor({ params, searchParams }: { params: 
   const me = await requireAgent();
   const inv = await db.investor.findFirst({
     where: { id, referredById: me.id },
-    include: { interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, state: true, dealType: true } } }, orderBy: { createdAt: "asc" } } },
+    include: { interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true } } }, orderBy: { createdAt: "asc" } } },
   });
   if (!inv) notFound();
   const [pipeline, partner, options, all] = await Promise.all([
@@ -83,7 +84,7 @@ export default async function AgentInvestor({ params, searchParams }: { params: 
             {inv.interests.map((it) => (
               <li key={it.id} className="rounded-lg border border-slate-200 p-3 text-sm">
                 <div className="font-medium">{it.project.title}</div>
-                <div className="mt-0.5 text-xs text-slate-500"><span className="font-mono">{it.project.code}</span> · {num(it.project.mw)} MW · {it.project.state}</div>
+                <div className="mt-0.5 text-xs text-slate-500"><span className="font-mono">{it.project.code}</span> · {num(it.project.mw)} MW · {placeShort(it.project)}</div>
                 <div className="mt-1"><Badge tone="blue">{pipelineLabel(funnelStages(pipeline, it.project.dealType), it.stage)}</Badge></div>
               </li>
             ))}

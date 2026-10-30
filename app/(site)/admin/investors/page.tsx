@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { addInterest } from "@/app/actions/investors";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { PipelineBoard, type BoardCard } from "@/components/PipelineBoard";
@@ -29,7 +30,7 @@ export default async function InvestorBoard({ searchParams }: { searchParams: Pr
     loadInvestorCrm(),
     getInvestorPipeline(),
     getScoring(),
-    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, state: true, city: true, dealType: true, facilityType: true, fundingNeeded: true, visibility: true, valueScore: true, developer: { select: { id: true, company: true } } }, orderBy: { code: "asc" } }),
+    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, country: true, state: true, city: true, dealType: true, facilityType: true, fundingNeeded: true, visibility: true, valueScore: true, developer: { select: { id: true, company: true } } }, orderBy: { code: "asc" } }),
   ]);
   const q = sp.q?.trim().toLowerCase();
   const listing = listings.find((p) => p.id === sp.listing) ?? null;
@@ -109,7 +110,7 @@ export default async function InvestorBoard({ searchParams }: { searchParams: Pr
                 <Badge tone={statusTone(listing.visibility)}>{listing.visibility}</Badge>
               </div>
               <div className="text-sm text-slate-500">
-                <span className="font-mono">{listing.code}</span> · {num(listing.mw)} MW {listing.facilityType} · {[listing.city, listing.state].filter(Boolean).join(", ")} · {dealTypeLabel(listing.dealType)}{listing.fundingNeeded ? ` · ${usd(listing.fundingNeeded)}` : ""} · <Link href={`/admin/developers/${listing.developer.id}`} className="text-brand-600">{listing.developer.company}</Link>
+                <span className="font-mono">{listing.code}</span> · {num(listing.mw)} MW {listing.facilityType} · {[listing.city, placeShort(listing)].filter(Boolean).join(", ")} · {dealTypeLabel(listing.dealType)}{listing.fundingNeeded ? ` · ${usd(listing.fundingNeeded)}` : ""} · <Link href={`/admin/developers/${listing.developer.id}`} className="text-brand-600">{listing.developer.company}</Link>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
                 {perStage.filter((s) => s.n).map((s) => <Link key={s.value} href={params({ stage: sp.stage === s.value ? undefined : s.value })} className={`rounded-full px-2 py-0.5 ${sp.stage === s.value ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>{s.label} {s.n}</Link>)}

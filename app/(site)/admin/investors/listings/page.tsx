@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { db } from "@/lib/db";
 import { Badge, Empty, PageHeader, statusTone } from "@/components/ui";
 import { DEAL_TYPES, dealTypeLabel } from "@/lib/constants";
@@ -18,7 +19,7 @@ export default async function InvestorListings({ searchParams }: { searchParams:
   const [{ investors }, pipeline, listings, touches] = await Promise.all([
     loadInvestorCrm(),
     getInvestorPipeline(),
-    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, state: true, dealType: true, fundingNeeded: true, visibility: true, developer: { select: { id: true, company: true } } }, orderBy: { code: "asc" } }),
+    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true, fundingNeeded: true, visibility: true, developer: { select: { id: true, company: true } } }, orderBy: { code: "asc" } }),
     db.activity.groupBy({ by: ["projectId"], where: { projectId: { not: null }, investorId: { not: null } }, _max: { createdAt: true } }),
   ]);
   const last = new Map(touches.map((t) => [t.projectId!, t._max.createdAt]));
@@ -48,7 +49,7 @@ export default async function InvestorListings({ searchParams }: { searchParams:
                 <tr key={p.id} className="align-top">
                   <td className="td min-w-64">
                     <Link href={`/admin/investors?listing=${p.id}`} className="font-medium text-brand-600">{p.title}</Link>
-                    <div className="text-xs text-slate-500"><span className="font-mono">{p.code}</span> · {num(p.mw)} MW · {p.state}{p.fundingNeeded ? ` · ${usd(p.fundingNeeded)}` : ""}</div>
+                    <div className="text-xs text-slate-500"><span className="font-mono">{p.code}</span> · {num(p.mw)} MW · {placeShort(p)}{p.fundingNeeded ? ` · ${usd(p.fundingNeeded)}` : ""}</div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs"><Link href={`/admin/developers/${p.developer.id}`} className="text-slate-500 hover:text-brand-600">{p.developer.company}</Link><Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></div>
                   </td>
                   <td className="td whitespace-nowrap text-sm">{dealTypeLabel(p.dealType)}</td>
