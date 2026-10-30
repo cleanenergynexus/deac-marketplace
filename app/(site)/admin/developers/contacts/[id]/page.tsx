@@ -18,6 +18,7 @@ import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
+import { getAgents } from "@/lib/agents-db";
 import { staffLevel, visibleStaff } from "@/lib/tasks";
 import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
@@ -38,8 +39,10 @@ export default async function ContactRecord({ params, searchParams }: { params: 
   const contact = await db.contact.findUnique({
     where: { id },
     include: {
+      referredBy: { select: { name: true } },
       developer: {
         include: {
+          referredBy: { select: { name: true } },
           contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
           projects: { select: { id: true, code: true, title: true, mw: true, valueScore: true, dealType: true, pipelineStage: true, contactId: true }, orderBy: { createdAt: "asc" } },
         },
@@ -48,7 +51,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
   });
   if (!contact) notFound();
   const dev = contact.developer;
-  const [scoring, pipeline, me, team] = await Promise.all([getScoring(), getPipeline(), requireAdmin(), getTeam()]);
+  const [scoring, pipeline, me, team, agents] = await Promise.all([getScoring(), getPipeline(), requireAdmin(), getTeam(), getAgents()]);
   const assignees = visibleStaff(me, team).map((u) => ({ id: u.id, name: u.name }));
   const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
 
@@ -78,11 +81,12 @@ export default async function ContactRecord({ params, searchParams }: { params: 
           <h1 className="mt-3 text-xl font-bold">{contact.name}</h1>
           {contact.title && <div className="text-sm text-slate-600">{contact.title}</div>}
           <Link href={`/admin/developers/${dev.id}`} className="text-sm text-brand-600">{dev.company}</Link>
-          <div className="mt-2 flex justify-center gap-2">
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
             {contact.isPrimary ? <Badge tone="blue">Primary contact</Badge> : (
               <form action={makePrimaryContact}><input type="hidden" name="id" value={id} /><button className="text-xs text-brand-600">Make primary contact</button></form>
             )}
             {openTasks > 0 && <Badge tone="amber">{openTasks} open task{openTasks === 1 ? "" : "s"}</Badge>}
+            {(contact.referredBy ?? dev.referredBy) && <Badge tone="purple">Referred by {(contact.referredBy ?? dev.referredBy)!.name}</Badge>}
           </div>
           <div className="mt-4 flex justify-center gap-3">
             {QUICK.map((q) => (
@@ -106,7 +110,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
         </div>
         <details className="card p-5" open>
           <summary className="cursor-pointer text-sm font-semibold">About this contact</summary>
-          <div className="mt-4"><ContactForm contact={contact} action={updateContact} compact country={dev.country} /></div>
+          <div className="mt-4"><ContactForm contact={contact} action={updateContact} compact country={dev.country} agents={agents} /></div>
         </details>
         {otherContacts.length > 0 && (
           <form action={deleteContact} className="text-center">

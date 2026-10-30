@@ -15,8 +15,8 @@ model User {
   email        String   @unique
   name         String
   passwordHash String
-  role         String // ADMIN | INVESTOR | DEVELOPER
-  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  role         String // ADMIN | INVESTOR | DEVELOPER | AGENT (referral agent, see lib/agents.ts)
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED (agents: APPROVED | SUSPENDED)
   investorId   String?  @unique
   investor     Investor? @relation(fields: [investorId], references: [id])
   developerId  String?  @unique
@@ -28,6 +28,16 @@ model User {
   manager      User?    @relation("Reports", fields: [managerId], references: [id], onDelete: SetNull)
   reports      User[]   @relation("Reports")
   tasks        Activity[] @relation("TaskAssignee")
+  phone        String? // E.164. Shown to a team member's referral agents, and on the agent's own profile
+  company      String? // referral agents: their own firm
+  bookingUrl   String? // team members: meeting booking link (Calendly, HubSpot...) shown to their referral agents
+  // Referral agents: the DEAC partner (a team login) who supports their deals and meetings.
+  partnerId    String?
+  partner      User?    @relation("AgentPartner", fields: [partnerId], references: [id], onDelete: SetNull)
+  agents       User[]   @relation("AgentPartner")
+  referredDevelopers Developer[] @relation("ReferredDevelopers")
+  referredContacts   Contact[]   @relation("ReferredContacts")
+  referredInvestors  Investor[]  @relation("ReferredInvestors")
   createdAt    DateTime @default(now())
 }
 
@@ -89,6 +99,8 @@ model Investor {
   tags            String   @default("")
   notes           String?
   owner           String? // team member responsible
+  referredById    String? // referral agent who brought this contact in; they see it read-only in their portal
+  referredBy      User?    @relation("ReferredInvestors", fields: [referredById], references: [id], onDelete: SetNull)
   lastContactAt   DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -102,6 +114,7 @@ model Investor {
   interests        InvestorInterest[]
 
   @@index([firmId])
+  @@index([referredById])
 }
 
 // One tile on the Investor CRM board: an investor contact working one listing. Its column comes from the
@@ -142,6 +155,8 @@ model Developer {
   source      String?
   notes       String?
   owner       String?
+  referredById String? // referral agent who brought this company in; they see it and all its contacts and projects
+  referredBy   User?   @relation("ReferredDevelopers", fields: [referredById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -174,6 +189,8 @@ model Contact {
   source      String?
   owner       String? // team member responsible
   notes       String?
+  referredById String? // referral agent who brought this contact in; they see the contact, its company's projects and its activity
+  referredBy   User?   @relation("ReferredContacts", fields: [referredById], references: [id], onDelete: SetNull)
   isPrimary   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -182,6 +199,7 @@ model Contact {
   activities Activity[]
 
   @@index([developerId])
+  @@index([referredById])
 }
 
 model TeamMember {
@@ -295,6 +313,7 @@ model DataRoomFile {
   contentType String          @default("application/octet-stream")
   storageKey  String // Vercel Blob pathname (private store), or "local:<path>" in local development
   uploadedBy  String?
+  uploadedById String? // the login that uploaded it; referral agents see only their own uploads
   documents   Document[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt

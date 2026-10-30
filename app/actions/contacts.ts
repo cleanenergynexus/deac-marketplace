@@ -8,6 +8,7 @@ import { isLogKind, parseWhen } from "@/lib/crm";
 import { phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
 import { findVisibleTask, getTeam, pickAssignee } from "@/lib/tasks-db";
+import { referrerFromForm } from "@/lib/agents-db";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 
@@ -48,7 +49,7 @@ export async function createContact(f: FormData) {
   const data = contactData(f);
   if (!data.name) throw new Error("Enter the contact's name.");
   const hasPrimary = await db.contact.count({ where: { developerId, isPrimary: true } });
-  const c = await db.contact.create({ data: { ...data, developerId, owner: data.owner ?? admin.name, isPrimary: !hasPrimary || f.get("isPrimary") === "on" } });
+  const c = await db.contact.create({ data: { ...data, developerId, referredById: await referrerFromForm(f), owner: data.owner ?? admin.name, isPrimary: !hasPrimary || f.get("isPrimary") === "on" } });
   if (c.isPrimary) {
     await db.contact.updateMany({ where: { developerId, id: { not: c.id } }, data: { isPrimary: false } });
     await syncPrimaryContact(developerId);
@@ -62,7 +63,7 @@ export async function updateContact(f: FormData) {
   const id = String(f.get("id"));
   const data = contactData(f);
   if (!data.name) throw new Error("Enter the contact's name.");
-  const c = await db.contact.update({ where: { id }, data });
+  const c = await db.contact.update({ where: { id }, data: { ...data, referredById: await referrerFromForm(f) } });
   if (c.isPrimary) await syncPrimaryContact(c.developerId);
   revalidateCrm(c.developerId, id);
 }

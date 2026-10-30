@@ -1,7 +1,7 @@
 // Edge-safe session helpers (used by middleware and server code).
 import { SignJWT, jwtVerify } from "jose";
 
-export type Session = { uid: string; role: "ADMIN" | "INVESTOR" | "DEVELOPER"; status: string; name: string };
+export type Session = { uid: string; role: "ADMIN" | "INVESTOR" | "DEVELOPER" | "AGENT"; status: string; name: string };
 export const COOKIE = "deac_session";
 
 const key = () => new TextEncoder().encode(process.env.SESSION_SECRET || "dev-only-secret-change-me");

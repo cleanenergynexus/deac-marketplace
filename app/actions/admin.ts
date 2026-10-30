@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { checkPassword, hashPassword, requireAdmin, requireTeamAdmin } from "@/lib/auth";
 import { checkStaffChange } from "@/lib/tasks";
 import { getTeam } from "@/lib/tasks-db";
-import { DEFAULT_INPUTS, evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
+import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { normalizeScoring, type ScoringConfig } from "@/lib/scoring";
 import { getScoring } from "@/lib/scoring-db";
 import { sendEmail } from "@/lib/email";
@@ -19,6 +19,8 @@ import { getPipeline } from "@/lib/pipeline-db";
 import { normalizePhone, phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
 import { firmIdFor, touchInterest } from "@/lib/investor-crm-db";
+import { importedValuation, projectData } from "@/lib/project-form";
+import { referrerFromForm } from "@/lib/agents-db";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -69,7 +71,7 @@ export async function createInvestor(f: FormData) {
   const email = s(f, "email")!.toLowerCase();
   if (await db.investor.count({ where: { email } })) throw new Error("An investor with that email is already in the CRM.");
   const data = await withFirm(investorData(f));
-  const inv = await db.investor.create({ data: { email, stage: s(f, "stage") ?? "PROSPECT", ...data, owner: data.owner ?? admin.name } });
+  const inv = await db.investor.create({ data: { email, stage: s(f, "stage") ?? "PROSPECT", ...data, owner: data.owner ?? admin.name, referredById: await referrerFromForm(f) } });
   // Added from a listing's board: link them to it straight away.
   const projectId = s(f, "projectId");
   if (projectId) await touchInterest(inv.id, projectId, "ADDED", admin.name);
@@ -80,7 +82,7 @@ export async function createInvestor(f: FormData) {
 export async function updateInvestor(f: FormData) {
   await requireAdmin();
   const id = String(f.get("id"));
-  await db.investor.update({ where: { id }, data: await withFirm(investorData(f)) });
+  await db.investor.update({ where: { id }, data: { ...(await withFirm(investorData(f))), referredById: await referrerFromForm(f) } });
   revalidatePath("/admin/investors", "layout");
 }
 
@@ -163,14 +165,14 @@ function developerData(f: FormData) {
 export async function createDeveloper(f: FormData) {
   const admin = await requireAdmin();
   const contact = { name: s(f, "contactName") ?? "", email: (s(f, "email") ?? "").toLowerCase(), phone: phoneFromForm(f, "phone", s(f, "country") ?? "US"), title: s(f, "contactTitle") };
-  const d = await db.developer.create({ data: { ...developerData(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: placeStage(allStages(await getPipeline()), s(f, "stage")),
+  const d = await db.developer.create({ data: { ...developerData(f), referredById: await referrerFromForm(f), contactName: contact.name, email: contact.email, phone: contact.phone, stage: placeStage(allStages(await getPipeline()), s(f, "stage")),
     contacts: { create: { ...contact, email: contact.email || null, isPrimary: true, source: s(f, "source"), owner: s(f, "owner") ?? admin.name } } } });
   redirect(`/admin/developers/${d.id}`);
 }
 export async function updateDeveloper(f: FormData) {
   await requireAdmin();
   const id = String(f.get("id"));
-  await db.developer.update({ where: { id }, data: developerData(f) });
+  await db.developer.update({ where: { id }, data: { ...developerData(f), referredById: await referrerFromForm(f) } });
   revalidatePath(`/admin/developers/${id}`);
 }
 export async function setDeveloperStage(f: FormData) {
@@ -211,36 +213,6 @@ export async function deleteTeamMember(f: FormData) {
 }
 
 // ---------- Projects / listings ----------
-function projectData(f: FormData) {
-  return {
-    title: s(f, "title") ?? "",
-    developerId: String(f.get("developerId")),
-    state: (s(f, "state") ?? "").toUpperCase(),
-    city: s(f, "city"),
-    mw: n(f, "mw") ?? 0,
-    facilityType: s(f, "facilityType") ?? "",
-    dealType: s(f, "dealType") ?? "FINANCING",
-    fundingNeeded: n(f, "fundingNeeded") ?? 0,
-    projectStatus: s(f, "projectStatus") ?? "",
-    summary: s(f, "summary") ?? "",
-    highlights: s(f, "highlights") ?? "",
-    term: s(f, "term"),
-    dealStage: s(f, "dealStage") ?? "MARKETING",
-    useOfFunds: s(f, "useOfFunds") ?? "",
-    coverImageUrl: s(f, "coverImageUrl"),
-    totalCapex: n(f, "totalCapex"),
-    targetIrr: n(f, "targetIrr"),
-    equityMultiple: n(f, "equityMultiple"),
-    leaseRateKwMo: n(f, "leaseRateKwMo"),
-    powerRateCents: n(f, "powerRateCents"),
-    powerStatus: s(f, "powerStatus"),
-    monthsToPower: n(f, "monthsToPower") ?? null,
-    codDate: s(f, "codDate"),
-    capitalStack: s(f, "capitalStack"),
-    economicsNotes: s(f, "economicsNotes"),
-    visibility: s(f, "visibility") ?? "DRAFT",
-  };
-}
 /** New projects start in the first column of their deal type's funnel unless the form picked another stage of that funnel. */
 async function pipelineStageFrom(f: FormData, dealType: string) {
   const stages = funnelStages(await getPipeline(), dealType);
@@ -270,15 +242,7 @@ export async function createImportedProject(f: FormData) {
   const data = projectData(f);
   if (!data.state || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("State, facility type, deal type and project status are required.");
 
-  // Scoring hints from the document, kept only if they are valid calculator values.
-  let valuationInputs: string | null = null;
-  try {
-    const raw = JSON.parse(String(f.get("valuation") ?? "{}"));
-    const clean = Object.fromEntries(Object.entries(raw).filter(([k, v]) => k in DEFAULT_INPUTS && typeof v === typeof DEFAULT_INPUTS[k as keyof ValuationInputs]));
-    if (data.mw) clean.mw = data.mw;
-    if (data.dealType === "SALE" && data.fundingNeeded) clean.askingPrice = data.fundingNeeded;
-    if (Object.keys(clean).length) valuationInputs = JSON.stringify(clean);
-  } catch { /* no hints */ }
+  const valuationInputs = importedValuation(f, data);
 
   const count = await db.project.count();
   const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: await pipelineStageFrom(f, data.dealType), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });

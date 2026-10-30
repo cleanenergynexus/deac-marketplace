@@ -18,9 +18,10 @@ export async function Nav() {
             <a key={label} href={href} className={`hidden xl:inline ${link}`}>{label}</a>
           ))}
           <Link href="/" className="text-[15px] font-semibold text-white">Marketplace</Link>
-          {s && (s.role === "ADMIN" || s.status === "APPROVED") && <Link href="/marketplace" className={link}>Opportunities</Link>}
+          {s && (s.role === "ADMIN" || (s.role === "INVESTOR" && s.status === "APPROVED")) && <Link href="/marketplace" className={link}>Opportunities</Link>}
           {s?.role === "INVESTOR" && <Link href="/portal" className={link}>My Portal</Link>}
           {s?.role === "ADMIN" && <Link href="/admin" className={link}>Admin</Link>}
+          {s?.role === "AGENT" && <Link href="/agent" className={link}>Agent portal</Link>}
           {!s && <Link href="/developers/submit" className={`hidden md:inline ${link}`}>Submit a project</Link>}
           {s ? (
             <form action="/logout" method="post"><button className={link}>Sign out</button></form>

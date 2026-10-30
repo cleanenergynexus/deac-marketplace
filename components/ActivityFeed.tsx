@@ -21,8 +21,15 @@ const TONE: Record<string, string> = {
   MEETING: "bg-violet-50 text-violet-700", TASK: "bg-slate-100 text-slate-700", STAGE: "bg-slate-100 text-slate-500", SYSTEM: "bg-slate-100 text-slate-500",
 };
 
-/** Contact / company timeline grouped by month, newest first. Tasks can be ticked off; logged entries can be deleted. */
-export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet.", assigning }: { items: FeedItem[]; showContact?: boolean; empty?: string; assigning?: Assigning }) {
+/** Where links in the feed go. The team's admin pages by default; a referral agent's portal passes its own. */
+export type FeedLinks = { contact: (id: string) => string; investor: (id: string) => string; project: (id: string) => string };
+const ADMIN_LINKS: FeedLinks = { contact: (id) => `/admin/developers/contacts/${id}`, investor: (id) => `/admin/investors/${id}`, project: (id) => `/admin/projects/${id}` };
+
+/**
+ * Contact / company timeline grouped by month, newest first. Tasks can be ticked off; logged entries can be deleted.
+ * `readOnly` (referral agents) shows the same history with nothing to tick, reassign or delete.
+ */
+export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet.", assigning, readOnly = false, links = ADMIN_LINKS }: { items: FeedItem[]; showContact?: boolean; empty?: string; assigning?: Assigning; readOnly?: boolean; links?: FeedLinks }) {
   if (!items.length) return <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{empty}</p>;
   return (
     <div className="space-y-5">
@@ -34,7 +41,7 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
               const task = a.kind === "TASK" ? taskState(a) : null;
               return (
                 <li key={a.id} className="card flex gap-3 p-4 text-sm">
-                  {a.kind === "TASK" ? (
+                  {a.kind === "TASK" && !readOnly ? (
                     <form action={toggleTask}>
                       <input type="hidden" name="id" value={a.id} />
                       <button aria-label={a.doneAt ? "Mark task not done" : "Mark task done"} title={a.doneAt ? "Mark not done" : "Mark done"}
@@ -43,7 +50,7 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                       </button>
                     </form>
                   ) : (
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${TONE[a.kind] ?? TONE.SYSTEM}`}><CrmIcon name={a.kind} /></span>
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${a.kind === "TASK" && a.doneAt ? "bg-emerald-500 text-white" : TONE[a.kind] ?? TONE.SYSTEM}`}><CrmIcon name={a.kind} /></span>
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -58,16 +65,16 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                         </span>
                       )}
                       {a.doneAt && <span className="text-emerald-700">Completed <LocalTime value={a.doneAt} time={false} /></span>}
-                      {a.kind === "TASK" && (assigning && !a.doneAt && (assigning.options.length > 1 || assigning.allowUnassigned) ? (
+                      {a.kind === "TASK" && (assigning && !readOnly && !a.doneAt && (assigning.options.length > 1 || assigning.allowUnassigned) ? (
                         <span className="inline-flex items-center gap-1">For <AssigneeSelect taskId={a.id} assigneeId={a.assigneeId} options={withCurrent(assigning.options, a.assignee)} allowUnassigned={assigning.allowUnassigned} className="!w-40" /></span>
                       ) : (
                         <span>For {a.assignee?.name ?? "nobody yet"}</span>
                       ))}
-                      {showContact && a.contact && <Link href={`/admin/developers/contacts/${a.contact.id}`} className="text-brand-600">{a.contact.name}</Link>}
-                      {showContact && a.investor && <Link href={`/admin/investors/${a.investor.id}`} className="text-brand-600">{a.investor.name}</Link>}
-                      {a.project && <Link href={`/admin/projects/${a.project.id}`} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
+                      {showContact && a.contact && <Link href={links.contact(a.contact.id)} className="text-brand-600">{a.contact.name}</Link>}
+                      {showContact && a.investor && <Link href={links.investor(a.investor.id)} className="text-brand-600">{a.investor.name}</Link>}
+                      {a.project && <Link href={links.project(a.project.id)} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
                       {a.by && <span>by {a.by}</span>}
-                      {isLogKind(a.kind) && (
+                      {isLogKind(a.kind) && !readOnly && (
                         <form action={deleteActivity} className="ml-auto">
                           <input type="hidden" name="id" value={a.id} />
                           <ConfirmButton message="Delete this entry from the timeline?" className="text-slate-400 hover:text-red-600">Delete</ConfirmButton>

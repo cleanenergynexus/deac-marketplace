@@ -4,8 +4,9 @@ import type { PipelineStage } from "@/lib/pipeline";
 import { SaveButton } from "@/components/SaveButton";
 import { PhoneInput } from "@/components/PhoneInput";
 import { AddressFields } from "@/components/AddressFields";
+import { ReferredBySelect, type AgentOption } from "@/components/ReferredBySelect";
 
-export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action: (f: FormData) => Promise<void>; stages?: PipelineStage[] }) {
+export function DeveloperForm({ dev, action, stages, agents }: { dev?: Developer; action: (f: FormData) => Promise<void>; stages?: PipelineStage[]; agents?: AgentOption[] }) {
   return (
     <form action={action} className="space-y-4">
       {dev && <input type="hidden" name="id" value={dev.id} />}
@@ -23,6 +24,7 @@ export function DeveloperForm({ dev, action, stages }: { dev?: Developer; action
         <Field label="MW delivered"><input name="mwDelivered" defaultValue={dev?.mwDelivered ?? ""} className="input" /></Field>
         <Field label="Source"><input name="source" defaultValue={dev?.source ?? ""} className="input" /></Field>
         <Field label="Relationship owner"><input name="owner" defaultValue={dev?.owner ?? ""} className="input" /></Field>
+        {agents && <ReferredBySelect agents={agents} value={dev?.referredById} />}
         {!dev && stages && <Field label="Stage"><Select name="stage" options={stages} /></Field>}
       </div>
       <AddressFields value={dev} className="grid gap-4 sm:grid-cols-3" />

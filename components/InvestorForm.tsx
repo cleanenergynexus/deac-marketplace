@@ -8,12 +8,13 @@ import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PhoneInput } from "@/components/PhoneInput";
 import { AddressFields } from "@/components/AddressFields";
+import { ReferredBySelect, type AgentOption } from "@/components/ReferredBySelect";
 
 /**
  * Investor contact profile and mandate. The Company field picks an Investor CRM company by name; a new name creates it.
  * `firm` pre-fills the company (adding from a company page); `projectId` links a new investor to that listing.
  */
-export function InvestorForm({ inv, action, firms = [], firm, projectId }: { inv?: Investor; action: (f: FormData) => Promise<void>; firms?: string[]; firm?: string | null; projectId?: string | null }) {
+export function InvestorForm({ inv, action, firms = [], firm, projectId, agents }: { inv?: Investor; action: (f: FormData) => Promise<void>; firms?: string[]; firm?: string | null; projectId?: string | null; agents?: AgentOption[] }) {
   const home = inv?.country ?? "US";
   return (
     <form action={action} className="space-y-5">
@@ -38,6 +39,7 @@ export function InvestorForm({ inv, action, firms = [], firm, projectId }: { inv
         <Field label="Min MW"><input name="mwMin" defaultValue={inv?.mwMin ?? ""} className="input" /></Field>
         <Field label="Max MW"><input name="mwMax" defaultValue={inv?.mwMax ?? ""} className="input" /></Field>
         <Field label="Relationship owner"><input name="owner" defaultValue={inv?.owner ?? ""} className="input" /></Field>
+        {agents && <ReferredBySelect agents={agents} value={inv?.referredById} />}
         <Field label="Tags (comma separated)" className="sm:col-span-3"><input name="tags" defaultValue={inv?.tags} className="input" placeholder="hyperscale, PR, tier-1" /></Field>
       </div>
       <Field label="Deal types"><Checks name="dealTypes" options={DEAL_TYPES} selected={csv(inv?.dealTypes)} /></Field>
