@@ -118,6 +118,7 @@ model Investor {
   analysisRequests AnalysisRequest[]
   campaignSends    CampaignRecipient[]
   interests        InvestorInterest[]
+  favorites        Favorite[]
 
   @@index([firmId])
   @@index([referredById])
@@ -141,6 +142,19 @@ model InvestorInterest {
 }
 
 // ---------- Developer CRM ----------
+// A listing an investor starred on the marketplace. Shown under Favorites in My Portal; no NDA needed.
+model Favorite {
+  id         String   @id @default(cuid())
+  investorId String
+  investor   Investor @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([investorId, projectId])
+  @@index([projectId])
+}
+
 model Developer {
   id          String   @id @default(cuid())
   company     String
@@ -277,6 +291,7 @@ model Project {
   analysisRequests AnalysisRequest[]
   activities       Activity[]
   interests        InvestorInterest[]
+  favorites        Favorite[]
 }
 
 model Document {

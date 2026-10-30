@@ -9,6 +9,7 @@ import { marketMatches } from "./regions";
  */
 export const STEP_STAGE = {
   ADDED: "INTERESTED",
+  FAVORITE: "INTERESTED",
   INTAKE: "INTERESTED",
   NDA: "NDA_SIGNED",
   LOI: "LOI_SUBMITTED",
@@ -20,6 +21,7 @@ export type InterestStep = keyof typeof STEP_STAGE;
 /** Labels for InvestorInterest.source, saying how the investor came to the listing. */
 export const STEP_SOURCE: Record<InterestStep, string> = {
   ADDED: "Added by team",
+  FAVORITE: "Starred on marketplace",
   INTAKE: "Intake request",
   NDA: "NDA",
   LOI: "Letter of interest",

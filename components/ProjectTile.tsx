@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { usd, num } from "@/lib/format";
 import { dealTypeLabel, isClosedDeal } from "@/lib/constants";
 import { ClosedBanner } from "@/components/ClosedBanner";
@@ -7,7 +8,19 @@ type P = { id: string; code: string; title: string; mw: number; facilityType: st
 
 const dealTone: Record<string, string> = { LEASE: "bg-sky-600", FINANCING: "bg-emerald-600", SALE: "bg-amber-600" };
 
-export function ProjectTile({ p, href, hideTitle = false }: { p: P; href: string; hideTitle?: boolean }) {
+/** `corner` (e.g. a favorite star) is drawn over the bottom-right of the cover image, outside the link. */
+export function ProjectTile({ p, href, hideTitle = false, corner }: { p: P; href: string; hideTitle?: boolean; corner?: ReactNode }) {
+  const tile = <Tile p={p} href={href} hideTitle={hideTitle} />;
+  if (!corner) return tile;
+  return (
+    <div className="relative flex flex-col [&>a]:flex-1">
+      {tile}
+      <div className="absolute right-3 top-24 z-10">{corner}</div>
+    </div>
+  );
+}
+
+function Tile({ p, href, hideTitle }: { p: P; href: string; hideTitle: boolean }) {
   const closed = isClosedDeal(p.dealStage);
   return (
     <Link href={href} className={`card group relative flex flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md ${closed ? "bg-slate-100" : ""}`}>

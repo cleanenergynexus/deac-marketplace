@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { requireMember } from "@/lib/auth";
 import { ProjectTile } from "@/components/ProjectTile";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { PageHeader, Empty } from "@/components/ui";
 import { DEAL_TYPES, FACILITY_TYPES, isClosedDeal } from "@/lib/constants";
 import { usd, num } from "@/lib/format";
@@ -21,10 +22,13 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
   const orderBy: Prisma.ProjectOrderByWithRelationInput =
     sp.sort === "mw" ? { mw: "desc" } : sp.sort === "funding" ? { fundingNeeded: "desc" } : { updatedAt: "desc" };
 
-  const [projects, states] = await Promise.all([
+  const [projects, states, favs] = await Promise.all([
     db.project.findMany({ where, orderBy }),
     db.project.findMany({ where: { visibility: { in: ["PRIVATE", "TEASER"] } }, select: { state: true }, distinct: ["state"], orderBy: { state: "asc" } }),
+    u.investorId ? db.favorite.findMany({ where: { investorId: u.investorId }, select: { projectId: true } }) : [],
   ]);
+  const starred = new Set(favs.map((f) => f.projectId));
+  const star = (id: string) => (u.investorId ? <FavoriteButton projectId={id} initial={starred.has(id)} /> : undefined);
   const open = projects.filter((p) => !isClosedDeal(p.dealStage));
   const closed = projects.filter((p) => isClosedDeal(p.dealStage));
   const totalMw = open.reduce((a, p) => a + p.mw, 0);
@@ -32,7 +36,7 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
 
   return (
     <div>
-      <PageHeader title="Opportunities" subtitle={`${open.length} open projects · ${num(totalMw)} MW · ${usd(totalFunding)} sought`} />
+      <PageHeader title="Opportunities" subtitle={`${open.length} open projects · ${num(totalMw)} MW · ${usd(totalFunding)} sought${u.investorId ? " · Star ☆ a listing to keep it in My Portal" : ""}`} />
       <form className="card mb-6 grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-7">
         <select name="deal" defaultValue={sp.deal ?? ""} className="input"><option value="">All deal types</option>{DEAL_TYPES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}</select>
         <select name="type" defaultValue={sp.type ?? ""} className="input"><option value="">All facility types</option>{FACILITY_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
@@ -43,7 +47,7 @@ export default async function Marketplace({ searchParams }: { searchParams: Prom
         <button className="btn">Filter</button>
       </form>
       {open.length ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{open.map((p) => <ProjectTile key={p.id} p={p} href={`/marketplace/${p.id}`} />)}</div>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{open.map((p) => <ProjectTile key={p.id} p={p} href={`/marketplace/${p.id}`} corner={star(p.id)} />)}</div>
       ) : (
         <Empty>{closed.length ? "No open opportunities match these filters." : "No opportunities match these filters."}</Empty>
       )}

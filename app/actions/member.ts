@@ -74,3 +74,26 @@ export async function submitAnalysisRequest(_: unknown, f: FormData) {
   revalidatePath(`/marketplace/${projectId}`);
   return { ok: true };
 }
+
+/**
+ * Investor stars or unstars a listing. Starred listings show under Favorites in My Portal, with or without an NDA.
+ * Starring also puts the investor on the Investor CRM board for that listing (Interested); unstarring leaves the tile.
+ */
+export async function toggleFavorite(projectId: string): Promise<{ favorite: boolean } | { error: string }> {
+  const u = await requireMember();
+  if (!u.investorId) return { error: "Only investor accounts can save favorites." };
+  const p = await db.project.findUnique({ where: { id: projectId }, select: { code: true, visibility: true } });
+  if (!p || p.visibility === "DRAFT") return { error: "This listing isn't available." };
+  const where = { investorId_projectId: { investorId: u.investorId, projectId } };
+  const existing = await db.favorite.findUnique({ where });
+  if (existing) {
+    await db.favorite.delete({ where });
+  } else {
+    await db.favorite.create({ data: { investorId: u.investorId, projectId } }).catch(() => null); // double click
+    await db.activity.create({ data: { investorId: u.investorId, projectId, kind: "SYSTEM", body: `Starred ${p.code} on the marketplace.` } });
+    await touchInterest(u.investorId, projectId, "FAVORITE");
+  }
+  revalidatePath("/portal");
+  revalidatePath("/marketplace");
+  return { favorite: !existing };
+}
