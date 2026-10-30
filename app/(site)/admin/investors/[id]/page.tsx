@@ -38,12 +38,18 @@ const QUICK = [
   { tab: "tasks", kind: "TASK", label: "Task" },
 ] as const;
 
+const EMAIL_ERRORS: Record<string, string> = {
+  invalid: "That email address doesn't look right.",
+  crm: "Another Investor CRM contact already uses that email.",
+  login: "That email already belongs to another login (team, referral agent or another investor).",
+};
+
 const STEP_TONE = { PENDING: "amber", APPROVED: "green", DECLINED: "red" } as const;
 
 /** Investor contact record, same layout as a Developer CRM contact: details left, communications middle, company and listings right. */
-export default async function InvestorRecord({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function InvestorRecord({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; emailError?: string }> }) {
   const { id } = await params;
-  const rawTab = (await searchParams).tab;
+  const { tab: rawTab, emailError } = await searchParams;
   const profile = rawTab === "profile";
   const tab = contactTab(rawTab);
   await ensureFirms();
@@ -179,7 +185,10 @@ export default async function InvestorRecord({ params, searchParams }: { params:
           <Link href="?tab=profile" className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${profile ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Profile</Link>
         </nav>
         {profile ? (
-          <div className="card p-5"><InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} /></div>
+          <div className="card p-5">
+            {emailError && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{EMAIL_ERRORS[emailError] ?? EMAIL_ERRORS.invalid} Nothing was saved.</p>}
+            {(login === "INVITED" || login === "INVITE_EXPIRED") && <p className="mb-4 rounded bg-amber-50 p-3 text-sm text-amber-900">{firstName} has an unused invite. If you correct the email, create a new invite link afterwards and send it to the new address.</p>}
+            <InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} /></div>
         ) : (
           <>
             <ActivityComposer key={tab.value} investor about="listing" contactId={id} contactEmail={inv.email} initialKind={tab.log}
