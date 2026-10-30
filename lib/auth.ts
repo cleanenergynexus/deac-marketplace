@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "./db";
-import { COOKIE, readToken, signSession, type Session } from "./session";
+import { COOKIE, readToken, readViewAs, signSession, VIEW_AS_COOKIE, type Session } from "./session";
 import { staffLevel } from "./tasks";
 import { investorStage, type Stage, type StepStatus } from "./disclosure";
 
@@ -44,11 +44,39 @@ export async function requireTeamAdmin() {
   return u;
 }
 
-/** Signed-in referral agent who isn't suspended. Everything else goes to sign-in. */
-export async function requireAgent() {
+/** The agent a team member is previewing with "View as agent", if any (the cookie must have been set for this team member). */
+async function previewedAgent(u: { id: string; role: string }) {
+  if (u.role !== "ADMIN") return null;
+  const v = await readViewAs((await cookies()).get(VIEW_AS_COOKIE)?.value);
+  if (!v || v.admin !== u.id) return null;
+  return db.user.findFirst({ where: { id: v.agent, role: "AGENT" }, include: { investor: true, developer: true } });
+}
+
+/**
+ * The referral agent whose portal is showing: the signed-in agent (if not suspended), or the agent a team member is
+ * previewing with "View as agent" (`preview` true). Everyone else goes to sign-in.
+ */
+export async function agentView() {
   const u = await currentUser();
-  if (!u || u.role !== "AGENT" || u.status !== "APPROVED") redirect("/login");
-  return u;
+  if (!u) redirect("/login");
+  if (u.role === "AGENT" && u.status === "APPROVED") return { agent: u, preview: false as const };
+  const agent = await previewedAgent(u);
+  if (agent) return { agent, preview: true as const, viewer: u };
+  redirect(u.role === "ADMIN" ? "/admin/agents" : "/login");
+}
+
+/** Agent portal pages: the agent whose portal is showing (also while a team member previews it). */
+export async function requireAgent() {
+  return (await agentView()).agent;
+}
+
+export const PREVIEW_MESSAGE = "This is a preview of the agent's portal, so nothing is saved. Exit the preview to work as yourself.";
+
+/** Agent actions: only the agent themselves. A team member's preview is read-only. */
+export async function requireAgentToAct() {
+  const v = await agentView();
+  if (v.preview) throw new Error(PREVIEW_MESSAGE);
+  return v.agent;
 }
 
 /** Approved investor (or admin, who can preview everything). */

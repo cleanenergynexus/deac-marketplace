@@ -19,3 +19,21 @@ export async function readToken(token?: string): Promise<Session | null> {
     return null;
   }
 }
+
+/** "View as agent": a team member previewing a referral agent's portal. Separate cookie, so their own session stays as it is. */
+export const VIEW_AS_COOKIE = "deac_view_as";
+export type ViewAs = { admin: string; agent: string };
+
+export async function signViewAs(v: ViewAs) {
+  return new SignJWT(v as unknown as Record<string, unknown>).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2h").sign(key());
+}
+
+export async function readViewAs(token?: string): Promise<ViewAs | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, key());
+    return typeof payload.admin === "string" && typeof payload.agent === "string" ? { admin: payload.admin, agent: payload.agent } : null;
+  } catch {
+    return null;
+  }
+}

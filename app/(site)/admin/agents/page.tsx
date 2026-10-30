@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { addAgent, removeAgent } from "@/app/actions/agents-admin";
+import { addAgent, removeAgent, viewAsAgent } from "@/app/actions/agents-admin";
 import { ActionForm } from "@/components/ActionForm";
 import { AgentEditForm } from "@/components/AgentEditForm";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -49,6 +49,10 @@ export default async function Agents() {
                   <div className="mt-1 text-xs text-slate-500">
                     Referred {a._count.referredDevelopers} compan{a._count.referredDevelopers === 1 ? "y" : "ies"}, {a._count.referredContacts} developer contact{a._count.referredContacts === 1 ? "" : "s"}, {a._count.referredInvestors} investor{a._count.referredInvestors === 1 ? "" : "s"} · Added {date(a.createdAt)}
                   </div>
+                  <form action={viewAsAgent} className="mt-3">
+                    <input type="hidden" name="id" value={a.id} />
+                    <button className="btn-ghost py-1.5">View as agent</button>
+                  </form>
                   {isAdmin && (
                     <form action={removeAgent} className="mt-2">
                       <input type="hidden" name="id" value={a.id} />
