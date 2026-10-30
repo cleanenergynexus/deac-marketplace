@@ -13,6 +13,7 @@ const list = (f: FormData, k: string) => f.getAll(k).map(String).filter(Boolean)
 export async function login(_: unknown, f: FormData) {
   const email = s(f, "email")?.toLowerCase();
   const user = email ? await db.user.findUnique({ where: { email } }) : null;
+  if (user?.inviteTokenHash) return { error: "You haven't set a password yet. Open the invite link DEAC sent you, or ask the team for a new one." };
   if (!user || !(await checkPassword(String(f.get("password") ?? ""), user.passwordHash))) return { error: "Email or password is incorrect." };
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: user.role as "ADMIN" | "AGENT", status: user.status, name: user.name });

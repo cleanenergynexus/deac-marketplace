@@ -38,7 +38,13 @@ model User {
   referredDevelopers Developer[] @relation("ReferredDevelopers")
   referredContacts   Contact[]   @relation("ReferredContacts")
   referredInvestors  Investor[]  @relation("ReferredInvestors")
+  // Direct invite from the Investor CRM (lib/invites.ts): SHA-256 of the one-time link token. Cleared once they set a password.
+  // Indexed, not @unique: adding a unique column makes the build's `prisma db push` stop for a data-loss prompt.
+  inviteTokenHash String?
+  inviteExpiresAt DateTime?
   createdAt    DateTime @default(now())
+
+  @@index([inviteTokenHash])
 }
 
 // ---------- Investor CRM ----------
