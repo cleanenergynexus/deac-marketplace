@@ -8,6 +8,9 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Avatar, CrmIcon } from "@/components/CrmIcons";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { InvestorForm } from "@/components/InvestorForm";
+import { InvitePanel } from "@/components/InvitePanel";
+import { cancelInvite } from "@/app/actions/invites";
+import { loginState } from "@/lib/invites";
 import { StageSelect } from "@/components/StageSelect";
 import { Badge, statusTone } from "@/components/ui";
 import { INVESTOR_STAGES, stageLabel } from "@/lib/constants";
@@ -81,6 +84,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
   const notLinked = listings.filter((p) => !linked.has(p.id));
   const fits = notLinked.filter((p) => p.visibility !== "DRAFT" && fitsMandate(inv, p));
   const firstName = inv.name.split(" ")[0];
+  const login = loginState(inv.user);
   const steps = (projectId: string) => [
     ...inv.dealSteps.filter((d) => d.projectId === projectId && d.step === "NDA").map((d) => ({ label: "NDA", status: d.status })),
     ...inv.lois.filter((l) => l.projectId === projectId).map((l) => ({ label: `LOI${l.amount ? ` ${usd(l.amount)}` : ""}`, status: l.status })),
@@ -134,10 +138,22 @@ export default async function InvestorRecord({ params, searchParams }: { params:
         </section>
         <section className="card p-4 text-sm">
           <h2 className="mb-2 font-semibold">Membership</h2>
-          <p className="mb-2 text-xs text-slate-500">Marketplace login: {inv.user ? <Badge tone={statusTone(inv.user.status)}>{inv.user.status}</Badge> : "none"}</p>
+          <p className="mb-2 text-xs text-slate-500">Marketplace login: {login === "INVITED" ? <Badge tone="blue">Invite sent</Badge> : login === "INVITE_EXPIRED" ? <Badge tone="amber">Invite expired</Badge> : inv.user ? <Badge tone={statusTone(inv.user.status)}>{inv.user.status}</Badge> : "none"}</p>
+          {(login === "NONE" || login === "INVITED" || login === "INVITE_EXPIRED") && (
+            <div className="mb-3 space-y-1">
+              {login === "NONE" && <p className="text-xs text-slate-500">Invite {firstName} directly. They skip Access Requests and are approved straight away.</p>}
+              <InvitePanel investorId={inv.id} label={login === "NONE" ? "Invite to marketplace" : "Create a new invite link"} />
+              {login !== "NONE" && (
+                <form action={cancelInvite} className="text-right">
+                  <input type="hidden" name="investorId" value={inv.id} />
+                  <ConfirmButton message={`Cancel ${inv.name}'s invite? The link stops working.`} className="text-[11px] text-slate-400 hover:text-red-600">Cancel invite</ConfirmButton>
+                </form>
+              )}
+            </div>
+          )}
           <form action={setInvestorStage} className="flex gap-2">
             <input type="hidden" name="id" value={inv.id} />
-            <select name="stage" defaultValue={inv.stage} aria-label="Membership stage" className="input py-1 text-sm">{INVESTOR_STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
+            <select key={inv.stage} name="stage" defaultValue={inv.stage} aria-label="Membership stage" className="input py-1 text-sm">{INVESTOR_STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>
             <button className="btn-ghost px-2 py-1">Save</button>
           </form>
         </section>
