@@ -11,7 +11,9 @@ const pittsburgh: Extraction = {
     { name: "Doug Hollidge", company: "Five9s Digital", role: "Sponsor", email: "Doug@Five9sDigital.com", phone: "704.651.2210" },
     { name: "John Bilyak", company: "Colliers", role: "Broker", email: "John.Bilyak@Colliers.com", phone: "412.638.1753" },
   ],
+  country: "US",
   state: "PA",
+  county: "",
   city: "Pittsburgh",
   address: "5400 Campbells Run Road, Pittsburgh, PA",
   mw: 3.5,
@@ -59,12 +61,21 @@ test("turns the Pittsburgh extraction into a listing draft", () => {
 });
 
 test("drops values outside the allowed choices", () => {
-  const r = toImportResult({ ...pittsburgh, state: "Pennsylvania", facilityType: "Warehouse", dealType: "LEASE", fundingNeeded: 12_500_000 }, []);
-  assert.equal(r.listing.state, "");
+  const r = toImportResult({ ...pittsburgh, country: "", state: "Narnia", facilityType: "Warehouse", dealType: "LEASE", fundingNeeded: 12_500_000 }, []);
+  assert.equal(r.listing.country, "");
   assert.equal(r.listing.facilityType, "");
   assert.equal(r.listing.fundingNeeded, "12500000");
   assert.equal(r.valuation.askingPrice, undefined); // only a sale price feeds the calculator
-  assert.deepEqual(r.blank, ["state", "facilityType"]);
+  assert.deepEqual(r.blank, ["country", "facilityType"]);
+});
+
+test("reads locations outside the US, and US states by name", () => {
+  const es = toImportResult({ ...pittsburgh, country: "es", state: "Comunidad de Madrid", county: "", city: "Alcobendas" }, []);
+  assert.deepEqual([es.listing.country, es.listing.state, es.listing.city], ["ES", "Comunidad de Madrid", "Alcobendas"]);
+  assert.ok(!es.blank.includes("country"));
+  const pa = toImportResult({ ...pittsburgh, country: "", state: "Pennsylvania", county: "Allegheny County" }, []);
+  assert.deepEqual([pa.listing.country, pa.listing.state, pa.listing.county], ["US", "PA", "Allegheny County"]);
+  assert.equal(toImportResult({ ...pittsburgh, country: "US", state: "Ontario" }, []).listing.state, "");
 });
 
 test("matches an existing developer by company name", () => {

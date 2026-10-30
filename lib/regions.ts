@@ -1,6 +1,7 @@
 // Market tree investors can target: region > sub-region > country > US state.
 // Investors save the codes they tick as `preferredRegions` (non-state codes) and `preferredStates` (US states).
 import { US_STATES } from "./constants";
+import { COUNTRY_MARKET, isUS } from "./location";
 
 export type MarketNode = { code: string; label: string; children?: MarketNode[] };
 
@@ -70,10 +71,16 @@ export function packMarkets(leaves: Set<string>): { states: string[]; regions: s
 /** Region a listing's US state / territory belongs to. */
 export const regionOfState = (state: string) => (["PR", "VI", "GU"].includes(state) ? "LATAM_CARIB" : "NORTH_AMERICA");
 
-/** Does an investor's market preference cover a listing in this state? Empty preferences = open to anything. */
-export function marketMatches(prefStates: string[], prefRegions: string[], state: string) {
+/**
+ * Does an investor's market preference cover a listing in this country / state? Empty preferences = open to anything.
+ * A US listing without a state matches anyone who picked at least one US state.
+ */
+export function marketMatches(prefStates: string[], prefRegions: string[], state: string, country = "US") {
   if (!prefStates.length && !prefRegions.length) return true;
   const leaves = expandMarkets(prefStates, prefRegions);
+  if (country.toUpperCase() === "PR") state = "PR";
+  else if (!isUS(country)) { const leaf = COUNTRY_MARKET[country.toUpperCase()]; return !!leaf && leaves.has(leaf); }
+  if (!state) return US_STATES.some((s) => leaves.has(s));
   return leaves.has(state) || prefRegions.includes(regionOfState(state));
 }
 

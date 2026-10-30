@@ -1,3 +1,4 @@
+import { placeRegion } from "@/lib/location";
 import { db } from "@/lib/db";
 import { usd, num } from "@/lib/format";
 import { dealTypeLabel, isClosedDeal } from "@/lib/constants";
@@ -25,7 +26,7 @@ export default async function EmbedListings({ searchParams }: { searchParams: Pr
           <div className="mt-2 text-3xl font-extrabold">{num(p.mw, 1)} <span className="text-base font-semibold">MW</span></div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
             <div><div className="text-xs text-slate-500">Type</div>{p.facilityType}</div>
-            <div><div className="text-xs text-slate-500">State</div>{p.state}</div>
+            <div><div className="text-xs text-slate-500">Location</div>{placeRegion(p)}</div>
             <div><div className="text-xs text-slate-500">Funding</div>{p.fundingNeeded ? usd(p.fundingNeeded) : "—"}</div>
           </div>
           <div className={`mt-3 text-sm font-semibold ${closed ? "text-red-600" : "text-brand-600"}`}>{closed ? "Closed - Sold" : "View on marketplace →"}</div>

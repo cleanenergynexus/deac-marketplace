@@ -109,7 +109,7 @@ export async function loadInvestorCrm() {
       orderBy: { updatedAt: "desc" },
       include: {
         user: { select: { status: true } },
-        interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, state: true, dealType: true, fundingNeeded: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
+        interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true, fundingNeeded: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
       },
     }),
     db.activity.groupBy({ by: ["investorId"], where: { investorId: { not: null }, kind: { in: LOGGED } }, _max: { createdAt: true } }),

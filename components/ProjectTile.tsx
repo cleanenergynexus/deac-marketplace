@@ -1,10 +1,11 @@
+import { placeRegion } from "@/lib/location";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { usd, num } from "@/lib/format";
 import { dealTypeLabel, isClosedDeal } from "@/lib/constants";
 import { ClosedBanner } from "@/components/ClosedBanner";
 
-type P = { id: string; code: string; title: string; mw: number; facilityType: string; fundingNeeded: number; state: string; city: string | null; dealType: string; projectStatus: string; coverImageUrl: string | null; dealStage?: string | null };
+type P = { id: string; code: string; title: string; mw: number; facilityType: string; fundingNeeded: number; country: string; state: string; city: string | null; dealType: string; projectStatus: string; coverImageUrl: string | null; dealStage?: string | null };
 
 const dealTone: Record<string, string> = { LEASE: "bg-sky-600", FINANCING: "bg-emerald-600", SALE: "bg-amber-600" };
 
@@ -38,7 +39,7 @@ function Tile({ p, href, hideTitle }: { p: P; href: string; hideTitle: boolean }
         {!hideTitle && <div className="font-semibold leading-snug group-hover:text-brand-600">{p.title}</div>}
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
           <div><dt className="text-xs text-slate-500">Facility</dt><dd className="font-medium">{p.facilityType}</dd></div>
-          <div><dt className="text-xs text-slate-500">Location</dt><dd className="font-medium">{p.state}{p.city && !hideTitle ? ` · ${p.city}` : ""}</dd></div>
+          <div><dt className="text-xs text-slate-500">Location</dt><dd className="font-medium">{placeRegion(p)}{p.city && !hideTitle ? ` · ${p.city}` : ""}</dd></div>
           <div><dt className="text-xs text-slate-500">Funding needed</dt><dd className="font-medium">{p.fundingNeeded ? usd(p.fundingNeeded) : "—"}</dd></div>
           <div><dt className="text-xs text-slate-500">Status</dt><dd className="font-medium">{p.projectStatus}</dd></div>
         </dl>

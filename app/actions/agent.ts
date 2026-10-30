@@ -1,5 +1,6 @@
 "use server";
 // Actions a referral agent can take from their portal (/agent). Every action checks the agent may see what it touches.
+import { codeRegion } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -184,12 +185,12 @@ export async function createAgentListing(f: FormData) {
   }
   f.set("developerId", developerId);
   const data = projectData(f);
-  if (!data.state || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("State, facility type, deal type and project status are required.");
+  if (!data.country || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("Country, facility type, deal type and project status are required.");
   const valuationInputs = importedValuation(f, data);
   const count = await db.project.count();
   const pipelineStage = placeStage(funnelStages(await getPipeline(), data.dealType), null);
   // The DEAC team decides what investors see: agent listings always start as team-only drafts.
-  const p = await db.project.create({ data: { ...data, visibility: "DRAFT", dealStage: "MARKETING", coverImageUrl: null, developerId, valuationInputs, pipelineStage, monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, visibility: "DRAFT", dealStage: "MARKETING", coverImageUrl: null, developerId, valuationInputs, pipelineStage, monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${codeRegion(data)}-${String(count + 1).padStart(3, "0")}` } });
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
   await db.activity.create({ data: { developerId, projectId: p.id, kind: "SYSTEM", by: agent.name, body: `${p.code} imported by referral agent ${agent.name} from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });

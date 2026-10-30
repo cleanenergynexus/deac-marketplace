@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { agentView } from "@/lib/auth";
@@ -60,7 +61,7 @@ export default async function AgentListing({ params, searchParams }: { params: P
         action={p.visibility !== "DRAFT" ? <Link href={`/marketplace/${p.id}`} className="btn-ghost">Open on the marketplace</Link> : undefined} />
       {created && <p className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-800">Listing created as a draft. Your DEAC partner has been asked to review it. Add the supporting documents to its data room below.</p>}
       <div className="grid gap-3 sm:grid-cols-4">
-        <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">Size</div><div className="mt-1 font-semibold">{num(p.mw)} MW · {p.state}{p.city ? ` · ${p.city}` : ""}</div></div>
+        <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">Size</div><div className="mt-1 font-semibold">{num(p.mw)} MW · {placeShort(p)}{p.city ? ` · ${p.city}` : ""}</div></div>
         <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">Deal</div><div className="mt-1 font-semibold">{stageLabel(DEAL_TYPES, p.dealType)} · {usd(p.fundingNeeded)}</div></div>
         <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">DEAC stage</div><div className="mt-1 font-semibold">{projectStageLabel(pipeline, p, p.developer.stage)}</div></div>
         <div className="card p-4 text-sm"><div className="text-xs uppercase text-slate-500">Status</div><div className="mt-1"><Badge tone={statusTone(p.visibility)}>{VIS[p.visibility] ?? p.visibility}</Badge></div></div>

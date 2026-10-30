@@ -1,4 +1,5 @@
 "use server";
+import { codeRegion } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -241,7 +242,7 @@ export async function createProject(f: FormData) {
   await requireAdmin();
   const data = projectData(f);
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: await pipelineStageFrom(f, data.dealType), code: s(f, "code") ?? `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: await pipelineStageFrom(f, data.dealType), code: s(f, "code") ?? `DEAC-${codeRegion(data)}-${String(count + 1).padStart(3, "0")}` } });
   redirect(`/admin/projects/${p.id}`);
 }
 /** Last step of the import wizard: saves the reviewed listing, creating the developer if it's new. */
@@ -259,12 +260,12 @@ export async function createImportedProject(f: FormData) {
   }
   f.set("developerId", developerId);
   const data = projectData(f);
-  if (!data.state || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("State, facility type, deal type and project status are required.");
+  if (!data.country || !data.facilityType || !data.dealType || !data.projectStatus) throw new Error("Country, facility type, deal type and project status are required.");
 
   const valuationInputs = importedValuation(f, data);
 
   const count = await db.project.count();
-  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: await pipelineStageFrom(f, data.dealType), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${data.state}-${String(count + 1).padStart(3, "0")}` } });
+  const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: await pipelineStageFrom(f, data.dealType), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${codeRegion(data)}-${String(count + 1).padStart(3, "0")}` } });
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
   await db.activity.create({ data: { developerId, kind: "SYSTEM", by: admin.name, body: `${p.code} imported from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });

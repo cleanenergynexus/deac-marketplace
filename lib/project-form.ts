@@ -1,5 +1,6 @@
 // Reads the listing form (ProjectForm) into Project fields. Shared by the team's listing actions and the referral agent import.
 import { DEFAULT_INPUTS, type ValuationInputs } from "./valuation";
+import { locationFromForm } from "./location";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 const n = (f: FormData, k: string) => { const v = s(f, k); return v ? Number(v.replace(/[$,%]/g, "")) : null; };
@@ -8,8 +9,7 @@ export function projectData(f: FormData) {
   return {
     title: s(f, "title") ?? "",
     developerId: String(f.get("developerId")),
-    state: (s(f, "state") ?? "").toUpperCase(),
-    city: s(f, "city"),
+    ...locationFromForm(f),
     mw: n(f, "mw") ?? 0,
     facilityType: s(f, "facilityType") ?? "",
     dealType: s(f, "dealType") ?? "FINANCING",

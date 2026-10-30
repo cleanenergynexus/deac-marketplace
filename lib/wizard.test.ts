@@ -53,7 +53,7 @@ test("cleans drafts and names files", () => {
 
 test("listing facts keep internal valuation labelled", () => {
   const t = projectFactsText({
-    code: "DEAC-TX-001", title: "Site", state: "TX", city: "Abilene", mw: 120, facilityType: "Powered Land", dealType: "SALE", fundingNeeded: 96e6,
+    code: "DEAC-TX-001", title: "Site", country: "US", state: "TX", county: null, city: "Abilene", mw: 120, facilityType: "Powered Land", dealType: "SALE", fundingNeeded: 96e6,
     projectStatus: "Site Control", summary: "", highlights: "Big\n\nFast", term: null, useOfFunds: "", totalCapex: null, targetIrr: null, equityMultiple: null,
     leaseRateKwMo: null, powerRateCents: 4.5, powerStatus: "Signed", monthsToPower: 18, codDate: null, capitalStack: null, economicsNotes: null, developer: { company: "Acme", website: null },
   }, { score: 82, recommendation: "Buy", perMw: 900000, marketValue: 108e6, low: 91.8e6, high: 118.8e6, askingVsMarket: -0.11 });

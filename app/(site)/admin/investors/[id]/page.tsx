@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { setInvestorStage, updateInvestor } from "@/app/actions/admin";
@@ -60,7 +61,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
       user: true,
       referredBy: { select: { name: true } },
       company: { include: { investors: { where: { id: { not: id } }, orderBy: { name: "asc" }, select: { id: true, name: true, title: true, email: true } } } },
-      interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, dealType: true, state: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
+      interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, dealType: true, country: true, state: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
       lois: { select: { projectId: true, status: true, amount: true } },
       dealSteps: { select: { projectId: true, step: true, status: true } },
       analysisRequests: { include: { project: { select: { code: true } } } },
@@ -69,7 +70,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
   if (!inv) notFound();
   const [pipeline, me, team, listings, firms, agents] = await Promise.all([
     getInvestorPipeline(), requireAdmin(), getTeam(),
-    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, state: true, dealType: true, facilityType: true, visibility: true }, orderBy: { code: "asc" } }),
+    db.project.findMany({ select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true, facilityType: true, visibility: true }, orderBy: { code: "asc" } }),
     db.investorFirm.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
     getAgents(),
   ]);
@@ -255,7 +256,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
             <ul className="divide-y divide-slate-100 text-sm">
               {fits.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-2 py-2">
-                  <span className="min-w-0"><Link href={`/admin/projects/${p.id}`} className="block truncate text-slate-800 hover:text-brand-600">{p.title}</Link><span className="font-mono text-xs text-slate-500">{p.code} · {num(p.mw)} MW · {p.state}</span></span>
+                  <span className="min-w-0"><Link href={`/admin/projects/${p.id}`} className="block truncate text-slate-800 hover:text-brand-600">{p.title}</Link><span className="font-mono text-xs text-slate-500">{p.code} · {num(p.mw)} MW · {placeShort(p)}</span></span>
                   <form action={addInterest}>
                     <input type="hidden" name="investorId" value={inv.id} />
                     <input type="hidden" name="projectId" value={p.id} />
