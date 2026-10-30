@@ -37,9 +37,22 @@ Listing visibility: `DRAFT` (team only) → `PRIVATE` (approved members) → `TE
 
 **Admin → Listings → Import from document**: upload a teaser, offering memo or broker flyer (PDF up to 4.4 MB, an image, or text, or paste an email). Claude (`claude-opus-5-5`) reads it and prefills the listing, the developer/sponsor and the valuation calculator inputs. You review and edit everything before the listing is created as a Draft. Needs `ANTHROPIC_API_KEY`. Extraction rules and the output schema live in `lib/importer.ts`.
 
-## deacna.com integration
+## deacna.com company website
 
-Recommended: deploy this app at `marketplace.deacna.com` and on deacna.com embed:
+The DEAC company website is a single static page at `public/site/index.html`. This app serves it:
+
+- on `deacna.com` and `www.deacna.com` at `/` (`middleware.ts` checks the host). Any other path on those hosts redirects to the marketplace, so `deacna.com/apply` and `deacna.com/login` work too.
+- on any host at `/site`, for previewing before the domain moves.
+
+It shows the live teaser tiles by framing `https://marketplace.deacna.com/embed/listings`. The embed posts its height to the parent so the frame fits the grid. Edit the copy straight in the HTML file.
+
+To move deacna.com off Squarespace:
+
+1. Vercel → Project → Settings → Domains: add `deacna.com` and `www.deacna.com` (redirect www to the apex or the other way round).
+2. In the DNS for deacna.com (Squarespace → Domains → DNS settings): delete the Squarespace Defaults records for `@` and `www`, then add the records Vercel shows (usually `A @ 76.76.21.21` and `CNAME www cname.vercel-dns.com`). Keep the `marketplace` CNAME and any email records (MX, TXT/SPF, DKIM) as they are.
+3. Once the site loads from Vercel, the Squarespace website plan can be cancelled. Keep the domain registration if it is with Squarespace.
+
+The teaser grid can also be embedded on other sites:
 
 ```html
 <iframe src="https://marketplace.deacna.com/embed/listings" style="width:100%;height:700px;border:0"></iframe>
