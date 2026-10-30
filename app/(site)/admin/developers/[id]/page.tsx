@@ -20,6 +20,7 @@ import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
+import { getAgents } from "@/lib/agents-db";
 import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
     activities: { where: visibleTimelineWhere(me, team), orderBy: { createdAt: "desc" }, take: 50, include: { contact: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } } },
   } });
   if (!dev) notFound();
-  const [scoring, pipeline] = await Promise.all([getScoring(), getPipeline()]);
+  const [scoring, pipeline, agents] = await Promise.all([getScoring(), getPipeline(), getAgents()]);
   const lastTouch = new Map((await db.activity.groupBy({ by: ["contactId"], where: { developerId: id, contactId: { not: null }, kind: { in: ["NOTE", "EMAIL", "CALL", "MEETING", "TASK"] } }, _max: { createdAt: true } })).map((t) => [t.contactId!, t._max.createdAt]));
   return (
     <div className="space-y-6">
@@ -69,7 +70,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
             </ul>
             <details className="mt-4">
               <summary className="cursor-pointer text-sm font-medium text-brand-600">+ Add a contact at {dev.company}</summary>
-              <div className="mt-3"><ContactForm developerId={dev.id} action={createContact} country={dev.country} /></div>
+              <div className="mt-3"><ContactForm developerId={dev.id} action={createContact} country={dev.country} agents={agents} /></div>
             </details>
           </section>
           <Section title="Projects" action={<Link href={`/admin/projects/new?developerId=${dev.id}`} className="btn-ghost">Add a project</Link>}>
@@ -87,7 +88,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
                 {addressLines(dev).map((l) => <span key={l} className="block">{l}</span>)}
               </a>
             )}
-            <DeveloperForm dev={dev} action={updateDeveloper} />
+            <DeveloperForm dev={dev} action={updateDeveloper} agents={agents} />
           </Section>
           <Section title="Team & bios (shown on listings)">
             <div className="grid gap-3 sm:grid-cols-2">

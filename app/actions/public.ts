@@ -14,9 +14,13 @@ export async function login(_: unknown, f: FormData) {
   const email = s(f, "email")?.toLowerCase();
   const user = email ? await db.user.findUnique({ where: { email } }) : null;
   if (!user || !(await checkPassword(String(f.get("password") ?? ""), user.passwordHash))) return { error: "Email or password is incorrect." };
-  await startSession({ uid: user.id, role: user.role as "ADMIN", status: user.status, name: user.name });
+  if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
+  await startSession({ uid: user.id, role: user.role as "ADMIN" | "AGENT", status: user.status, name: user.name });
   const next = s(f, "next");
   if (user.role === "ADMIN") redirect(next?.startsWith("/") ? next : "/admin");
+  if (user.role === "AGENT") {
+    redirect(next?.startsWith("/agent") ? next : "/agent");
+  }
   if (user.status !== "APPROVED") redirect("/pending");
   redirect(next?.startsWith("/") ? next : "/marketplace");
 }
@@ -55,6 +59,7 @@ export async function applyForAccess(_: unknown, f: FormData) {
   const investor = await db.investor.upsert({ where: { email }, create: { email, ...data }, update: data });
   const user = await db.user.create({ data: { email, name: data.name, passwordHash: await hashPassword(password), role: "INVESTOR", status: "PENDING", investorId: investor.id } });
   await db.activity.create({ data: { investorId: investor.id, kind: "SYSTEM", body: "Submitted membership application via website." } });
+  if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: "INVESTOR", status: "PENDING", name: user.name });
   redirect("/pending");
 }
@@ -104,6 +109,7 @@ export async function createFirstAdmin(_: unknown, f: FormData) {
   const password = String(f.get("password") ?? "");
   if (!email || password.length < 10) return { error: "Email and a password of at least 10 characters are required." };
   const user = await db.user.create({ data: { email, name: s(f, "name") ?? email, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED" } });
+  if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: "ADMIN", status: "APPROVED", name: user.name });
   redirect("/admin");
 }

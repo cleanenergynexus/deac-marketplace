@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 export default async function Pending() {
   const u = await currentUser();
   if (!u) redirect("/login");
+  if (u.role === "AGENT") redirect("/agent");
   if (u.status === "APPROVED") redirect("/marketplace");
   return (
     <div className="mx-auto max-w-lg card p-8 text-center">

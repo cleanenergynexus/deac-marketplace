@@ -21,6 +21,7 @@ import { formatPhone, telHref } from "@/lib/phone";
 import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { marketSummary } from "@/lib/regions";
 import { requireAdmin } from "@/lib/auth";
+import { getAgents } from "@/lib/agents-db";
 import { staffLevel, visibleStaff } from "@/lib/tasks";
 import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
@@ -48,6 +49,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
     where: { id },
     include: {
       user: true,
+      referredBy: { select: { name: true } },
       company: { include: { investors: { where: { id: { not: id } }, orderBy: { name: "asc" }, select: { id: true, name: true, title: true, email: true } } } },
       interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, dealType: true, state: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
       lois: { select: { projectId: true, status: true, amount: true } },
@@ -56,10 +58,11 @@ export default async function InvestorRecord({ params, searchParams }: { params:
     },
   });
   if (!inv) notFound();
-  const [pipeline, me, team, listings, firms] = await Promise.all([
+  const [pipeline, me, team, listings, firms, agents] = await Promise.all([
     getInvestorPipeline(), requireAdmin(), getTeam(),
     db.project.findMany({ select: { id: true, code: true, title: true, mw: true, state: true, dealType: true, facilityType: true, visibility: true }, orderBy: { code: "asc" } }),
     db.investorFirm.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
+    getAgents(),
   ]);
   const assignees = visibleStaff(me, team).map((u) => ({ id: u.id, name: u.name }));
   const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
@@ -96,6 +99,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
           {inv.company ? <Link href={`/admin/investors/companies/${inv.company.id}`} className="text-sm text-brand-600">{inv.company.name}</Link> : <Link href={`?tab=profile`} className="text-sm text-slate-500 hover:text-brand-600">Add a company</Link>}
           <div className="mt-2 flex flex-wrap justify-center gap-2">
             <Badge tone={memberTone(inv.stage)}>{stageLabel(INVESTOR_STAGES, inv.stage)}</Badge>
+            {inv.referredBy && <Badge tone="purple">Referred by {inv.referredBy.name}</Badge>}
             {openTasks > 0 && <Badge tone="amber">{openTasks} open task{openTasks === 1 ? "" : "s"}</Badge>}
           </div>
           <div className="mt-4 flex justify-center gap-3">
@@ -159,7 +163,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
           <Link href="?tab=profile" className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${profile ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Profile</Link>
         </nav>
         {profile ? (
-          <div className="card p-5"><InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} /></div>
+          <div className="card p-5"><InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} /></div>
         ) : (
           <>
             <ActivityComposer key={tab.value} investor about="listing" contactId={id} contactEmail={inv.email} initialKind={tab.log}

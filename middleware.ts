@@ -21,11 +21,14 @@ export async function middleware(req: NextRequest) {
   if (p === "/site" || p === "/site/") return NextResponse.rewrite(new URL("/site/index.html", req.url));
 
   // Fast gate for signed-in areas; pages re-check against the database.
-  if (!/^\/(admin|marketplace|portal)(\/|$)/.test(p)) return NextResponse.next();
+  if (!/^\/(admin|agent|marketplace|portal)(\/|$)/.test(p)) return NextResponse.next();
   const s = await readToken(req.cookies.get(COOKIE)?.value);
   const to = (path: string) => NextResponse.redirect(new URL(path, req.url));
   if (!s) return to(`/login?next=${encodeURIComponent(p)}`);
-  if (p.startsWith("/admin") && s.role !== "ADMIN") return to("/");
+  if (/^\/admin(\/|$)/.test(p) && s.role !== "ADMIN") return to("/");
+  if (/^\/agent(\/|$)/.test(p) && s.role !== "AGENT") return to("/");
+  // Referral agents only use their own portal.
+  if (s.role === "AGENT" && !/^\/agent(\/|$)/.test(p)) return to("/agent");
   return NextResponse.next();
 }
 

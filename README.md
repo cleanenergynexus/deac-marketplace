@@ -98,3 +98,12 @@ Works like the Developer CRM. **Investor CRM → Companies** are investor firms 
 The board has one tile per investor per listing (contact and company first, listing second), with one funnel per deal type. Pick a listing in the menu above the board to see only that listing's investors, add investors to it, and see who else fits its mandate. **Investor CRM → Funnels** edits the columns (saved in `PipelineSettings` row `investor`).
 
 Tiles are created and moved forward on their own when an investor signs a listing's NDA, sends an LOI, has an LOI approved, gets diligence access or sends an intake request (never backwards). Existing NDAs, LOIs and intake requests become tiles the first time a CRM page loads, and investors' free-text firm names become companies.
+
+## Referral agents
+
+Outside agents who bring developers and investors to DEAC. **Team → Referral agents** adds an agent login and assigns their **DEAC partner** (a team member who supports their deals and meetings). Agents sign in at `/login` and land on their own portal at `/agent`; they can't open the admin area or the investor marketplace.
+
+- **What they see:** contacts marked **Referred by agent** on the contact (Developer CRM contact or company, Investor CRM contact). A referred developer company shows all its contacts; a referred developer contact shows its company's projects. Everything is view only, including the activity timeline the team logs on those contacts.
+- **What they can do:** refer new developers and investors (added to the CRM with the agent as referrer, and a task for their partner), import a listing with the import wizard (always saved as a Draft for the team to review), upload files into their projects' data rooms, and request meetings (a task for their partner on that contact's timeline).
+- **Data room:** upload only. Agents see the files they uploaded, never open or download any file (`/api/data-room/files/*` returns 403 for agents).
+- Partners add a phone number and a meeting booking link under **My account**; agents see them on their portal. Rules live in `lib/agents.ts`.

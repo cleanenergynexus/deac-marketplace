@@ -28,9 +28,11 @@ type Props = {
   dataRoom?: DataRoomIndex;
   /** Shows a Delete Listing button that submits to this action. */
   deleteAction?: (f: FormData) => Promise<void>;
+  /** Referral agents: hide what only the DEAC team decides (visibility, deal stage, cover image). */
+  hideTeamFields?: boolean;
 };
 
-export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing", documents, dataRoom, deleteAction }: Props) {
+export function ProjectForm({ p, developers, developerId, action, draft, developerField, children, submitLabel = "Create listing", documents, dataRoom, deleteAction, hideTeamFields = false }: Props) {
   const v = (x: unknown) => (x == null ? "" : String(x));
   const d = (draft ?? {}) as Partial<ListingDraft>;
   // On an imported draft, a value the document didn't give stays empty until the admin picks one.
@@ -40,13 +42,13 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
       {p && <input type="hidden" name="id" value={p.id} />}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Title" className="sm:col-span-2"><input name="title" defaultValue={p ? p.title : d.title} required className="input" /></Field>
-        <Field label="Visibility">
+        {!hideTeamFields && <Field label="Visibility">
           <select name="visibility" defaultValue={p?.visibility ?? "DRAFT"} className="input">
             <option value="DRAFT">Draft (team only)</option>
             <option value="PRIVATE">Private (approved investors)</option>
             <option value="TEASER">Private + public teaser on deacna.com</option>
           </select>
-        </Field>
+        </Field>}
         {developerField ?? <Field label="Developer"><Select name="developerId" options={developers.map((x) => ({ value: x.id, label: x.company }))} defaultValue={p?.developerId ?? developerId} required /></Field>}
         <Field label="State"><Select name="state" options={US_STATES} defaultValue={p ? p.state : d.state} required {...pickFirst} /></Field>
         <Field label="City / county"><input name="city" defaultValue={p ? v(p.city) : d.city} className="input" /></Field>
@@ -56,8 +58,10 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
         <Field label="Funding needed ($)"><MoneyInput name="fundingNeeded" defaultValue={p ? v(p.fundingNeeded) : d.fundingNeeded} required /></Field>
         <Field label="Project status"><Select name="projectStatus" options={PROJECT_STATUSES} defaultValue={p ? p.projectStatus : d.projectStatus} {...pickFirst} /></Field>
         <Field label="Term"><input name="term" defaultValue={v(p?.term)} className="input" placeholder="e.g. 24 mo" /></Field>
-        <Field label="Deal stage (shown to investors)"><Select name="dealStage" options={DEAL_STAGES.map((x) => ({ value: x.value, label: `${x.label} (${x.status})` }))} defaultValue={p?.dealStage ?? "MARKETING"} /></Field>
-        <Field label="Cover image URL"><input name="coverImageUrl" defaultValue={v(p?.coverImageUrl)} className="input" /></Field>
+        {!hideTeamFields && <>
+          <Field label="Deal stage (shown to investors)"><Select name="dealStage" options={DEAL_STAGES.map((x) => ({ value: x.value, label: `${x.label} (${x.status})` }))} defaultValue={p?.dealStage ?? "MARKETING"} /></Field>
+          <Field label="Cover image URL"><input name="coverImageUrl" defaultValue={v(p?.coverImageUrl)} className="input" /></Field>
+        </>}
         <Field label="Summary" className="sm:col-span-3"><textarea name="summary" rows={4} defaultValue={p ? p.summary : d.summary} className="input" /></Field>
         <Field label="Highlights (one per line)" className="sm:col-span-3"><textarea name="highlights" rows={3} defaultValue={p ? p.highlights : d.highlights} className="input" /></Field>
         <Field label="Use of funds (one per line, e.g. Equipment & EPC: $3.1M)" className="sm:col-span-3"><textarea name="useOfFunds" rows={3} defaultValue={v(p?.useOfFunds)} className="input" placeholder={"Equipment & EPC: $3.1M\nInterconnection: $0.4M\nSoft costs / contingency: $0.7M"} /></Field>

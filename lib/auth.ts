@@ -44,6 +44,13 @@ export async function requireTeamAdmin() {
   return u;
 }
 
+/** Signed-in referral agent who isn't suspended. Everything else goes to sign-in. */
+export async function requireAgent() {
+  const u = await currentUser();
+  if (!u || u.role !== "AGENT" || u.status !== "APPROVED") redirect("/login");
+  return u;
+}
+
 /** Approved investor (or admin, who can preview everything). */
 export async function requireMember() {
   const u = await currentUser();

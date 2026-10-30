@@ -1,7 +1,8 @@
 "use server";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { currentUser } from "@/lib/auth";
+import { agentCompanyWhere } from "@/lib/agents";
 import { extractListing, importerEnabled, type SourceDoc } from "@/lib/extract";
 import { fetchWebPage, WebPageError } from "@/lib/webpage";
 import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES, toImportResult, type ImportResult } from "@/lib/importer";
@@ -12,7 +13,10 @@ const TEXT_EXT: Record<string, string> = { txt: "text/plain", md: "text/markdown
 
 /** Step 1 of the import wizard: read the web page, uploaded document and/or pasted text with Claude. */
 export async function extractProject(_: ExtractState, f: FormData): Promise<ExtractState> {
-  await requireAdmin();
+  // The DEAC team, or a referral agent (who only gets their own companies to match against).
+  const u = await currentUser();
+  const agent = u?.role === "AGENT" && u.status === "APPROVED";
+  if (!u || (u.role !== "ADMIN" && !agent)) return { error: "Please sign in again." };
   if (!importerEnabled()) return { error: "The importer isn't set up yet: add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables, then redeploy." };
 
   const docs: SourceDoc[] = [];
@@ -48,7 +52,7 @@ export async function extractProject(_: ExtractState, f: FormData): Promise<Extr
 
   try {
     const raw = await extractListing(docs);
-    const developers = await db.developer.findMany({ select: { id: true, company: true } });
+    const developers = await db.developer.findMany({ where: agent ? agentCompanyWhere(u.id) : undefined, select: { id: true, company: true } });
     return { result: toImportResult(raw, developers), sourceName: names.join(" + ") };
   } catch (e) {
     console.error("Project import failed", e);

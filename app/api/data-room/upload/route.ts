@@ -4,17 +4,18 @@ import { issueSignedToken } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { hasReadWriteToken } from "@/lib/storage";
+import { agentProject } from "@/lib/agents-db";
 
 const MAX_BYTES = 5 * 1024 ** 3;
 
-/** Only the DEAC team, and only into this project's folder of the store. */
+/** The DEAC team, or a referral agent on one of their own projects, and only into this project's folder of the store. */
 async function authorize(pathname: string, clientPayload: string | null) {
   const u = await currentUser();
-  if (!u || u.role !== "ADMIN") throw new Error("Only the DEAC team can upload to a data room");
+  const agent = u?.role === "AGENT" && u.status === "APPROVED";
+  if (!u || (u.role !== "ADMIN" && !agent)) throw new Error("Only the DEAC team can upload to a data room");
   const projectId = clientPayload ?? "";
-  if (!projectId || !pathname.startsWith(`data-room/${projectId}/`) || pathname.includes("..") || !(await db.project.findUnique({ where: { id: projectId }, select: { id: true } }))) {
-    throw new Error("Unknown project");
-  }
+  const project = !projectId ? null : agent ? await agentProject(u.id, projectId) : await db.project.findUnique({ where: { id: projectId }, select: { id: true } });
+  if (!project || !pathname.startsWith(`data-room/${projectId}/`) || pathname.includes("..")) throw new Error("Unknown project");
 }
 
 /**

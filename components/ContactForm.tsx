@@ -3,10 +3,11 @@ import { Field } from "@/components/ui";
 import { SaveButton } from "@/components/SaveButton";
 import { PhoneInput } from "@/components/PhoneInput";
 import { AddressFields } from "@/components/AddressFields";
+import { ReferredBySelect, type AgentOption } from "@/components/ReferredBySelect";
 
 /** Contact properties. With `contact` it edits; without, it adds a new contact to `developerId`. */
 /** `country` is the company's country, used as the default for new phone numbers and addresses. */
-export function ContactForm({ contact, developerId, companies, action, compact = false, country }: { contact?: Contact; developerId?: string; companies?: { id: string; company: string }[]; action: (f: FormData) => Promise<void>; compact?: boolean; country?: string | null }) {
+export function ContactForm({ contact, developerId, companies, action, compact = false, country, agents }: { contact?: Contact; developerId?: string; companies?: { id: string; company: string }[]; action: (f: FormData) => Promise<void>; compact?: boolean; country?: string | null; agents?: AgentOption[] }) {
   const grid = compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-2";
   const home = contact?.country ?? country ?? "US";
   return (
@@ -31,6 +32,7 @@ export function ContactForm({ contact, developerId, companies, action, compact =
         <Field label="Location"><input name="location" defaultValue={contact?.location ?? ""} className="input" /></Field>
         <Field label="Source"><input name="source" defaultValue={contact?.source ?? ""} className="input" placeholder="Referral, conference…" /></Field>
         <Field label="Contact owner"><input name="owner" defaultValue={contact?.owner ?? ""} className="input" placeholder="Team member responsible" /></Field>
+        {agents && <ReferredBySelect agents={agents} value={contact?.referredById} />}
       </div>
       <AddressFields value={contact ?? { country: home }} className={grid} />
       <Field label="Background notes"><textarea name="notes" rows={3} defaultValue={contact?.notes ?? ""} className="input" /></Field>

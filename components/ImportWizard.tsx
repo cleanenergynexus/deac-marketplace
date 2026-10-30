@@ -3,6 +3,7 @@ import { useActionState, useState } from "react";
 import type { Developer } from "@prisma/client";
 import { extractProject, type ExtractState } from "@/app/actions/import";
 import { createImportedProject } from "@/app/actions/admin";
+import { createAgentListing } from "@/app/actions/agent";
 import { ProjectForm } from "@/components/ProjectForm";
 import { Field } from "@/components/ui";
 import { PhoneInput } from "@/components/PhoneInput";
@@ -11,7 +12,8 @@ import type { ImportResult } from "@/lib/importer";
 
 const LABELS: Record<string, string> = { title: "Title", state: "State", mw: "Capacity (MW)", facilityType: "Facility type", dealType: "Deal type", fundingNeeded: "Funding needed", projectStatus: "Project status", summary: "Summary" };
 
-export function ImportWizard({ developers, developerId, enabled }: { developers: Pick<Developer, "id" | "company">[]; developerId?: string; enabled: boolean }) {
+/** `agent`: a referral agent's import. Their listing is saved through createAgentListing as a draft for the DEAC team. */
+export function ImportWizard({ developers, developerId, enabled, agent = false }: { developers: Pick<Developer, "id" | "company">[]; developerId?: string; enabled: boolean; agent?: boolean }) {
   const [state, extract, pending] = useActionState<ExtractState, FormData>(extractProject, undefined);
   const result = state?.result;
 
@@ -20,7 +22,7 @@ export function ImportWizard({ developers, developerId, enabled }: { developers:
       <Steps step={result ? 2 : 1} />
       {!enabled && (
         <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-          The importer needs an Anthropic API key. Add <code>ANTHROPIC_API_KEY</code> in Vercel → Settings → Environment Variables, then redeploy.
+          {agent ? "The importer isn't switched on yet. Ask your DEAC partner." : <>The importer needs an Anthropic API key. Add <code>ANTHROPIC_API_KEY</code> in Vercel → Settings → Environment Variables, then redeploy.</>}
         </p>
       )}
       {!result ? (
@@ -43,7 +45,7 @@ export function ImportWizard({ developers, developerId, enabled }: { developers:
           </div>
         </form>
       ) : (
-        <Review result={result} sourceName={state?.sourceName ?? "document"} developers={developers} developerId={developerId} onRestart={() => window.location.reload()} />
+        <Review result={result} sourceName={state?.sourceName ?? "document"} developers={developers} developerId={developerId} agent={agent} onRestart={() => window.location.reload()} />
       )}
     </div>
   );
@@ -59,7 +61,7 @@ function Steps({ step }: { step: 1 | 2 }) {
   return <ol className="flex flex-wrap gap-6 text-sm">{item(1, "Add a source")}{item(2, "Review & create listing")}</ol>;
 }
 
-function Review({ result, sourceName, developers, developerId, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; developerId?: string; onRestart: () => void }) {
+function Review({ result, sourceName, developers, developerId, agent, onRestart }: { result: ImportResult; sourceName: string; developers: Pick<Developer, "id" | "company">[]; developerId?: string; agent: boolean; onRestart: () => void }) {
   // Started from a developer's page: keep that developer, whatever the document names.
   const [devChoice, setDevChoice] = useState(developerId ?? result.developerMatchId ?? (result.developer.company ? "__new__" : ""));
   const contactsNote = result.contacts.map((c) => [c.name, c.role && `(${c.role})`, c.company, c.email, formatPhone(c.phone)].filter(Boolean).join(" ")).join("; ");
@@ -81,7 +83,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
     <div className="space-y-4">
       <div className="card space-y-2 p-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p>Read from <b>{sourceName}</b>. Check every field before creating the listing. It is saved as a <b>Draft</b> unless you change visibility.</p>
+          <p>Read from <b>{sourceName}</b>. Check every field before creating the listing. {agent ? <>It is saved as a <b>Draft</b> for the DEAC team to review before investors see it.</> : <>It is saved as a <b>Draft</b> unless you change visibility.</>}</p>
           <button type="button" onClick={onRestart} className="btn-ghost">Start over</button>
         </div>
         {result.blank.length > 0 && (
@@ -90,7 +92,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
         {result.missing.length > 0 && <p className="text-slate-600">Investors will likely ask for: {result.missing.join(", ")}.</p>}
       </div>
       <div className="card p-6">
-        <ProjectForm developers={developers} action={createImportedProject} draft={result.listing} developerField={developerField} submitLabel="Create listing">
+        <ProjectForm developers={developers} action={agent ? createAgentListing : createImportedProject} draft={result.listing} developerField={developerField} submitLabel={agent ? "Create draft listing" : "Create listing"} hideTeamFields={agent}>
           <input type="hidden" name="sourceName" value={sourceName} />
           <input type="hidden" name="contactsNote" value={contactsNote} />
           <input type="hidden" name="valuation" value={JSON.stringify(result.valuation)} />
@@ -113,7 +115,7 @@ function Review({ result, sourceName, developers, developerId, onRestart }: { re
               <p className="mt-1 text-xs text-slate-500">Saved to the developer&apos;s activity log.</p>
             </div>
           )}
-          {scoringCount > 0 && <p className="text-sm text-slate-600">{scoringCount} valuation calculator inputs were also found. They prefill the calculator on the listing page, where you can review them and save a score.</p>}
+          {scoringCount > 0 && !agent && <p className="text-sm text-slate-600">{scoringCount} valuation calculator inputs were also found. They prefill the calculator on the listing page, where you can review them and save a score.</p>}
         </ProjectForm>
       </div>
     </div>

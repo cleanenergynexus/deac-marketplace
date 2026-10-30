@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/requests", label: "Intake requests", count: openReqs },
     { href: "/admin/outreach", label: "Outreach" },
     { href: "/admin/calculator", label: "Valuation calculator", children: [{ href: "/admin/scoring", label: "Scoring settings" }] },
-    { href: "/admin/team", label: "Team" },
+    { href: "/admin/team", label: "Team", children: [{ href: "/admin/agents", label: "Referral agents" }] },
     { href: "/admin/account", label: "My account" },
   ];
   return (

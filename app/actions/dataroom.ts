@@ -83,7 +83,7 @@ export async function registerFile(input: { projectId: string; folderId: string 
   if (!stored) return { error: `Upload of ${input.name} didn't complete. Try again.` };
   const name = uniqueName(cleanName(input.name) || "Untitled", await siblingNames(projectId, folderId));
   const contentType = (stored.contentType || input.contentType || "application/octet-stream").slice(0, 200);
-  const f = await db.dataRoomFile.create({ data: { projectId, folderId, name, size: stored.size, contentType, storageKey: input.storageKey, uploadedBy: admin.name } });
+  const f = await db.dataRoomFile.create({ data: { projectId, folderId, name, size: stored.size, contentType, storageKey: input.storageKey, uploadedBy: admin.name, uploadedById: admin.id } });
   refresh(projectId);
   return { id: f.id };
 }
