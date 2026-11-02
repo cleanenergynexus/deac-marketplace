@@ -560,6 +560,11 @@ model SignatureRequest {
   signerName     String?
   signerEmail    String?
   signerCompany  String?
+  // Two-party (or more) signing: the recipient above is signer 0; additional signers (e.g. a DEAC countersignature)
+  // are SignatureSigner rows. Lowest signOrder signs first; equal numbers sign at the same time.
+  signOrder         Int       @default(1)
+  recipientSentAt   DateTime? // when the recipient's turn came (their link was sent)
+  recipientSignedAt DateTime? // when the recipient signed (the request is SIGNED only once everyone has)
   status         String    @default("DRAFT") // TEMPLATE | DRAFT | SENT | VIEWED | SIGNED | DECLINED | VOIDED
   source         String    @default("ESIGN") // ESIGN | UPLOADED
   // Signing link: only the SHA-256 of the token is kept. Investors can also sign from My Portal while signed in.
@@ -580,13 +585,44 @@ model SignatureRequest {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  events SignatureEvent[]
+  events  SignatureEvent[]
+  signers SignatureSigner[]
 
   @@index([tokenHash])
   @@index([investorId])
   @@index([contactId])
   @@index([agentId])
   @@index([projectId])
+}
+
+// An additional signer on a request (the recipient on the request is signer 0). Fields placed for this signer carry
+// its slot number. Templates keep their signers so every copy sent goes to the same countersigner.
+model SignatureSigner {
+  id             String           @id @default(cuid())
+  requestId      String
+  request        SignatureRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  slot           Int // 1..9, matches SignField.signer
+  role           String           @default("Countersignature") // shown to everyone, e.g. "DEAC countersignature"
+  signOrder      Int              @default(2)
+  signerType     String? // TEAM | INVESTOR | CONTACT | AGENT (null on a template = choose before sending)
+  userId         String? // DEAC team member or referral agent
+  investorId     String?
+  contactId      String?
+  name           String?
+  email          String?
+  company        String?
+  status         String           @default("WAITING") // WAITING | SENT | VIEWED | SIGNED | DECLINED
+  tokenHash      String?
+  tokenExpiresAt DateTime?
+  values         String           @default("{}")
+  sentAt         DateTime?
+  viewedAt       DateTime?
+  signedAt       DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@index([requestId])
+  @@index([tokenHash])
+  @@index([userId])
 }
 
 // Audit trail of a signature request: created, sent, viewed, signed, declined, voided, link renewed.

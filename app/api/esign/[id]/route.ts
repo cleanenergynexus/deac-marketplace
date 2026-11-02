@@ -20,8 +20,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const u = await currentUser();
   const team = u?.role === "ADMIN";
   if (!team) {
-    const byToken = !!token && r.tokenHash === hashSignToken(token) && !!r.tokenExpiresAt && r.tokenExpiresAt > new Date();
-    const byLogin = !!u && ((!!u.investorId && r.investorId === u.investorId) || (u.role === "AGENT" && r.agentId === u.id));
+    const now = new Date();
+    const hash = token ? hashSignToken(token) : null;
+    // Additional signers (e.g. a co-signer) have their own links and may also be signed in.
+    const cosigners = await db.signatureSigner.findMany({ where: { requestId: r.id }, select: { tokenHash: true, tokenExpiresAt: true, userId: true, investorId: true } });
+    const byToken = !!hash && ((r.tokenHash === hash && !!r.tokenExpiresAt && r.tokenExpiresAt > now) || cosigners.some((c) => c.tokenHash === hash && !!c.tokenExpiresAt && c.tokenExpiresAt > now));
+    const byLogin = !!u && (
+      (!!u.investorId && r.investorId === u.investorId) || (u.role === "AGENT" && r.agentId === u.id) ||
+      cosigners.some((c) => (!!c.userId && c.userId === u.id) || (!!u.investorId && c.investorId === u.investorId))
+    );
     if (r.isTemplate || !(byToken || byLogin)) return new NextResponse("Not found", { status: 404 });
     // The unsigned PDF only while it's waiting for a signature; the signed copy once signed.
     if (which === "original" ? !isOpen(r.status) : r.status !== "SIGNED") return new NextResponse("Not available", { status: 404 });

@@ -30,14 +30,22 @@ export type CertificateInfo = {
   title: string;
   sourceName: string;
   sourceHash: string;
-  signer: { name: string; email: string; company?: string | null; kind: string };
+  signers: { name: string; email: string; company?: string | null; kind: string; role?: string | null; signedAt: Date }[];
   sentBy?: string | null;
   consent: string;
   events: { at: Date; action: string; detail?: string | null; ip?: string | null; userAgent?: string | null }[];
 };
 
-/** Stamps what the signer entered onto the original pages and appends the certificate. Returns the signed PDF. */
-export async function buildSignedPdf(original: Uint8Array, fields: SignField[], values: SignValues, signedAt: Date, cert: CertificateInfo): Promise<Uint8Array> {
+/** What one signer entered, and when they signed (slot 0 = the recipient). */
+export type PartyValues = { slot: number; values: SignValues; signedAt: Date };
+
+/**
+ * Stamps what every signer entered onto the original pages (each field shows its own signer's answers) and appends
+ * the certificate. Returns the signed PDF.
+ */
+export async function buildSignedPdf(original: Uint8Array, fields: SignField[], parties: PartyValues[], completedAt: Date, cert: CertificateInfo): Promise<Uint8Array> {
+  const signedAt = completedAt;
+  const bySlot = new Map(parties.map((p) => [p.slot, p]));
   const doc = await PDFDocument.load(original, { updateMetadata: false });
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -51,7 +59,9 @@ export async function buildSignedPdf(original: Uint8Array, fields: SignField[], 
 
   for (const f of fields) {
     const page = pages[f.page];
-    if (!page) continue;
+    const party = bySlot.get(f.signer ?? 0);
+    if (!page || !party) continue;
+    const values = party.values;
     const box = pageBox(page);
     // Field fractions are measured from the top-left of the visible page; PDF points start bottom-left.
     const x = box.x + f.x * box.width;
@@ -65,7 +75,7 @@ export async function buildSignedPdf(original: Uint8Array, fields: SignField[], 
       page.drawImage(img, { x, y: y + (h - img.height * scale) / 2, width: img.width * scale, height: img.height * scale });
       continue;
     }
-    const text = winAnsi(fieldText(f, values, signedAt));
+    const text = winAnsi(fieldText(f, values, party.signedAt));
     if (!text) continue;
     if (f.type === "CHECKBOX") {
       const size = Math.min(h, w) * 0.9;
@@ -78,7 +88,7 @@ export async function buildSignedPdf(original: Uint8Array, fields: SignField[], 
 
   addCertificate(doc, font, bold, signedAt, cert);
   doc.setTitle(cert.title);
-  doc.setSubject(`Signed by ${cert.signer.name} on ${signedAt.toISOString()}`);
+  doc.setSubject(`Signed by ${cert.signers.map((x) => x.name).join(", ")}, completed ${signedAt.toISOString()}`);
   doc.setProducer("DEAC Marketplace e-signature");
   doc.setModificationDate(signedAt);
   return doc.save();
@@ -89,6 +99,8 @@ function pageBox(page: PDFPage) {
   const c = page.getCropBox();
   return c.width > 0 && c.height > 0 ? c : { x: 0, y: 0, ...page.getSize() };
 }
+
+const utc = (d: Date) => d.toISOString().replace("T", " ").slice(0, 19);
 
 function addCertificate(doc: PDFDocument, font: PDFFont, bold: PDFFont, signedAt: Date, cert: CertificateInfo) {
   let page = doc.addPage([612, 792]);
@@ -133,17 +145,23 @@ function addCertificate(doc: PDFDocument, font: PDFFont, bold: PDFFont, signedAt
   row("Original file", cert.sourceName);
   row("Original SHA-256", cert.sourceHash);
   row("Envelope ID", cert.requestId);
-  row("Signer", `${cert.signer.name} <${cert.signer.email}>`);
-  if (cert.signer.company) row("Company", cert.signer.company);
-  row("Signer type", cert.signer.kind);
   if (cert.sentBy) row("Sent by", cert.sentBy);
-  row("Signed (UTC)", signedAt.toISOString().replace("T", " ").slice(0, 19));
-  y -= 8;
+  row(cert.signers.length > 1 ? "Completed (UTC)" : "Signed (UTC)", utc(signedAt));
+  y -= 6;
+  write(cert.signers.length > 1 ? "Signers" : "Signer", { f: bold, size: 11, gap: 4 });
+  cert.signers.forEach((x, i) => {
+    row(cert.signers.length > 1 ? `${i + 1}. ${x.role || "Signer"}` : "Name", `${x.name} <${x.email}>`);
+    if (x.company) row("Company", x.company);
+    row("Signer type", x.kind);
+    row("Signed (UTC)", utc(x.signedAt));
+    y -= 4;
+  });
+  y -= 4;
   write("Consent", { f: bold, size: 11, gap: 2 });
-  write(`The signer clicked "I Agree" after confirming: ${cert.consent}`, { gap: 12 });
+  write(`${cert.signers.length > 1 ? "Each signer" : "The signer"} clicked "I Agree" after confirming: ${cert.consent}`, { gap: 12 });
   write("Audit trail", { f: bold, size: 11, gap: 4 });
   for (const e of cert.events) {
-    write(`${e.at.toISOString().replace("T", " ").slice(0, 19)} UTC  ${e.action}${e.detail ? ` - ${e.detail}` : ""}`, { size: 9 });
+    write(`${utc(e.at)} UTC  ${e.action}${e.detail ? ` - ${e.detail}` : ""}`, { size: 9 });
     const meta = [e.ip && `IP ${e.ip}`, e.userAgent && e.userAgent.slice(0, 160)].filter(Boolean).join(" | ");
     if (meta) write(meta, { size: 8, color: muted, x: left + 12 });
     y -= 3;

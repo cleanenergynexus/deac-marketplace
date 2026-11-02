@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { renewLink, sendEnvelope, type SendState } from "@/app/actions/esign";
 
 export type SignerOption = { ref: string; name: string; email: string | null; company: string | null; kind: string };
@@ -57,23 +57,46 @@ function Links({ sent }: { sent: NonNullable<NonNullable<SendState>["sent"]> }) 
   return (
     <div className="space-y-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">
       {sent.map((x) => (
-        <div key={x.id} className="space-y-1">
+        <div key={`${x.id}-${x.slot}`} className="space-y-1">
           <p className="font-medium">{x.name}: {x.emailed ? `emailed to ${x.email}.` : "share this signing link:"}</p>
           <div className="flex gap-2">
             <input readOnly value={x.link} aria-label={`Signing link for ${x.name}`} className="input flex-1 bg-white py-1 font-mono text-[11px]" onFocus={(e) => e.currentTarget.select()} />
-            <button type="button" className="btn px-2 py-1" onClick={async () => { await navigator.clipboard.writeText(x.link); setCopied(x.id); }}>{copied === x.id ? "Copied ✓" : "Copy"}</button>
+            <button type="button" className="btn px-2 py-1" onClick={async () => { await navigator.clipboard.writeText(x.link); setCopied(x.link); }}>{copied === x.link ? "Copied ✓" : "Copy"}</button>
           </div>
           <a href={`/admin/signatures/${x.id}`} className="font-semibold text-brand-700">Open request →</a>
         </div>
       ))}
-      <p className="text-emerald-800">Each link is personal and works for 30 days. It isn&apos;t shown again; create a new one from the request if it gets lost. Investors can also sign from My Portal.</p>
+      <p className="text-emerald-800">Each link is personal and works for 30 days. Signers who sign later get their link by email when it&apos;s their turn. It isn&apos;t shown again; create a new one from the request if it gets lost. Investors can also sign from My Portal.</p>
     </div>
   );
 }
 
+const linksKey = (id: string) => `esign-links-${id}`;
+
+/**
+ * Links just sent from a draft. Sending turns the page read-only (the send form goes away), so the form hands the
+ * links over through this tab's session storage and they show here once.
+ */
+export function JustSentLinks({ id }: { id: string }) {
+  const [sent, setSent] = useState<NonNullable<SendState>["sent"] | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(linksKey(id));
+      if (raw) { setSent(JSON.parse(raw)); sessionStorage.removeItem(linksKey(id)); }
+    } catch {}
+  }, [id]);
+  if (!sent?.length) return null;
+  return <div className="card p-4"><h2 className="mb-2 font-semibold">Sent</h2><Links sent={sent} /></div>;
+}
+
 /** Send a draft or template to one or more signers. */
 export function SendPanel({ id, options, initial, isTemplate }: { id: string; options: SignerOption[]; initial?: string[]; isTemplate: boolean }) {
-  const [state, action, pending] = useActionState<SendState, FormData>(sendEnvelope, undefined);
+  const [state, action, pending] = useActionState<SendState, FormData>(async (prev, f) => {
+    const res = await sendEnvelope(prev, f);
+    // A sent draft turns read-only and this form unmounts, so hand the links to the page (JustSentLinks).
+    if (!isTemplate && res?.sent?.length) try { sessionStorage.setItem(linksKey(id), JSON.stringify(res.sent)); } catch {}
+    return res;
+  }, undefined);
   if (state?.sent?.length && !isTemplate) return <Links sent={state.sent} />;
   return (
     <form action={action} className="space-y-3">
@@ -87,14 +110,15 @@ export function SendPanel({ id, options, initial, isTemplate }: { id: string; op
 }
 
 /** A new signing link for an open request. */
-export function RenewLinkPanel({ id }: { id: string }) {
+export function RenewLinkPanel({ id, slot = 0, name }: { id: string; slot?: number; name?: string }) {
   const [state, action, pending] = useActionState<SendState, FormData>(renewLink, undefined);
   if (state?.sent?.length) return <Links sent={state.sent} />;
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="id" value={id} />
-      <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="email" defaultChecked /> Email the new link to the signer</label>
-      <button className="btn-ghost w-full py-1.5" disabled={pending}>{pending ? "Creating…" : "Resend / new signing link"}</button>
+      <input type="hidden" name="slot" value={slot} />
+      <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="email" defaultChecked /> Email the new link to {name ?? "the signer"}</label>
+      <button className="btn-ghost w-full py-1.5" disabled={pending}>{pending ? "Creating…" : `Resend / new signing link${name ? ` for ${name.split(" ")[0]}` : ""}`}</button>
       {state?.error && <p className="rounded bg-red-50 p-2 text-xs text-red-700">{state.error}</p>}
     </form>
   );

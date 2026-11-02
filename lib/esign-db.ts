@@ -8,7 +8,8 @@ import { recordSentEmail } from "./gmail-db";
 import { touchInterest } from "./investor-crm-db";
 import { saveGenerated, readStored } from "./storage";
 import { cleanName, uniqueName } from "./dataroom";
-import { isOpen, kindLabel, SIGNED_FOLDER, SIGNER_LABEL, SIGN_LINK_DAYS, signUrl, type SignerType, type SignValues } from "./esign";
+import type { SignatureRequest, SignatureSigner } from "@prisma/client";
+import { dueSlots, isOpen, kindLabel, parseValues, PARTY_LABEL, SIGNED_FOLDER, SIGNER_LABEL, SIGN_LINK_DAYS, signUrl, type PartyState, type SignerType, type SignValues } from "./esign";
 
 export const appUrl = () => process.env.PUBLIC_APP_URL || "https://marketplace.deacna.com";
 export const hashSignToken = (t: string) => createHash("sha256").update(t).digest("hex");
@@ -30,7 +31,7 @@ export async function logEvent(requestId: string, action: string, detail?: strin
 }
 
 export type SignerProfile = {
-  type: SignerType; id: string; name: string; email: string | null; company: string | null; title: string | null; phone: string | null;
+  type: SignerType | "TEAM"; id: string; name: string; email: string | null; company: string | null; title: string | null; phone: string | null;
   street: string | null; city: string | null; region: string | null; postalCode: string | null; country: string | null;
 };
 
@@ -46,11 +47,108 @@ export async function loadSigner(ref: string): Promise<SignerProfile | null> {
     const c = await db.contact.findUnique({ where: { id }, include: { developer: { select: { company: true } } } });
     return c && { type, id, name: c.name, email: c.email, company: c.developer.company, title: c.title, phone: c.phone ?? c.mobile, street: c.street, city: c.city, region: c.region, postalCode: c.postalCode, country: c.country };
   }
-  if (type === "AGENT") {
-    const a = await db.user.findFirst({ where: { id, role: "AGENT" } });
-    return a && { type, id, name: a.name, email: a.email, company: a.company, title: null, phone: a.phone, street: null, city: null, region: null, postalCode: null, country: null };
+  if (type === "AGENT" || type === "TEAM") {
+    const a = await db.user.findFirst({ where: { id, role: type === "AGENT" ? "AGENT" : "ADMIN" } });
+    return a && { type, id, name: a.name, email: a.email, company: a.company ?? (type === "TEAM" ? "DEAC" : null), title: null, phone: a.phone, street: null, city: null, region: null, postalCode: null, country: null };
   }
   return null;
+}
+
+/** Columns that link an additional signer to their record. */
+export const cosignerLink = (p: SignerProfile) => ({
+  signerType: p.type, userId: p.type === "TEAM" || p.type === "AGENT" ? p.id : null, investorId: p.type === "INVESTOR" ? p.id : null, contactId: p.type === "CONTACT" ? p.id : null,
+  name: p.name, email: p.email, company: p.company,
+});
+
+export const cosignerRef = (c: { signerType: string | null; userId: string | null; investorId: string | null; contactId: string | null }) =>
+  c.signerType === "INVESTOR" ? `INVESTOR:${c.investorId}` : c.signerType === "CONTACT" ? `CONTACT:${c.contactId}` : (c.signerType === "TEAM" || c.signerType === "AGENT") && c.userId ? `${c.signerType}:${c.userId}` : "";
+
+/** Everyone who signs a request, in signing order. Slot 0 is the recipient on the request itself. */
+export type Party = PartyState & {
+  role: string; name: string; email: string | null; company: string | null; kind: string; ref: string;
+  status: "WAITING" | "SENT" | "VIEWED" | "SIGNED" | "DECLINED"; issued: boolean; viewedAt: Date | null; signedAt: Date | null; values: SignValues;
+  cosigner: SignatureSigner | null;
+};
+
+export function partiesOf(r: SignatureRequest, cosigners: SignatureSigner[]): Party[] {
+  const recipientSigned = !!r.recipientSignedAt || r.status === "SIGNED";
+  const cosignerDeclined = cosigners.some((c) => c.status === "DECLINED");
+  const recipientIssued = !!(r.recipientSentAt || r.tokenHash);
+  const recipient: Party = {
+    slot: 0, order: r.signOrder, signed: recipientSigned, role: cosigners.length ? "Recipient" : "Signer", name: r.signerName ?? "Recipient", email: r.signerEmail, company: r.signerCompany,
+    kind: signerKindLabel(r.signerType), ref: signerRef(r), issued: recipientIssued, viewedAt: r.viewedAt, signedAt: r.recipientSignedAt ?? (r.status === "SIGNED" ? r.signedAt : null), values: parseValues(r.values),
+    status: recipientSigned ? "SIGNED" : r.status === "DECLINED" && !cosignerDeclined ? "DECLINED" : !recipientIssued ? "WAITING" : r.viewedAt ? "VIEWED" : "SENT", cosigner: null,
+  };
+  const rest: Party[] = cosigners.map((c) => ({
+    slot: c.slot, order: c.signOrder, signed: c.status === "SIGNED", role: c.role, name: c.name ?? `(${c.role})`, email: c.email, company: c.company, kind: c.signerType ? (PARTY_LABEL[c.signerType] ?? "Signer") : "Not chosen yet",
+    ref: cosignerRef(c), issued: c.status !== "WAITING", viewedAt: c.viewedAt, signedAt: c.signedAt, values: parseValues(c.values), status: c.status as Party["status"], cosigner: c,
+  }));
+  return [recipient, ...rest].sort((a, b) => a.order - b.order || a.slot - b.slot);
+}
+
+export async function loadParties(r: SignatureRequest) {
+  return partiesOf(r, await db.signatureSigner.findMany({ where: { requestId: r.id }, orderBy: { slot: "asc" } }));
+}
+
+/** Copies a template's (or draft's) additional signers onto a new request. */
+export async function copyCosigners(fromId: string, toId: string) {
+  const cs = await db.signatureSigner.findMany({ where: { requestId: fromId } });
+  if (!cs.length) return;
+  await db.signatureSigner.createMany({
+    data: cs.map((c) => ({ requestId: toId, slot: c.slot, role: c.role, signOrder: c.signOrder, signerType: c.signerType, userId: c.userId, investorId: c.investorId, contactId: c.contactId, name: c.name, email: c.email, company: c.company })),
+  });
+}
+
+export type SentLink = { id: string; slot: number; name: string; email: string | null; link: string; emailed: boolean };
+
+/** Who signing emails come from when nobody on the team pressed a button (e.g. the previous signer just signed). */
+async function senderOf(r: { createdById: string | null }) {
+  const u = r.createdById ? await db.user.findFirst({ where: { id: r.createdById, role: "ADMIN" }, select: { id: true, name: true } }) : null;
+  return u ?? { id: null, name: "The DEAC team" };
+}
+
+/**
+ * Sends signing links to whoever's turn it is and hasn't had a link yet (everyone with the lowest signing order
+ * still unsigned). DEAC team members also get a task. Returns the links, for the team to copy.
+ */
+export async function sendDueLinks(requestId: string, opts: { from?: { id: string | null; name: string }; skipRecipient?: boolean } = {}): Promise<SentLink[]> {
+  const r = await db.signatureRequest.findUnique({ where: { id: requestId } });
+  if (!r || !isOpen(r.status)) return [];
+  const parties = await loadParties(r);
+  const due = new Set(dueSlots(parties));
+  const from = opts.from ?? (await senderOf(r));
+  // Sent by a team member pressing Send: their IP goes on the audit trail. Otherwise it went out automatically.
+  const meta = opts.from ? await requestMeta().catch(() => undefined) : undefined;
+  const auto = opts.from ? "" : ", automatically when it was their turn";
+  const out: SentLink[] = [];
+  for (const p of parties) {
+    if (!due.has(p.slot) || p.issued) continue;
+    if (p.slot === 0) {
+      await db.signatureRequest.update({ where: { id: r.id }, data: { recipientSentAt: new Date() } });
+      if (opts.skipRecipient) continue;
+      const link = await issueLink(r.id);
+      const emailed = await emailSignLink(r, link, from);
+      await logEvent(r.id, "SENT", `To ${p.name} <${p.email}>${emailed ? " by email" : " (link shared by the team)"}${auto}`, from.name, meta);
+      out.push({ id: r.id, slot: 0, name: p.name, email: p.email, link, emailed });
+      continue;
+    }
+    const c = p.cosigner!;
+    const { token, hash, expiresAt } = newSignToken();
+    await db.signatureSigner.update({ where: { id: c.id }, data: { status: "SENT", sentAt: new Date(), tokenHash: hash, tokenExpiresAt: expiresAt } });
+    const link = signUrl(appUrl(), token);
+    const emailed = await emailSignLink(
+      { title: r.title, kind: r.kind, message: r.message, signerName: c.name, signerEmail: c.email, investorId: c.investorId, contactId: c.contactId, agentId: c.signerType === "AGENT" ? c.userId : null, projectId: r.projectId },
+      link, from,
+    );
+    if (c.signerType === "TEAM" && c.userId) {
+      await db.activity.create({
+        data: { kind: "TASK", subject: `Sign: ${r.title}`, body: `Your signature (${c.role}) is needed on "${r.title}"${r.signerName ? ` with ${r.signerName}` : ""}.\n\nSign it here: /admin/signatures/${r.id}/sign`, investorId: r.investorId, contactId: r.contactId, projectId: r.projectId, assigneeId: c.userId, by: "E-signature", dueAt: new Date() },
+      });
+    }
+    await logEvent(r.id, "SENT", `To ${p.name} <${p.email}> (${c.role})${emailed ? " by email" : " (link shared by the team)"}${auto}`, from.name, meta);
+    out.push({ id: r.id, slot: c.slot, name: p.name, email: p.email, link, emailed });
+  }
+  return out;
 }
 
 /** Columns that link a request to its signer. */
@@ -129,7 +227,7 @@ export async function applySignedEffects(r: Signed, by: string): Promise<string 
 export async function emailSignLink(
   r: { title: string; kind: string; message: string | null; signerName: string | null; signerEmail: string | null; investorId: string | null; contactId: string | null; agentId: string | null; projectId: string | null },
   link: string,
-  from: { id: string; name: string },
+  from: { id: string | null; name: string },
 ) {
   if (!r.signerEmail) return false;
   const first = (r.signerName ?? "").split(" ")[0] || "there";
@@ -158,34 +256,55 @@ export async function readPdf(key: string) {
 
 type Ref = { token?: string | null; id?: string | null };
 
+export type SignerMatch = { request: SignatureRequest; slot: number; cosigner: SignatureSigner | null; expired: boolean; viaLogin: boolean };
+
 /**
- * The request a signer may act on: by the emailed link's token, or by id for the signed-in investor or agent it
- * was sent to. Returns null when neither matches.
+ * The request a signer may act on, and which signer they are: by the emailed link's token, or by id for a signed-in
+ * investor, agent or team member it was sent to. Returns null when neither matches.
  */
-export async function findForSigner(ref: Ref) {
+export async function findForSigner(ref: Ref): Promise<SignerMatch | null> {
+  const now = new Date();
   if (ref.token) {
-    const r = await db.signatureRequest.findFirst({ where: { tokenHash: hashSignToken(ref.token), isTemplate: false } });
-    if (!r) return null;
-    if (isOpen(r.status) && r.tokenExpiresAt && r.tokenExpiresAt < new Date()) return { request: r, expired: true as const, viaLogin: false };
-    return { request: r, expired: false as const, viaLogin: false };
+    const hash = hashSignToken(ref.token);
+    const r = await db.signatureRequest.findFirst({ where: { tokenHash: hash, isTemplate: false } });
+    if (r) return { request: r, slot: 0, cosigner: null, expired: isOpen(r.status) && !!r.tokenExpiresAt && r.tokenExpiresAt < now, viaLogin: false };
+    const c = await db.signatureSigner.findFirst({ where: { tokenHash: hash }, include: { request: true } });
+    if (!c || c.request.isTemplate) return null;
+    const { request, ...cosigner } = c;
+    return { request, slot: c.slot, cosigner, expired: isOpen(request.status) && !!c.tokenExpiresAt && c.tokenExpiresAt < now, viaLogin: false };
   }
   if (!ref.id) return null;
   const u = await currentUser();
   if (!u) return null;
   const r = await db.signatureRequest.findFirst({ where: { id: ref.id, isTemplate: false } });
   if (!r) return null;
-  const mine = (u.investorId && r.investorId === u.investorId) || (u.role === "AGENT" && r.agentId === u.id);
-  return mine ? { request: r, expired: false as const, viaLogin: true } : null;
+  const cosigners = await db.signatureSigner.findMany({ where: { requestId: r.id } });
+  const parties = partiesOf(r, cosigners);
+  const mine = parties.filter((p) =>
+    p.slot === 0
+      ? (u.investorId && r.investorId === u.investorId) || (u.role === "AGENT" && r.agentId === u.id)
+      : (p.cosigner!.userId && p.cosigner!.userId === u.id) || (u.investorId && p.cosigner!.investorId === u.investorId),
+  );
+  if (!mine.length) return null;
+  const due = dueSlots(parties);
+  const pick = mine.find((p) => due.includes(p.slot)) ?? mine.find((p) => !p.signed) ?? mine[0];
+  return { request: r, slot: pick.slot, cosigner: pick.cosigner, expired: false, viaLogin: true };
 }
 
-/** First open of the signing page (called while rendering it, so no cache refresh here). */
-export async function markViewed(ref: Ref) {
-  const found = await findForSigner(ref);
-  if (!found || found.expired || found.request.status !== "SENT") return;
+/** First open of the signing page by this signer (called while rendering it, so no cache refresh here). */
+export async function markViewed(found: SignerMatch) {
+  if (found.expired) return;
+  const meta = await requestMeta();
+  const how = found.viaLogin ? "Opened while signed in" : "Opened from the signing link";
+  if (found.cosigner) {
+    const done = await db.signatureSigner.updateMany({ where: { id: found.cosigner.id, status: "SENT" }, data: { status: "VIEWED", viewedAt: new Date() } });
+    if (done.count) await logEvent(found.request.id, "VIEWED", `${how} (${found.cosigner.role})`, found.cosigner.name, meta);
+    return;
+  }
+  if (found.request.status !== "SENT") return;
   await db.signatureRequest.update({ where: { id: found.request.id }, data: { status: "VIEWED", viewedAt: new Date() } });
-  await logEvent(found.request.id, "VIEWED", found.viaLogin ? "Opened from their portal" : "Opened from the signing link", found.request.signerName, await requestMeta());
+  await logEvent(found.request.id, "VIEWED", how, found.request.signerName, meta);
 }
-
 
 /** The NDA template investors sign from a listing: the listing's own, else a default one with no listing. */
 export async function listingNdaTemplate(projectId: string) {
@@ -207,6 +326,12 @@ export async function loadSignerOptions() {
     ...contacts.map((c) => ({ ref: `CONTACT:${c.id}`, name: c.name, email: c.email, company: c.developer.company, kind: SIGNER_LABEL.CONTACT })),
     ...agents.map((a) => ({ ref: `AGENT:${a.id}`, name: a.name, email: a.email, company: a.company, kind: SIGNER_LABEL.AGENT })),
   ];
+}
+
+/** DEAC team members, for countersignatures. */
+export async function teamOptions() {
+  const us = await db.user.findMany({ where: { role: "ADMIN" }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } });
+  return us.map((u) => ({ ref: `TEAM:${u.id}`, name: u.name, email: u.email, company: "DEAC", kind: PARTY_LABEL.TEAM }));
 }
 
 /** Listings for pickers: "DEAC-TX-001 · Title". */

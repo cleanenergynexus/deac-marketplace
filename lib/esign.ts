@@ -16,6 +16,8 @@ export const isDocKind = (v: unknown): v is DocKind => DOC_KINDS.some((d) => d.v
 export const SIGNER_TYPES = ["INVESTOR", "CONTACT", "AGENT"] as const;
 export type SignerType = (typeof SIGNER_TYPES)[number];
 export const SIGNER_LABEL: Record<SignerType, string> = { INVESTOR: "Investor", CONTACT: "Developer contact", AGENT: "Referral agent" };
+/** Additional signers can also be DEAC team members (e.g. a countersignature). */
+export const PARTY_LABEL: Record<string, string> = { ...SIGNER_LABEL, TEAM: "DEAC team" };
 
 export const STATUS_LABEL: Record<string, string> = {
   TEMPLATE: "Template", DRAFT: "Draft", SENT: "Sent", VIEWED: "Viewed", SIGNED: "Signed", DECLINED: "Declined", VOIDED: "Voided",
@@ -52,7 +54,9 @@ export const FIELD_TYPES = {
 export type FieldType = keyof typeof FIELD_TYPES;
 export const isFieldType = (v: unknown): v is FieldType => typeof v === "string" && Object.hasOwn(FIELD_TYPES, v);
 
-export type SignField = { id: string; type: FieldType; page: number; x: number; y: number; w: number; h: number; required: boolean; label?: string };
+/** `signer` is who fills the field: 0 (or missing) = the recipient, 1..9 = an additional signer's slot. */
+export type SignField = { id: string; type: FieldType; page: number; x: number; y: number; w: number; h: number; required: boolean; label?: string; signer?: number };
+export const MAX_SIGNERS = 9;
 
 /** Everything the signer entered. Signature and initials are PNG data URLs; custom fields are keyed by field id. */
 export type SignValues = Partial<Record<ProfileKey, string>> & { signature?: string; initials?: string; custom?: Record<string, string> };
@@ -77,7 +81,12 @@ export function normalizeFields(raw: unknown, pageCount: number): SignField[] {
     while (ids.has(id)) id += "x";
     ids.add(id);
     const label = typeof o.label === "string" ? o.label.trim().slice(0, 80) : "";
-    out.push({ id, type: o.type, page, x: clamp(num(o.x, 0), 0, 1 - w), y: clamp(num(o.y, 0), 0, 1 - h), w, h, required: o.required !== false && o.type !== "CHECKBOX" ? true : o.required === true, ...(label ? { label } : {}) });
+    const signer = Math.trunc(num(o.signer, 0));
+    out.push({
+      id, type: o.type, page, x: clamp(num(o.x, 0), 0, 1 - w), y: clamp(num(o.y, 0), 0, 1 - h), w, h,
+      required: o.required !== false && o.type !== "CHECKBOX" ? true : o.required === true, ...(label ? { label } : {}),
+      ...(signer >= 1 && signer <= MAX_SIGNERS ? { signer } : {}),
+    });
   }
   return out;
 }
@@ -92,6 +101,34 @@ export function parseValues(json: string | null | undefined): SignValues {
     return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   } catch { return {}; }
 }
+
+/** The fields one signer fills (slot 0 = the recipient). */
+export const fieldsFor = (fields: SignField[], slot: number) => fields.filter((f) => (f.signer ?? 0) === slot);
+
+/** Where each signer stands. Slot 0 is the recipient; lower order signs first, equal orders sign together. */
+export type PartyState = { slot: number; order: number; signed: boolean };
+
+/** The signers whose turn it is now (nobody once everyone has signed). */
+export function dueSlots(parties: PartyState[]): number[] {
+  const waiting = parties.filter((p) => !p.signed);
+  if (!waiting.length) return [];
+  const next = Math.min(...waiting.map((p) => p.order));
+  return waiting.filter((p) => p.order === next).map((p) => p.slot);
+}
+export const allSigned = (parties: PartyState[]) => parties.every((p) => p.signed);
+
+/** "1st", "2nd"... for the signing order pickers. */
+export const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th"}`;
+
+/** Colours that tell the signers apart in the editor and on the signing page (slot 0 = recipient). */
+export const SIGNER_COLORS = [
+  "border-brand-500 bg-brand-100/70 text-brand-700",
+  "border-violet-500 bg-violet-100/70 text-violet-900",
+  "border-emerald-500 bg-emerald-100/70 text-emerald-900",
+  "border-rose-500 bg-rose-100/70 text-rose-900",
+  "border-cyan-500 bg-cyan-100/70 text-cyan-900",
+];
+export const signerColor = (slot: number) => SIGNER_COLORS[slot % SIGNER_COLORS.length];
 
 /** What the signing panel asks for, given the fields on the document. Full name is always asked (audit trail). */
 export function panelFor(fields: SignField[]) {
