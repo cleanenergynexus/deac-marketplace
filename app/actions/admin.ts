@@ -117,7 +117,7 @@ export async function setInvestorStage(f: FormData) {
     const wasPending = inv.user.status !== "APPROVED";
     await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
     if (wasPending)
-      await sendEmail({ to: inv.email, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— DEAC Team` });
+      await sendEmail({ to: inv.email, toName: inv.name, fromUserId: admin.id, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— ${admin.name}, DEAC` });
   }
   if (inv.user && stage === "DECLINED") await db.user.update({ where: { id: inv.user.id }, data: { status: "REJECTED" } });
   revalidatePath(`/admin/investors/${id}`);

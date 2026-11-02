@@ -9,7 +9,7 @@ export function InvitePanel({ investorId, label }: { investorId: string; label: 
   if (state?.link) {
     return (
       <div className="space-y-2 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">
-        <p className="font-medium">{state.name} is approved. {state.emailed ? "We emailed them this link." : "Send them this link to set a password:"}</p>
+        <p className="font-medium">{state.name} is approved. {state.emailed ? (state.from ? `We emailed them this link from your Gmail (${state.from}).` : "We emailed them this link.") : "Send them this link to set a password:"}</p>
         <input readOnly value={state.link} aria-label="Invite link" className="input w-full bg-white py-1 font-mono text-[11px]" onFocus={(e) => e.currentTarget.select()} />
         <button type="button" className="btn w-full py-1" onClick={async () => { await navigator.clipboard.writeText(state.link!); setCopied(true); }}>{copied ? "Copied ✓" : "Copy invite link"}</button>
         <p className="text-emerald-800">The link works once and expires in 14 days. It isn&apos;t shown again; create a new one if it gets lost.</p>
