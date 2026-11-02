@@ -43,6 +43,8 @@ model User {
   inviteTokenHash String?
   inviteExpiresAt DateTime?
   signatures   SignatureRequest[] @relation("AgentSignatures")
+  gmail        GmailAccount?
+  agentActivities Activity[] @relation("AgentActivities")
   createdAt    DateTime @default(now())
 
   @@index([inviteTokenHash])
@@ -445,10 +447,37 @@ model Activity {
   assigneeId  String? // tasks: team member responsible. Null = unassigned (only Admins see these)
   assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   by          String?
+  agentId     String? // referral agent this touchpoint was with (emails pulled from Gmail)
+  agent       User?      @relation("AgentActivities", fields: [agentId], references: [id], onDelete: Cascade)
+  // Emails sent or pulled through a team member's linked Gmail (lib/gmail-db.ts). Hidden from referral agents.
+  mailbox        String? // the Gmail address the email came from
+  gmailMessageId String? // Gmail's id in that mailbox
+  gmailThreadId  String?
+  emailMessageId String? // the email's Message-ID header, the same in every mailbox (stops duplicates when two of the team were on it)
   createdAt   DateTime   @default(now()) // when it happened (can be back-dated when logging)
 
   @@index([contactId])
   @@index([assigneeId])
+  @@index([agentId])
+  @@index([gmailMessageId])
+  @@index([emailMessageId])
+}
+
+// A team member's linked Gmail (My account → Gmail). Tokens are encrypted with GMAIL_TOKEN_KEY (lib/secret-box.ts).
+model GmailAccount {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email           String
+  refreshToken    String // encrypted
+  accessToken     String? // encrypted
+  accessExpiresAt DateTime?
+  scope           String    @default("")
+  lastSyncAt      DateTime?
+  lastSyncError   String?
+  lastSyncAdded   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // ---------- Outreach ----------

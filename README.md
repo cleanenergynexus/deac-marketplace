@@ -65,7 +65,7 @@ Only `/embed/*` may be framed (by deacna.com); everything else sends `X-Frame-Op
 1. **Vercel:** Add New → Project → import `cleanenergynexus/deac-marketplace`.
 2. **Database:** in the Vercel project, Storage → add a Neon Postgres database. This sets `DATABASE_URL`.
 3. **Data room file storage:** Storage → Create → **Blob**, choose **Private** access, connect it to the project. This sets `BLOB_READ_WRITE_TOKEN`.
-4. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard and the Document Wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`.
+4. **Environment variables:** `SESSION_SECRET` (long random string), `PUBLIC_APP_URL=https://marketplace.deacna.com`, `SETUP_TOKEN` (one-time code), `ANTHROPIC_API_KEY` (for the project import wizard and the Document Wizard), and optionally `RESEND_API_KEY` + `OUTREACH_FROM`, and the Gmail variables (see "Gmail" below).
 5. **Deploy.** The build creates the database tables automatically.
 6. **First admin:** open `/setup` on the live site, enter the `SETUP_TOKEN`, and create your login (the page shuts off once an admin exists; then delete `SETUP_TOKEN`). Add the rest of your staff under **Admin → Team**. Alternative from a terminal: `npm run create-admin -- you@deacna.com "Your Name" "strong-password"`.
 7. **Domain:** Vercel → Settings → Domains → add `marketplace.deacna.com`, then add the CNAME record Vercel shows at your DNS provider for deacna.com.
@@ -109,3 +109,21 @@ Outside agents who bring developers and investors to DEAC. **Team → Referral a
 - **Data room:** upload only. Agents never open the internal data room; they see the files they uploaded. Like investors, they can open only documents shared on a live listing, at their level (Teaser documents everywhere, all documents on listings they originated).
 - **View as agent** (on Team → Referral agents) opens an agent's portal exactly as they see it, without their password and without signing you out. It's read-only (forms and uploads don't save) and ends with **Exit preview** or after 2 hours.
 - Partners add a phone number and a meeting booking link under **My account**; agents see them on their portal. Rules live in `lib/agents.ts`.
+
+## Gmail (My account → Gmail)
+
+Each team member can link their own Gmail under **My account**. Once linked:
+
+- **Sending:** e-signature requests and **Send email** in a contact's Activity box go out from their Gmail (they show in their Sent folder, replies land in their inbox). Without a linked Gmail the app falls back to Resend (`OUTREACH_FROM`, with Reply-To set to the team member); without `RESEND_API_KEY` either, nothing is sent and **Send email** is hidden.
+- **Pulling:** emails with investor contacts, developer contacts and referral agents (matched by email address, From/To/Cc) are copied onto their timeline as Email sent / Email received, with an **Open in Gmail** link. The first sync goes back `GMAIL_SYNC_DAYS` (default 90) days; after that, a nightly Vercel Cron job (`vercel.json`, 11:00 UTC) syncs every linked mailbox, **Sync now** runs it on demand, and opening a contact's record pulls their latest 50 emails. Quoted reply text is dropped; attachments are listed by name, not copied. The same email in two team members' mailboxes is filed once (by its Message-ID).
+- Synced emails are visible to the team on the record, never to referral agents. Tokens are stored encrypted (AES-256-GCM with `GMAIL_TOKEN_KEY`, `lib/secret-box.ts`). **Unlink Gmail** revokes the token at Google; emails already filed stay.
+
+Google Cloud setup (once, by a Google Workspace admin):
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → create a project (e.g. "DEAC Marketplace").
+2. **APIs & Services → Library → Gmail API → Enable.**
+3. **Google Auth Platform → Branding:** app name "DEAC Marketplace", support email, authorized domain `deacna.com`. **Audience:** User type **Internal** (only accounts in your Google Workspace can link; no Google review needed). **Data access → Add scopes:** `openid`, `.../auth/userinfo.email`, `.../auth/gmail.readonly`, `.../auth/gmail.send`.
+4. **Clients → Create client → Web application.** Authorized redirect URI: `https://marketplace.deacna.com/api/google/callback` (add `http://localhost:3000/api/google/callback` for local testing).
+5. Vercel → Settings → Environment Variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY` (`openssl rand -base64 32`; changing it later means everyone links again), `CRON_SECRET` (any long random string; Vercel sends it to the cron job). Optional `GMAIL_SYNC_DAYS`. Redeploy.
+
+If team members use addresses outside your Workspace, the app must be **External**: while it's in Testing, add each person as a test user (their link expires every 7 days); publishing an External app with `gmail.readonly` requires Google's verification and a yearly security assessment.

@@ -3,7 +3,7 @@ import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
-import { agentContactWhere, contactActivityWhere } from "@/lib/agents";
+import { agentContactWhere, contactActivityWhere, PUBLIC_TO_AGENTS } from "@/lib/agents";
 import { AGENT_LINKS, getPartner, meetingOptions } from "@/lib/agent-portal";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Avatar, CrmIcon } from "@/components/CrmIcons";
@@ -34,7 +34,7 @@ export default async function AgentContact({ params, searchParams }: { params: P
     getPartner(me.partnerId),
     meetingOptions(me.id),
     db.activity.findMany({
-      where: contactActivityWhere(contact),
+      where: { AND: [contactActivityWhere(contact), PUBLIC_TO_AGENTS] },
       include: { project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     }),

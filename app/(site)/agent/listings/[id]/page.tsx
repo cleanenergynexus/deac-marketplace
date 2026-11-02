@@ -3,7 +3,7 @@ import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { agentView } from "@/lib/auth";
-import { agentContactWhere, agentProjectWhere } from "@/lib/agents";
+import { agentContactWhere, agentProjectWhere, PUBLIC_TO_AGENTS } from "@/lib/agents";
 import { AGENT_LINKS } from "@/lib/agent-portal";
 import { blobUploadMethod, storageMode } from "@/lib/storage";
 import { folderPath, formatBytes } from "@/lib/dataroom";
@@ -39,7 +39,7 @@ export default async function AgentListing({ params, searchParams }: { params: P
     getPipeline(),
     db.activity.findMany({
       // Developer-side entries only: investor activity on the listing belongs to those investors.
-      where: { projectId: id, developerId: p.developerId },
+      where: { projectId: id, developerId: p.developerId, ...PUBLIC_TO_AGENTS },
       include: { contact: { select: { id: true, name: true } }, assignee: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
       take: 30,

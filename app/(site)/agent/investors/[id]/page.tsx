@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PUBLIC_TO_AGENTS } from "@/lib/agents";
 import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -33,7 +34,7 @@ export default async function AgentInvestor({ params, searchParams }: { params: 
     getPartner(me.partnerId),
     meetingOptions(me.id),
     db.activity.findMany({
-      where: { investorId: id },
+      where: { investorId: id, ...PUBLIC_TO_AGENTS },
       include: { project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     }),

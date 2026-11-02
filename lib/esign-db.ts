@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { db } from "./db";
 import { currentUser } from "./auth";
 import { sendEmail } from "./email";
+import { recordSentEmail } from "./gmail-db";
 import { touchInterest } from "./investor-crm-db";
 import { saveGenerated, readStored } from "./storage";
 import { cleanName, uniqueName } from "./dataroom";
@@ -121,16 +122,24 @@ export async function applySignedEffects(r: Signed, by: string): Promise<string 
   return r.autoApprove ? `LOI for ${p?.code} accepted` : `LOI for ${p?.code} waiting for review`;
 }
 
-/** Emails the signing link. Returns whether it actually went out (without RESEND_API_KEY it's only logged). */
-export async function emailSignLink(r: { title: string; kind: string; message: string | null; signerName: string | null; signerEmail: string | null }, link: string, from: string) {
+/**
+ * Emails the signing link from the sender's own Gmail when they linked it (else through Resend, replies to them), and
+ * puts the email on the signer's timeline. Returns whether it actually went out (without Gmail or RESEND_API_KEY it's only logged).
+ */
+export async function emailSignLink(
+  r: { title: string; kind: string; message: string | null; signerName: string | null; signerEmail: string | null; investorId: string | null; contactId: string | null; agentId: string | null; projectId: string | null },
+  link: string,
+  from: { id: string; name: string },
+) {
   if (!r.signerEmail) return false;
   const first = (r.signerName ?? "").split(" ")[0] || "there";
-  const mail = await sendEmail({
-    to: r.signerEmail,
-    subject: `Please sign: ${r.title}`,
-    text: `Hi ${first},\n\n${from} at DEAC sent you a ${kindLabel(r.kind)} to review and sign: ${r.title}.${r.message ? `\n\n${r.message}` : ""}\n\nReview and sign here (the link is personal to you and works for ${SIGN_LINK_DAYS} days):\n${link}\n\n— DEAC Team`,
-  });
-  return mail.status === "SENT";
+  const subject = `Please sign: ${r.title}`;
+  const text = `Hi ${first},\n\n${from.name} at DEAC sent you a ${kindLabel(r.kind)} to review and sign: ${r.title}.${r.message ? `\n\n${r.message}` : ""}\n\nReview and sign here (the link is personal to you and works for ${SIGN_LINK_DAYS} days):\n${link}\n\n— ${from.name}, DEAC`;
+  const mail = await sendEmail({ to: r.signerEmail, toName: r.signerName, subject, text, fromUserId: from.id });
+  if (mail.status !== "SENT") return false;
+  // The signing link is personal, so the timeline keeps the email without it.
+  await recordSentEmail(r, { subject, text: text.replace(link, "[signing link]"), by: from.name, projectId: r.projectId, gmail: mail.gmail });
+  return true;
 }
 
 /** Sets a fresh signing link on a request and returns it (only the hash is stored). */

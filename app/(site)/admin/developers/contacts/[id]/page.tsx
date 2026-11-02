@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { deleteContact, makePrimaryContact, setProjectContact, updateContact } from "@/app/actions/contacts";
 import { ActivityComposer } from "@/components/ActivityComposer";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { GmailRecordSync } from "@/components/GmailPanel";
+import { getGmailAccount } from "@/lib/gmail-db";
 import { ContactForm } from "@/components/ContactForm";
 import { Avatar, CrmIcon } from "@/components/CrmIcons";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -130,7 +132,8 @@ export default async function ContactRecord({ params, searchParams }: { params: 
             </Link>
           ))}
         </nav>
-        <ActivityComposer key={tab.value} contactId={id} contactEmail={contact.email} initialKind={tab.log} projects={dev.projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))} assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
+        <GmailRecordSync contactId={id} />
+        <ActivityComposer key={tab.value} contactId={id} contactEmail={contact.email} sendFrom={{ gmail: (await getGmailAccount(me.id))?.email ?? null, resend: !!process.env.RESEND_API_KEY }} initialKind={tab.log} projects={dev.projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))} assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
         <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} empty={tab.value === "activity" ? `Nothing logged with ${contact.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
       </main>
 
