@@ -39,7 +39,7 @@ export async function inviteInvestor(_: InviteState, f: FormData): Promise<Invit
   // From the inviter's own Gmail when they linked it under My account (else DEAC's address, replies to them).
   const subject = "You're invited to the DEAC Marketplace";
   const text = `Hi ${inv.name.split(" ")[0]},\n\n${admin.name} has invited you to the DEAC private investor marketplace. Your membership is already approved.\n\nSet your password and sign in here (link valid for ${INVITE_DAYS} days):\n${link}\n\n— ${admin.name}, DEAC`;
-  const mail = await sendEmail({ to: inv.email, toName: inv.name, subject, text, fromUserId: admin.id });
+  const mail = await sendEmail({ to: inv.email, toName: inv.name, subject, text, fromUserId: admin.id, investorId: inv.id });
   // The timeline keeps the email without the one-time link.
   if (mail.status === "SENT") await recordSentEmail({ investorId: inv.id }, { subject, text: text.replace(link, "[invite link]"), by: admin.name, gmail: mail.gmail });
   revalidatePath(`/admin/investors/${inv.id}`);

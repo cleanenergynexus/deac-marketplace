@@ -135,7 +135,7 @@ export async function emailSignLink(
   const first = (r.signerName ?? "").split(" ")[0] || "there";
   const subject = `Please sign: ${r.title}`;
   const text = `Hi ${first},\n\n${from.name} at DEAC sent you a ${kindLabel(r.kind)} to review and sign: ${r.title}.${r.message ? `\n\n${r.message}` : ""}\n\nReview and sign here (the link is personal to you and works for ${SIGN_LINK_DAYS} days):\n${link}\n\n— ${from.name}, DEAC`;
-  const mail = await sendEmail({ to: r.signerEmail, toName: r.signerName, subject, text, fromUserId: from.id });
+  const mail = await sendEmail({ to: r.signerEmail, toName: r.signerName, subject, text, fromUserId: from.id, investorId: r.investorId });
   if (mail.status !== "SENT") return false;
   // The signing link is personal, so the timeline keeps the email without it.
   await recordSentEmail(r, { subject, text: text.replace(link, "[signing link]"), by: from.name, projectId: r.projectId, gmail: mail.gmail });

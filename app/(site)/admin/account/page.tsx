@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/ActionForm";
 import { Field, PageHeader, Section } from "@/components/ui";
 import { GmailPanel } from "@/components/GmailPanel";
 import { getGmailAccount, gmailSetupMissing } from "@/lib/gmail-db";
+import { saveMySignature } from "@/app/actions/gmail";
 
 export const dynamic = "force-dynamic";
 // "Sync now" can take a while on a full mailbox.
@@ -34,6 +35,17 @@ export default async function Account({ searchParams }: { searchParams: Promise<
           linked={linked && { email: linked.email, lastSyncAt: linked.lastSyncAt, lastSyncError: linked.lastSyncError, lastSyncAdded: linked.lastSyncAdded }}
           missing={gmailSetupMissing()}
         />
+      </Section>
+      <Section title="Email signature">
+        <p className="mb-3 text-sm text-slate-600">
+          Ends the emails the marketplace sends for you: invites, signature requests, approvals and emails from a contact&apos;s Activity. It replaces the
+          standard &quot;— {me?.name}, DEAC&quot; line. Leave it empty to keep that line.
+        </p>
+        <ActionForm action={saveMySignature} submitLabel="Save signature" success="Signature saved. Your next emails will use it." className="grid max-w-xl gap-4">
+          <Field label="Signature">
+            <textarea name="signature" rows={5} defaultValue={me?.emailSignature ?? ""} className="input font-sans" placeholder={`${me?.name ?? "Your name"}\nManaging Partner, DEAC\n+1 (555) 555-5555 · deacna.com`} />
+          </Field>
+        </ActionForm>
       </Section>
       <Section title="Contact details for referral agents">
         <p className="mb-3 text-sm text-slate-600">Referral agents you partner with see these on their portal, so they can call you or book a meeting.</p>

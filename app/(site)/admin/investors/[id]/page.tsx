@@ -193,7 +193,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
           <div className="card p-5">
             {emailError && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{EMAIL_ERRORS[emailError] ?? EMAIL_ERRORS.invalid} Nothing was saved.</p>}
             {(login === "INVITED" || login === "INVITE_EXPIRED") && <p className="mb-4 rounded bg-amber-50 p-3 text-sm text-amber-900">{firstName} has an unused invite. If you correct the email, create a new invite link afterwards and send it to the new address.</p>}
-            <InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} /></div>
+            <InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} team={team.map((u) => u.name)} /></div>
         ) : (
           <>
             <GmailRecordSync investorId={id} />
