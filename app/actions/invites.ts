@@ -6,9 +6,10 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { hashPassword, requireAdmin, startSession } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
+import { recordSentEmail } from "@/lib/gmail-db";
 import { hashInviteToken, inviteExpired, inviteUrl, INVITE_DAYS, loginState, newInvite, stageAfterInvite } from "@/lib/invites";
 
-export type InviteState = { error?: string; link?: string; emailed?: boolean; name?: string } | undefined;
+export type InviteState = { error?: string; link?: string; emailed?: boolean; from?: string; name?: string } | undefined;
 
 const appUrl = () => process.env.PUBLIC_APP_URL || "https://marketplace.deacna.com";
 
@@ -35,14 +36,15 @@ export async function inviteInvestor(_: InviteState, f: FormData): Promise<Invit
   await db.activity.create({ data: { investorId: inv.id, kind: "SYSTEM", by: admin.name, body: `${state === "NONE" ? "Invited" : "Re-invited"} to the marketplace by ${admin.name} (approved, no access request).${stage !== inv.stage ? ` Stage → ${stage}` : ""}` } });
 
   const link = inviteUrl(appUrl(), token);
-  const mail = await sendEmail({
-    to: inv.email,
-    subject: "You're invited to the DEAC Marketplace",
-    text: `Hi ${inv.name.split(" ")[0]},\n\n${admin.name} has invited you to the DEAC private investor marketplace. Your membership is already approved.\n\nSet your password and sign in here (link valid for ${INVITE_DAYS} days):\n${link}\n\n— DEAC Team`,
-  });
+  // From the inviter's own Gmail when they linked it under My account (else DEAC's address, replies to them).
+  const subject = "You're invited to the DEAC Marketplace";
+  const text = `Hi ${inv.name.split(" ")[0]},\n\n${admin.name} has invited you to the DEAC private investor marketplace. Your membership is already approved.\n\nSet your password and sign in here (link valid for ${INVITE_DAYS} days):\n${link}\n\n— ${admin.name}, DEAC`;
+  const mail = await sendEmail({ to: inv.email, toName: inv.name, subject, text, fromUserId: admin.id });
+  // The timeline keeps the email without the one-time link.
+  if (mail.status === "SENT") await recordSentEmail({ investorId: inv.id }, { subject, text: text.replace(link, "[invite link]"), by: admin.name, gmail: mail.gmail });
   revalidatePath(`/admin/investors/${inv.id}`);
   revalidatePath("/admin", "layout");
-  return { link, emailed: mail.status === "SENT", name: inv.name };
+  return { link, emailed: mail.status === "SENT", from: mail.via === "GMAIL" ? mail.gmail?.mailbox : undefined, name: inv.name };
 }
 
 /** Takes back an invite nobody has used yet (removes the unused login). */
