@@ -21,7 +21,7 @@ import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
-import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +110,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
         </div>
         <Section title="Activity">
           <p className="mb-3 text-xs text-slate-500">Everything logged with {dev.company}&apos;s contacts. Open a contact to log a note, email, call, meeting or task.</p>
-          <ActivityFeed items={dev.activities} showContact />
+          <ActivityFeed items={dev.activities} showContact editing={await getTaskEditing(me, team)} />
         </Section>
       </div>
     </div>

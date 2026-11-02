@@ -9,10 +9,11 @@ import { ConfirmButton } from "@/components/ConfirmButton";
 import { CrmIcon } from "@/components/CrmIcons";
 import { LocalTime } from "@/components/LocalTime";
 import { TaskForm } from "@/components/TaskForm";
+import { TaskEditButton } from "@/components/TaskEditButton";
 import { Badge, PageHeader } from "@/components/ui";
 import { taskState } from "@/lib/crm";
 import { sortTasks, staffLevel, staffLevelLabel, TASK_STATUSES, taskScope, taskScopes, taskStatus, visibleStaff, type TaskScope } from "@/lib/tasks";
-import { getTeam, visibleTaskWhere } from "@/lib/tasks-db";
+import { getTaskPickers, getTeam, visibleTaskWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +37,10 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
   const assigneeFilter: Prisma.ActivityWhereInput = who === "none" ? { assigneeId: null } : who ? { assigneeId: who } : ids ? { assigneeId: { in: ids } } : {};
   const where: Prisma.ActivityWhereInput = { AND: [visibleTaskWhere(me, team), assigneeFilter] };
 
-  const [open, done, contacts, projects, investors] = await Promise.all([
+  const [open, done, pickers] = await Promise.all([
     db.activity.findMany({ where: { ...where, doneAt: null }, include: taskInclude }),
     status === "done" ? db.activity.findMany({ where: { ...where, doneAt: { not: null } }, include: taskInclude, orderBy: { doneAt: "desc" }, take: 200 }) : [],
-    db.contact.findMany({ select: { id: true, name: true, developerId: true, developer: { select: { company: true } } }, orderBy: { name: "asc" } }),
-    db.project.findMany({ select: { id: true, code: true, title: true, developerId: true }, orderBy: { code: "asc" } }),
-    db.investor.findMany({ select: { id: true, name: true, firm: true }, orderBy: { name: "asc" } }),
+    getTaskPickers(),
   ]);
   const overdue = open.filter((t) => taskState(t) === "overdue");
   const shown = sortTasks(status === "done" ? done : status === "overdue" ? overdue : open);
@@ -68,10 +67,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
       <details className="card p-4" open={!open.length}>
         <summary className="cursor-pointer text-sm font-semibold">New task</summary>
         <div className="mt-4">
-          <TaskForm assignees={assignees} me={me.id} allowUnassigned={allowUnassigned}
-            contacts={contacts.map((c) => ({ id: c.id, name: c.name, company: c.developer.company, developerId: c.developerId }))}
-            investors={investors.map((i) => ({ id: `inv:${i.id}`, name: i.name, company: i.firm ?? "Investor", developerId: "" }))}
-            projects={projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}`, developerId: p.developerId }))} />
+          <TaskForm assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} {...pickers} />
         </div>
       </details>
 
@@ -149,8 +145,9 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
                         : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="td text-sm">{t.project ? <Link href={`/admin/projects/${t.project.id}`} title={t.project.title} className="whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600 hover:text-brand-600">{t.project.code}</Link> : <span className="text-slate-400">—</span>}</td>
-                    <td className="td text-right">
-                      <form action={deleteActivity}>
+                    <td className="td whitespace-nowrap text-right">
+                      <TaskEditButton task={t} editing={{ ...pickers, assignees: withCurrent(assignees, t.assignee), me: me.id, allowUnassigned }} className="mr-3 text-xs text-slate-400 hover:text-brand-600" />
+                      <form action={deleteActivity} className="inline">
                         <input type="hidden" name="id" value={t.id} />
                         <ConfirmButton message="Delete this task?" className="text-xs text-slate-400 hover:text-red-600">Delete</ConfirmButton>
                       </form>

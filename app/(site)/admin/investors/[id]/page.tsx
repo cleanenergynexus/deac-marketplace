@@ -31,7 +31,7 @@ import { marketSummary } from "@/lib/regions";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
 import { staffLevel, visibleStaff } from "@/lib/tasks";
-import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -200,7 +200,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
             <ActivityComposer key={tab.value} investor about="listing" contactId={id} contactEmail={inv.email} initialKind={tab.log} sendFrom={{ gmail: (await getGmailAccount(me.id))?.email ?? null, resend: !!process.env.RESEND_API_KEY }}
               projects={[...inv.interests.map((it) => it.project), ...notLinked].map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))}
               assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
-            <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} empty={tab.value === "activity" ? `Nothing logged with ${inv.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
+            <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} editing={await getTaskEditing(me, team)} empty={tab.value === "activity" ? `Nothing logged with ${inv.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
           </>
         )}
       </main>

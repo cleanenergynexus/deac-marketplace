@@ -167,12 +167,11 @@ export async function deleteActivity(f: FormData) {
   if (a.kind === "TASK") revalidatePath("/admin", "layout");
 }
 
-/** New task from the Tasks page. Linking it to a contact and/or project puts it on that contact's timeline. */
-export async function createTask(f: FormData) {
-  const admin = await requireAdmin();
-  const subject = s(f, "subject");
-  if (!subject) throw new Error("Give the task a title.");
-  const tz = Number(f.get("tz") ?? 0);
+/**
+ * Reads the contact / project a task form links to. Contact is a developer contact id, or "inv:<id>" for an Investor CRM contact.
+ * Works out which timeline (developer company or investor) the task belongs on.
+ */
+async function taskLinks(f: FormData) {
   const picked = s(f, "contactId");
   // Investor CRM contacts are listed as "inv:<id>" next to developer contacts.
   const investorId = picked?.startsWith("inv:") ? picked.slice(4) : null;
@@ -180,28 +179,59 @@ export async function createTask(f: FormData) {
   const projectId = s(f, "projectId");
   if (investorId && !(await db.investor.count({ where: { id: investorId } }))) throw new Error("That investor is no longer in the CRM.");
   const [contact, project] = await Promise.all([
-    contactId ? db.contact.findUniqueOrThrow({ where: { id: contactId } }) : null,
-    projectId ? db.project.findUniqueOrThrow({ where: { id: projectId } }) : null,
+    contactId ? db.contact.findUnique({ where: { id: contactId } }) : null,
+    projectId ? db.project.findUnique({ where: { id: projectId } }) : null,
   ]);
+  if (contactId && !contact) throw new Error("That contact is no longer in the CRM.");
+  if (projectId && !project) throw new Error("That project no longer exists.");
   if (contact && project && contact.developerId !== project.developerId) throw new Error("That project is not at this contact's company.");
-  // An investor task about a listing stays on the investor's timeline, not the developer's.
-  const developerId = investorId ? null : contact?.developerId ?? project?.developerId ?? null;
+  return {
+    // A project task with no contact goes on the project's contact's timeline.
+    contactId: investorId ? null : contact?.id ?? project?.contactId ?? null,
+    investorId,
+    // An investor task about a listing stays on the investor's timeline, not the developer's.
+    developerId: investorId ? null : contact?.developerId ?? project?.developerId ?? null,
+    projectId: project?.id ?? null,
+  };
+}
+
+/** New task from the Tasks page. Linking it to a contact and/or project puts it on that contact's timeline. */
+export async function createTask(f: FormData) {
+  const admin = await requireAdmin();
+  const subject = s(f, "subject");
+  if (!subject) throw new Error("Give the task a title.");
+  const links = await taskLinks(f);
   await db.activity.create({
     data: {
       kind: "TASK",
       subject,
       body: s(f, "body") ?? "",
-      dueAt: parseWhen(s(f, "dueAt"), tz),
+      dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)),
       assigneeId: pickAssignee(admin, await getTeam(), f.get("assigneeId")),
-      // A project task with no contact goes on the project's contact's timeline.
-      contactId: investorId ? null : contact?.id ?? project?.contactId ?? null,
-      investorId,
-      developerId,
-      projectId: project?.id ?? null,
+      ...links,
       by: admin.name,
     },
   });
-  if (developerId) revalidateCrm(developerId, contact?.id ?? project?.contactId);
-  if (investorId) revalidatePath("/admin/investors", "layout");
+  revalidateEntry(links);
+  revalidatePath("/admin", "layout");
+}
+
+/** Changes a task after it was created: title, details, due date, who it's for, and the contact / project it's about. */
+export async function updateTask(f: FormData) {
+  const admin = await requireAdmin();
+  const { task: a, team } = await findVisibleTask(admin, String(f.get("id")));
+  if (a.kind !== "TASK") throw new Error("Only tasks can be edited here.");
+  const subject = s(f, "subject");
+  if (!subject) throw new Error("Give the task a title.");
+  const picked = f.get("assigneeId") ?? "";
+  // Keeping the current assignee is always fine, even if this person couldn't pick them.
+  const assigneeId = picked === (a.assigneeId ?? "") ? a.assigneeId : pickAssignee(admin, team, picked);
+  const links = await taskLinks(f);
+  await db.activity.update({
+    where: { id: a.id },
+    data: { subject, body: s(f, "body") ?? "", dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)), assigneeId, ...links },
+  });
+  revalidateEntry(a); // the timeline it was on
+  revalidateEntry(links); // and the one it's on now
   revalidatePath("/admin", "layout");
 }
