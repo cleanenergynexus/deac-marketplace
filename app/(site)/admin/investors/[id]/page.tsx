@@ -8,6 +8,8 @@ import { setInvestorStage, updateInvestor } from "@/app/actions/admin";
 import { addInterest, removeInterest } from "@/app/actions/investors";
 import { ActivityComposer } from "@/components/ActivityComposer";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { GmailRecordSync } from "@/components/GmailPanel";
+import { getGmailAccount } from "@/lib/gmail-db";
 import { Avatar, CrmIcon } from "@/components/CrmIcons";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { InvestorForm } from "@/components/InvestorForm";
@@ -194,7 +196,8 @@ export default async function InvestorRecord({ params, searchParams }: { params:
             <InvestorForm inv={inv} action={updateInvestor} firms={firms.map((f) => f.name)} agents={agents} /></div>
         ) : (
           <>
-            <ActivityComposer key={tab.value} investor about="listing" contactId={id} contactEmail={inv.email} initialKind={tab.log}
+            <GmailRecordSync investorId={id} />
+            <ActivityComposer key={tab.value} investor about="listing" contactId={id} contactEmail={inv.email} initialKind={tab.log} sendFrom={{ gmail: (await getGmailAccount(me.id))?.email ?? null, resend: !!process.env.RESEND_API_KEY }}
               projects={[...inv.interests.map((it) => it.project), ...notLinked].map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))}
               assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
             <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} empty={tab.value === "activity" ? `Nothing logged with ${inv.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />

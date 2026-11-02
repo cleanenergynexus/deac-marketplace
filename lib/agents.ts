@@ -41,6 +41,9 @@ export function contactActivityWhere(contact: { id: string; developerId: string;
   return { OR: [{ contactId: contact.id }, ...(contact.isPrimary ? [{ developerId: contact.developerId, contactId: null }] : [])] };
 }
 
+/** Timeline entries agents may see: not emails copied from a team member's Gmail (those stay with the team). */
+export const PUBLIC_TO_AGENTS: Prisma.ActivityWhereInput = { mailbox: null };
+
 /** Everything an agent can see across all their contacts (for their overview feed). */
 export function agentActivityWhere(agentId: string): Prisma.ActivityWhereInput {
   return {

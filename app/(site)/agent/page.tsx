@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
-import { agentActivityWhere, agentCompanyWhere, agentContactWhere, agentInvestorWhere, agentProjectWhere } from "@/lib/agents";
+import { agentActivityWhere, agentCompanyWhere, agentContactWhere, agentInvestorWhere, agentProjectWhere, PUBLIC_TO_AGENTS } from "@/lib/agents";
 import { AGENT_LINKS, getPartner, meetingOptions } from "@/lib/agent-portal";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { MeetingRequestForm } from "@/components/MeetingRequestForm";
@@ -19,7 +19,7 @@ export default async function AgentHome() {
     db.investor.count({ where: agentInvestorWhere(me.id) }),
     db.project.count({ where: agentProjectWhere(me.id) }),
     db.activity.findMany({
-      where: agentActivityWhere(me.id),
+      where: { AND: [agentActivityWhere(me.id), PUBLIC_TO_AGENTS] },
       include: { contact: { select: { id: true, name: true } }, investor: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
       take: 25,

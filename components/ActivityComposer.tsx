@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { logContactActivity } from "@/app/actions/contacts";
 import { logInvestorActivity } from "@/app/actions/investors";
+import { sendCrmEmail } from "@/app/actions/gmail";
 import { CALL_OUTCOMES, EMAIL_DIRECTIONS, LOG_KINDS, type LogKind } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
 
@@ -20,6 +21,8 @@ type Props = {
   assignees: { id: string; name: string }[];
   me: string;
   allowUnassigned: boolean;
+  /** How "Send email" goes out: from the team member's linked Gmail, or DEAC's address (Resend). Null = sending isn't set up. */
+  sendFrom?: { gmail: string | null; resend: boolean };
 };
 
 const PLACEHOLDER: Record<LogKind, string> = {
@@ -31,10 +34,12 @@ const PLACEHOLDER: Record<LogKind, string> = {
 };
 
 /** Log box above the contact timeline: pick Note, Email, Call, Meeting or Task, fill it in, save. */
-export function ActivityComposer({ contactId, investor = false, about = "project", contactEmail, projects, initialKind, assignees, me, allowUnassigned }: Props) {
+export function ActivityComposer({ contactId, investor = false, about = "project", contactEmail, projects, initialKind, assignees, me, allowUnassigned, sendFrom }: Props) {
   const [kind, setKind] = useState<LogKind>(initialKind);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [sendMsg, setSendMsg] = useState<{ error?: string; ok?: string } | null>(null);
+  const canSend = !!contactEmail && !!sendFrom && (!!sendFrom.gmail || sendFrom.resend);
   const tz = useRef<HTMLInputElement>(null);
   useEffect(() => setKind(initialKind), [initialKind]);
   useEffect(() => { if (tz.current) tz.current.value = String(new Date().getTimezoneOffset()); });
@@ -44,7 +49,7 @@ export function ActivityComposer({ contactId, investor = false, about = "project
   return (
     <form
       id="composer"
-      action={async (f) => { await (investor ? logInvestorActivity(f) : logContactActivity(f)); setSubject(""); setBody(""); }}
+      action={async (f) => { setSendMsg(null); await (investor ? logInvestorActivity(f) : logContactActivity(f)); setSubject(""); setBody(""); }}
       className="card space-y-3 p-4"
     >
       <input type="hidden" name={investor ? "investorId" : "contactId"} value={contactId} />
@@ -102,11 +107,45 @@ export function ActivityComposer({ contactId, investor = false, about = "project
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {kind === "EMAIL" && mailto && <a href={mailto} className="btn-ghost" title="Opens your email app with this subject and text">Write in email app</a>}
-          <Submit kind={kind} />
+          {kind === "EMAIL" && mailto && !canSend && <a href={mailto} className="btn-ghost" title="Opens your email app with this subject and text">Write in email app</a>}
+          {kind === "EMAIL" && canSend ? (
+            <>
+              <LogEmail />
+              <SendEmail
+                to={contactEmail!}
+                from={sendFrom!.gmail}
+                action={async (f) => {
+                  const r = await sendCrmEmail(f);
+                  setSendMsg(r ?? null);
+                  if (r?.ok) { setSubject(""); setBody(""); }
+                }}
+              />
+            </>
+          ) : <Submit kind={kind} />}
         </div>
       </div>
+      {kind === "EMAIL" && canSend && (
+        <p className="text-xs text-slate-500">
+          <b>Send email</b> sends it to {contactEmail} {sendFrom!.gmail ? <>from your Gmail ({sendFrom!.gmail})</> : <>from DEAC&apos;s address, with replies going to you (link Gmail under My account to send as yourself)</>} and logs it here. <b>Log email</b> only records one you sent or received elsewhere.
+        </p>
+      )}
+      {sendMsg?.error && <p className="rounded bg-red-50 p-2 text-sm text-red-700">{sendMsg.error}</p>}
+      {sendMsg?.ok && <p className="rounded bg-emerald-50 p-2 text-sm text-emerald-800">{sendMsg.ok}</p>}
     </form>
+  );
+}
+
+function LogEmail() {
+  const { pending } = useFormStatus();
+  return <button className="btn-ghost" disabled={pending}>Log email</button>;
+}
+
+function SendEmail({ to, from, action }: { to: string; from: string | null; action: (f: FormData) => Promise<void> }) {
+  const { pending } = useFormStatus();
+  return (
+    <button formAction={action} formNoValidate className="btn" disabled={pending} title={`Send to ${to}${from ? ` from ${from}` : ""}`}>
+      {pending ? "Working…" : "Send email"}
+    </button>
   );
 }
 

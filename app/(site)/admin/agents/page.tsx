@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignatureList } from "@/components/SignatureList";
+import { ActivityFeed } from "@/components/ActivityFeed";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { addAgent, removeAgent, viewAsAgent } from "@/app/actions/agents-admin";
@@ -22,7 +23,11 @@ export default async function Agents() {
   const [agents, partners] = await Promise.all([
     db.user.findMany({
       where: { role: "AGENT" },
-      include: { partner: { select: { name: true } }, _count: { select: { referredDevelopers: true, referredContacts: true, referredInvestors: true } } },
+      include: {
+        partner: { select: { name: true } },
+        agentActivities: { where: { kind: "EMAIL" }, orderBy: { createdAt: "desc" }, take: 20 },
+        _count: { select: { referredDevelopers: true, referredContacts: true, referredInvestors: true, agentActivities: { where: { kind: "EMAIL" } } } },
+      },
       orderBy: { name: "asc" },
     }),
     db.user.findMany({ where: { role: "ADMIN" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -57,6 +62,12 @@ export default async function Agents() {
                   <details className="mt-3 rounded-md border border-slate-200 p-2" id={`signatures-${a.id}`}>
                     <summary className="cursor-pointer text-xs font-semibold text-slate-700">NDAs &amp; agreements</summary>
                     <div className="mt-2"><SignatureList signer={`AGENT:${a.id}`} /></div>
+                  </details>
+                  <details className="mt-3 rounded-md border border-slate-200 p-2" id={`emails-${a.id}`}>
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-700">Emails ({a._count.agentActivities})</summary>
+                    <div className="mt-2">
+                      <ActivityFeed items={a.agentActivities} empty={`No emails with ${a.name} yet. Emails from a linked Gmail (My account) show here.`} />
+                    </div>
                   </details>
                   {isAdmin && (
                     <form action={removeAgent} className="mt-2">

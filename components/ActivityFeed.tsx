@@ -3,6 +3,7 @@ import type { Activity } from "@prisma/client";
 import { deleteActivity, toggleTask } from "@/app/actions/contacts";
 import { activityTitle, groupByMonth, isLogKind, taskState } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
+import { threadUrl } from "@/lib/gmail";
 import { LocalTime } from "@/components/LocalTime";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { AssigneeSelect, type Assignee } from "@/components/AssigneeSelect";
@@ -73,7 +74,8 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                       {showContact && a.contact && <Link href={links.contact(a.contact.id)} className="text-brand-600">{a.contact.name}</Link>}
                       {showContact && a.investor && <Link href={links.investor(a.investor.id)} className="text-brand-600">{a.investor.name}</Link>}
                       {a.project && <Link href={links.project(a.project.id)} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
-                      {a.by && <span>by {a.by}</span>}
+                      {a.by && <span>{a.kind === "EMAIL" && a.outcome === "RECEIVED" && a.mailbox ? "from" : "by"} {a.by}</span>}
+                      {a.mailbox && a.gmailThreadId && !readOnly && <a href={threadUrl(a.mailbox, a.gmailThreadId)} target="_blank" rel="noreferrer" className="text-brand-600" title={`In ${a.mailbox}`}>Open in Gmail</a>}
                       {isLogKind(a.kind) && !readOnly && (
                         <form action={deleteActivity} className="ml-auto">
                           <input type="hidden" name="id" value={a.id} />

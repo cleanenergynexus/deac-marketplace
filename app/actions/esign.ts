@@ -146,7 +146,7 @@ export async function sendEnvelope(_: SendState, f: FormData): Promise<SendState
     }
     const r = await db.signatureRequest.update({ where: { id }, data: { ...signerLink(p), status: "SENT", sentAt: new Date() } });
     const link = await issueLink(id);
-    const emailed = await emailSignLink(r, link, admin.name);
+    const emailed = await emailSignLink(r, link, admin);
     await logEvent(id, "SENT", `To ${p.name} <${p.email}>${emailed ? " by email" : " (link shared by the team)"}`, admin.name, meta);
     await logOnRecord(r, `${kindLabel(r.kind)} "${r.title}" sent for e-signature by ${admin.name}.`, admin.name);
     sent.push({ id, name: p.name, email: p.email, link, emailed });
@@ -161,7 +161,7 @@ export async function renewLink(_: SendState, f: FormData): Promise<SendState> {
   const r = await db.signatureRequest.findUnique({ where: { id: String(f.get("id")) } });
   if (!r || !isOpen(r.status)) return { error: "Only a request waiting for a signature can get a new link." };
   const link = await issueLink(r.id);
-  const emailed = f.get("email") === "on" ? await emailSignLink(r, link, admin.name) : false;
+  const emailed = f.get("email") === "on" ? await emailSignLink(r, link, admin) : false;
   await logEvent(r.id, "LINK_RENEWED", emailed ? "New link emailed" : "New link created", admin.name, await requestMeta());
   refresh(r.id);
   return { sent: [{ id: r.id, name: r.signerName ?? "", email: r.signerEmail, link, emailed }] };
