@@ -24,6 +24,7 @@ export default async function AdminHome() {
     db.investorInterest.findMany({ select: { stage: true, project: { select: { dealType: true } } } }),
     getInvestorPipeline(),
   ]);
+  const recentlySigned = await db.signatureRequest.findMany({ where: { status: { in: ["SIGNED", "DECLINED"] }, source: "ESIGN", updatedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, select: { id: true, title: true, status: true, signerName: true }, orderBy: { updatedAt: "desc" }, take: 5 });
   const myTasks = await db.activity.findMany({ where: { kind: "TASK", assigneeId: me.id, doneAt: null }, select: { dueAt: true, doneAt: true } });
   const myOverdue = myTasks.filter((t) => taskState(t) === "overdue").length;
   const myToday = myTasks.filter((t) => taskState(t) === "due-today").length;
@@ -46,6 +47,17 @@ export default async function AdminHome() {
           <span><b>{pendingAccess}</b> investor{pendingAccess === 1 ? "" : "s"} waiting for access approval</span>
           <span className="font-semibold">Review →</span>
         </Link>
+      )}
+      {recentlySigned.length > 0 && (
+        <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">
+          <div className="flex items-center justify-between gap-3">
+            <b>E-signatures in the last 7 days</b>
+            <Link href="/admin/signatures?status=SIGNED" className="font-semibold">All signed →</Link>
+          </div>
+          <ul className="mt-2 space-y-1">{recentlySigned.map((d) => (
+            <li key={d.id}><Link href={`/admin/signatures/${d.id}`} className="hover:underline">{d.signerName} {d.status === "SIGNED" ? "signed" : <span className="text-red-700">declined</span>} &ldquo;{d.title}&rdquo;</Link></li>
+          ))}</ul>
+        </div>
       )}
       {myTasks.length > 0 && (
         <Link href="/admin/tasks" className={`flex items-center justify-between rounded-lg p-4 text-sm hover:opacity-90 ${myOverdue ? "bg-red-50 text-red-900" : "bg-brand-50 text-brand-900"}`}>

@@ -213,3 +213,18 @@ export function signerHref(r: { signerType: string | null; investorId: string | 
   if (r.agentId) return "/admin/agents";
   return null;
 }
+
+/**
+ * Tells the team a signer acted: a task for whoever sent the document (unassigned, so every Admin sees it, when
+ * an investor signed a listing NDA on their own), plus an email to the same people.
+ */
+export async function notifyTeam(r: { id: string; createdById: string | null; investorId: string | null; contactId: string | null; projectId: string | null }, subject: string, body: string) {
+  const sender = r.createdById ? await db.user.findFirst({ where: { id: r.createdById, role: "ADMIN" }, select: { id: true, email: true } }) : null;
+  const developerId = r.contactId ? (await db.contact.findUnique({ where: { id: r.contactId }, select: { developerId: true } }))?.developerId ?? null : null;
+  const link = `${appUrl()}/admin/signatures/${r.id}`;
+  await db.activity.create({
+    data: { kind: "TASK", subject, body: `${body}\n\nOpen the document: /admin/signatures/${r.id}`, investorId: r.investorId, contactId: r.contactId, developerId, projectId: r.projectId, assigneeId: sender?.id ?? null, by: "E-signature", dueAt: new Date() },
+  });
+  const to = sender ? [sender.email] : (await db.user.findMany({ where: { role: "ADMIN", staffLevel: "ADMIN" }, select: { email: true } })).map((u) => u.email);
+  for (const email of to) await sendEmail({ to: email, subject, text: `${body}\n\n${link}\n\n— DEAC Marketplace` });
+}

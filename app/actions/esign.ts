@@ -8,13 +8,14 @@ import { sendEmail } from "@/lib/email";
 import { saveGenerated } from "@/lib/storage";
 import { inspectPdf, sha256, buildSignedPdf } from "@/lib/esign-pdf";
 import { cleanName } from "@/lib/dataroom";
-import { applySignedEffects, emailSignLink, fileInDataRoom, findForSigner, issueLink, listingNdaTemplate, loadSigner, logEvent, logOnRecord, readPdf, requestMeta, signerKindLabel, signerLink } from "@/lib/esign-db";
+import { applySignedEffects, emailSignLink, notifyTeam, fileInDataRoom, findForSigner, issueLink, listingNdaTemplate, loadSigner, logEvent, logOnRecord, readPdf, requestMeta, signerKindLabel, signerLink } from "@/lib/esign-db";
 import { CONSENT_TEXT, cleanValues, isDocKind, isOpen, kindLabel, missingValues, normalizeFields, parseFields, signedFileName, type SignValues } from "@/lib/esign";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 const MAX_PDF = 4_400_000;
 
 function refresh(id?: string) {
+  revalidatePath("/admin", "layout");
   revalidatePath("/admin/signatures", "layout");
   if (id) revalidatePath(`/admin/signatures/${id}`);
 }
@@ -284,10 +285,7 @@ export async function signRequest(_: SignState, f: FormData): Promise<SignState>
   const effect = await applySignedEffects({ ...r, values: JSON.stringify(values) }, "E-signature");
   if (effect) await logEvent(r.id, "UNLOCKED", effect);
 
-  if (r.createdById) {
-    const sender = await db.user.findUnique({ where: { id: r.createdById }, select: { email: true, name: true } });
-    if (sender) await sendEmail({ to: sender.email, subject: `Signed: ${r.title} — ${signerName}`, text: `${signerName}${r.signerCompany ? ` (${r.signerCompany})` : ""} signed "${r.title}".${effect ? `\n${effect}.` : ""}\n\nSigned copy: ${process.env.PUBLIC_APP_URL ?? ""}/admin/signatures/${r.id}\n\n— DEAC Marketplace` });
-  }
+  await notifyTeam(r, `Signed: ${r.title} — ${signerName}`, `${signerName}${r.signerCompany ? ` (${r.signerCompany})` : ""} signed "${r.title}".${effect ? ` ${effect}.` : ""}`);
   if (r.signerEmail) await sendEmail({ to: r.signerEmail, subject: `Signed: ${r.title}`, text: `Hi ${signerName.split(" ")[0]},\n\nThank you for signing "${r.title}". You can download your signed copy from the same link for 30 days${r.investorId ? ", and any time from My Portal" : ""}.${effect && r.autoApprove && r.projectId ? "\n\nThe confidential details of the listing are now open to you in the DEAC Marketplace." : ""}\n\n— DEAC Team` });
   refresh(r.id);
   revalidatePath("/admin/lois");
@@ -313,10 +311,7 @@ export async function declineRequest(_: SignState, f: FormData): Promise<SignSta
   await db.signatureRequest.update({ where: { id: r.id }, data: { status: "DECLINED", declineReason: reason } });
   await logEvent(r.id, "DECLINED", reason, r.signerName, await requestMeta());
   await logOnRecord(r, `Declined to sign ${kindLabel(r.kind)} "${r.title}"${reason ? `: ${reason}` : "."}`, r.signerName);
-  if (r.createdById) {
-    const sender = await db.user.findUnique({ where: { id: r.createdById }, select: { email: true } });
-    if (sender) await sendEmail({ to: sender.email, subject: `Declined: ${r.title} — ${r.signerName}`, text: `${r.signerName} declined to sign "${r.title}".${reason ? `\n\nReason: ${reason}` : ""}\n\n${process.env.PUBLIC_APP_URL ?? ""}/admin/signatures/${r.id}` });
-  }
+  await notifyTeam(r, `Declined: ${r.title} — ${r.signerName}`, `${r.signerName} declined to sign "${r.title}".${reason ? ` Reason: ${reason}` : ""}`);
   refresh(r.id);
   return { ok: true };
 }
