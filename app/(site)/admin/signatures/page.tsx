@@ -31,7 +31,7 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
       ...(statusWhere && !templates ? { status: statusWhere } : {}),
       ...(q ? { OR: [{ title: { contains: q, mode: "insensitive" as const } }, { signerName: { contains: q, mode: "insensitive" as const } }, { signerEmail: { contains: q, mode: "insensitive" as const } }, { signerCompany: { contains: q, mode: "insensitive" as const } }] } : {}),
     },
-    include: { project: { select: { code: true } } },
+    include: { project: { select: { code: true } }, signers: { select: { status: true, name: true, role: true } } },
     orderBy: { updatedAt: "desc" },
     take: 300,
   });
@@ -78,7 +78,7 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
                   {templates ? (
                     <>
                       <td className="td text-sm">{r.project?.code ?? <span className="text-slate-400">Any</span>}</td>
-                      <td className="td text-sm">{(JSON.parse(r.fields) as unknown[]).length}</td>
+                      <td className="td text-sm">{(JSON.parse(r.fields) as unknown[]).length}{r.signers.length > 0 && <div className="text-xs text-slate-500">{r.signers.length + 1} signers</div>}</td>
                       <td className="td">{r.listingNda ? <Badge tone="green">On</Badge> : <span className="text-xs text-slate-400">—</span>}</td>
                       <td className="td text-right">
                         <span className="inline-flex items-center gap-3">
@@ -89,9 +89,9 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
                     </>
                   ) : (
                     <>
-                      <td className="td text-sm">{r.signerName ? (href ? <Link href={href} className="text-brand-600">{r.signerName}</Link> : r.signerName) : <span className="text-slate-400">Not chosen</span>}<div className="text-xs text-slate-500">{r.signerType ? SIGNER_LABEL[r.signerType as SignerType] : ""}{r.signerCompany ? ` · ${r.signerCompany}` : ""}</div></td>
+                      <td className="td text-sm">{r.signerName ? (href ? <Link href={href} className="text-brand-600">{r.signerName}</Link> : r.signerName) : <span className="text-slate-400">Not chosen</span>}<div className="text-xs text-slate-500">{r.signerType ? SIGNER_LABEL[r.signerType as SignerType] : ""}{r.signerCompany ? ` · ${r.signerCompany}` : ""}</div>{r.signers.length > 0 && <div className="text-xs text-slate-500">+ {r.signers.map((c) => c.name ?? c.role).join(", ")}</div>}</td>
                       <td className="td text-sm">{r.project?.code ?? <span className="text-slate-400">—</span>}</td>
-                      <td className="td"><Badge tone={statusBadge(r.status)}>{STATUS_LABEL[r.status] ?? r.status}</Badge></td>
+                      <td className="td"><Badge tone={statusBadge(r.status)}>{STATUS_LABEL[r.status] ?? r.status}</Badge>{r.signers.length > 0 && (r.status === "SENT" || r.status === "VIEWED") && <div className="mt-0.5 text-xs text-slate-500">{(r.recipientSignedAt ? 1 : 0) + r.signers.filter((c) => c.status === "SIGNED").length} of {r.signers.length + 1} signed</div>}</td>
                       <td className="td text-xs">{date(r.sentAt)}</td>
                       <td className="td text-xs">{date(r.signedAt)}</td>
                     </>

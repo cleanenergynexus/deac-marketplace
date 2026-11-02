@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PDFDocument } from "pdf-lib";
-import { cleanValues, fieldText, missingValues, normalizeFields, panelFor, signedFileName, splitName, initialsOf, type SignField } from "./esign";
+import { cleanValues, fieldText, missingValues, normalizeFields, panelFor, signedFileName, splitName, initialsOf, dueSlots, allSigned, fieldsFor, ordinal, type SignField } from "./esign";
 import { buildSignedPdf, inspectPdf, sha256 } from "./esign-pdf";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -59,6 +59,22 @@ test("cleanValues drops what wasn't asked and bad images", () => {
   assert.deepEqual(v.custom, { x: "yes" });
 });
 
+test("signing order", () => {
+  const p = (slot: number, order: number, signed = false) => ({ slot, order, signed });
+  assert.deepEqual(dueSlots([p(0, 1), p(1, 2)]), [0]);
+  assert.deepEqual(dueSlots([p(0, 1, true), p(1, 2)]), [1]);
+  assert.deepEqual(dueSlots([p(0, 2), p(1, 1)]), [1]);
+  assert.deepEqual(dueSlots([p(0, 1), p(1, 1), p(2, 2)]), [0, 1]);
+  assert.deepEqual(dueSlots([p(0, 1, true), p(1, 2, true)]), []);
+  assert.ok(allSigned([p(0, 1, true), p(1, 2, true)]));
+  assert.ok(!allSigned([p(0, 1, true), p(1, 2)]));
+  const fs = normalizeFields([{ type: "SIGNATURE", page: 0, x: 0, y: 0 }, { type: "SIGNATURE", page: 0, x: 0, y: 0.5, signer: 1 }, { type: "NAME", page: 0, x: 0, y: 0.6, signer: 42 }], 1);
+  assert.deepEqual(fs.map((f) => f.signer), [undefined, 1, undefined]);
+  assert.equal(fieldsFor(fs, 0).length, 2);
+  assert.equal(fieldsFor(fs, 1).length, 1);
+  assert.equal(ordinal(1) + ordinal(2) + ordinal(3) + ordinal(11), "1st2nd3rd11th");
+});
+
 test("names", () => {
   assert.deepEqual(splitName("Joaquin de la Altenberg"), { first: "Joaquin de la", last: "Altenberg" });
   assert.equal(initialsOf("ana maria ruiz"), "AMR");
@@ -72,9 +88,11 @@ test("stamps the fields and appends a certificate", async () => {
   assert.deepEqual(await inspectPdf(bytes), { pageCount: 1 });
   assert.ok("error" in (await inspectPdf(new TextEncoder().encode("hello"))));
   const v = { name: "Ana Ruiz", street: "1 Main St", city: "Austin", region: "TX", postalCode: "78741", country: "US", signature: PNG, company: "Fondo “Ñ” 中", custom: { x: "yes" } };
-  const out = await buildSignedPdf(bytes, fields, v, new Date("2026-11-02T15:00:00Z"), {
+  const at = new Date("2026-11-02T15:00:00Z");
+  const two = [...fields, { id: "cs", type: "SIGNATURE" as const, page: 0, x: 0.5, y: 0.8, w: 0.2, h: 0.05, required: true, signer: 1 }];
+  const out = await buildSignedPdf(bytes, two, [{ slot: 0, values: v, signedAt: at }, { slot: 1, values: { name: "Dee Team", signature: PNG }, signedAt: at }], at, {
     requestId: "req1", title: "Confidentiality Agreement", sourceName: "nda.pdf", sourceHash: sha256(bytes), consent: "I agree.",
-    signer: { name: "Ana Ruiz", email: "ana@example.com", company: "Fondo", kind: "Investor" },
+    signers: [{ name: "Ana Ruiz", email: "ana@example.com", company: "Fondo", kind: "Investor", role: "Recipient", signedAt: at }, { name: "Dee Team", email: "dee@deacna.com", kind: "DEAC team", role: "DEAC countersignature", signedAt: at }],
     events: [{ at: new Date(), action: "SENT", detail: "To Ana", ip: "1.2.3.4", userAgent: "Test" }, { at: new Date(), action: "SIGNED" }],
   });
   const signed = await PDFDocument.load(out);

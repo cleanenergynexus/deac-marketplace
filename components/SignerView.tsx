@@ -27,15 +27,21 @@ async function typedToPng(text: string, size = 72) {
   return c.toDataURL("image/png");
 }
 
+/** Another signer's field, shown read-only: what they entered once signed, else a placeholder with their name. */
+export type OtherField = { f: SignField; by: string; role: string; img?: string; text: string };
+
 /**
  * The signing screen: the signer's details on the left (prefilled from their record, required ones marked), the
  * document on the right with each field showing what will be printed there, then "I Agree".
  */
-export function SignerView({ refKey, refValue, pdfUrl, fields, prefill, email, signerName, title, message, sender }: {
+export function SignerView({ refKey, refValue, pdfUrl, fields, others = [], parties = [], prefill, email, signerName, title, message, sender, canSaveProfile = true }: {
   refKey: "token" | "id";
   refValue: string;
   pdfUrl: string;
   fields: SignField[];
+  others?: OtherField[];
+  parties?: { name: string; role: string; signed: boolean; me: boolean }[];
+  canSaveProfile?: boolean;
   prefill: SignValues;
   email: string;
   signerName: string;
@@ -109,6 +115,19 @@ export function SignerView({ refKey, refValue, pdfUrl, fields, prefill, email, s
             <p className="mt-1 text-xs text-slate-500">{sender ? `Sent by ${sender} at DEAC. ` : ""}Review the document, confirm your details, then click I Agree.</p>
             {message && <p className="mt-2 rounded-md bg-slate-50 p-2 text-sm text-slate-700">{message}</p>}
           </div>
+          {parties.length > 1 && (
+            <div className="rounded-md border border-slate-200 p-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Signers</div>
+              <ol className="mt-1 space-y-1 text-sm">
+                {parties.map((x, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate"><span className="font-medium">{x.me ? "You" : x.name}</span> <span className="text-xs text-slate-500">· {x.role}</span></span>
+                    <span className={`shrink-0 text-xs ${x.signed ? "text-emerald-700" : x.me ? "font-semibold text-amber-700" : "text-slate-400"}`}>{x.signed ? "Signed ✓" : x.me ? "Signing now" : "Waiting"}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
           {otherKeys.map(input)}
           <p className="text-xs text-slate-500">Not {signerName}? Please don&apos;t sign. Reply to the email so we can send it to the right person.</p>
           {addressKeys.length > 0 && <div className="grid grid-cols-2 gap-3">{addressKeys.map((k) => <div key={k} className={k === "street" || k === "country" ? "col-span-2" : ""}>{input(k)}</div>)}</div>}
@@ -161,7 +180,7 @@ export function SignerView({ refKey, refValue, pdfUrl, fields, prefill, email, s
               <input type="hidden" name={refKey} value={refValue} />
               <input type="hidden" name="values" value={JSON.stringify({ ...v, email })} />
               {consent && <input type="hidden" name="consent" value="on" />}
-              <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="saveProfile" defaultChecked /> Save my address and phone to my DEAC profile</label>
+              {canSaveProfile && <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" name="saveProfile" defaultChecked /> Save my address and phone to my DEAC profile</label>}
               {(state?.error || (tried && !ready)) && <p className="rounded bg-red-50 p-2 text-xs text-red-700">{state?.error ?? (missing.length ? `Please complete: ${missing.join(", ")}.` : "Please tick the box to agree to sign electronically.")}</p>}
               <div className="flex items-center justify-between gap-3">
                 <button type="button" className="text-xs text-slate-500 hover:text-red-600" onClick={() => setDeclining(true)}>Decline</button>
@@ -176,7 +195,15 @@ export function SignerView({ refKey, refValue, pdfUrl, fields, prefill, email, s
         <div className="mx-auto max-w-4xl">
           <PdfPages
             url={pdfUrl}
-            overlay={(page) => fields.filter((f) => f.page === page).map((f) => {
+            overlay={(page) => [...others.filter((o) => o.f.page === page).map((o) => (
+              <div key={`o-${o.f.id}`} title={`${o.by} (${o.role})`}
+                className={`pointer-events-none absolute flex items-center overflow-hidden rounded-sm leading-none ${o.img || o.text ? "" : "border border-dashed border-violet-400 bg-violet-50/70"}`}
+                style={{ left: `${o.f.x * 100}%`, top: `${o.f.y * 100}%`, width: `${o.f.w * 100}%`, height: `${o.f.h * 100}%` }}>
+                {o.img ? <img src={o.img} alt="" className="h-full w-full object-contain object-left" /> : o.text ? (
+                  <span className="truncate px-0.5 text-[#0d1a5a]" style={{ fontSize: `${Math.min(o.f.h * 80, 1.39)}cqh` }}>{o.text}</span>
+                ) : <span className="truncate px-0.5 text-[9px] font-semibold text-violet-800">{o.by}: {FIELD_TYPES[o.f.type].label}</span>}
+              </div>
+            )), ...fields.filter((f) => f.page === page).map((f) => {
               const img = f.type === "SIGNATURE" ? v.signature : f.type === "INITIALS" ? v.initials : undefined;
               const text = fieldText(f, v, now);
               const empty = !img && !text;
@@ -192,7 +219,7 @@ export function SignerView({ refKey, refValue, pdfUrl, fields, prefill, email, s
                   )}
                 </button>
               );
-            })}
+            })]}
           />
         </div>
       </div>

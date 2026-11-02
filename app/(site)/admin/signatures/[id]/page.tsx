@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import type { Party } from "@/lib/esign-db";
 import { deleteEnvelope, voidRequest } from "@/app/actions/esign";
-import { listingOptions, loadSignerOptions, signerHref, signerRef } from "@/lib/esign-db";
-import { isOpen, kindLabel, parseFields, SIGNER_LABEL, STATUS_LABEL, statusBadge, type SignerType } from "@/lib/esign";
+import { cosignerRef, listingOptions, loadSignerOptions, partiesOf, signerHref, signerRef, teamOptions } from "@/lib/esign-db";
+import { dueSlots, isOpen, kindLabel, parseFields, SIGNER_LABEL, signerColor, STATUS_LABEL, statusBadge, type SignerType } from "@/lib/esign";
 import { SignFieldEditor } from "@/components/SignFieldEditor";
-import { RenewLinkPanel, SendPanel } from "@/components/SignerPicker";
+import { JustSentLinks, RenewLinkPanel, SendPanel } from "@/components/SignerPicker";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { LocalTime } from "@/components/LocalTime";
 import { Badge, PageHeader, Section } from "@/components/ui";
@@ -15,14 +16,19 @@ import { date } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function SignatureRequestPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const { id } = await params;
-  const r = await db.signatureRequest.findUnique({ where: { id }, include: { project: { select: { id: true, code: true, title: true } }, events: { orderBy: { createdAt: "asc" } } } });
+  const r = await db.signatureRequest.findUnique({ where: { id }, include: { project: { select: { id: true, code: true, title: true } }, events: { orderBy: { createdAt: "asc" } }, signers: { orderBy: { slot: "asc" } } } });
   if (!r) notFound();
   const editable = r.isTemplate || r.status === "DRAFT";
-  const [listings, signers, sentFrom] = await Promise.all([
+  const parties = partiesOf(r, r.signers);
+  const multi = parties.length > 1;
+  const due = isOpen(r.status) ? dueSlots(parties) : [];
+  const myTurn = parties.find((p) => p.cosigner?.userId === me.id && due.includes(p.slot));
+  const [listings, signers, team, sentFrom] = await Promise.all([
     listingOptions(),
     editable ? loadSignerOptions() : Promise.resolve([]),
+    editable ? teamOptions() : Promise.resolve([]),
     r.isTemplate ? db.signatureRequest.groupBy({ by: ["status"], where: { templateId: r.id }, _count: true }) : Promise.resolve([]),
   ]);
   const fields = parseFields(r.fields, r.pageCount);
@@ -45,7 +51,7 @@ export default async function SignatureRequestPage({ params }: { params: Promise
         <Section title={r.isTemplate ? "Send this template" : "Send for signature"}>
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="space-y-2 text-sm text-slate-600">
-              <p>Place the fields on the document below (they save on their own), then choose who signs. Each signer gets a personal link by email{r.isTemplate ? " and their own copy" : ""}; investors also see it in My Portal.</p>
+              <p>Place the fields on the document below (they save on their own), then choose who {multi ? "receives it" : "signs"}.{multi ? <> Signers sign in the order set under <b>Signers</b>; each gets their link when it&apos;s their turn.</> : <> Need a countersignature? Add a signer under <b>Signers</b>.</>} Each signer gets a personal link by email{r.isTemplate ? " and their own copy" : ""}; investors also see it in My Portal.</p>
               <p>The signer sees their details prefilled from their record, fills in anything missing, signs and clicks <b>I Agree</b>. The signed PDF gets a signing certificate and is saved {r.projectId ? "to this listing's data room, under Signed Documents" : "on the request"}.</p>
               {r.isTemplate && sentFrom.length > 0 && <p className="text-xs">Sent from this template: {sentFrom.map((g) => `${g._count} ${(STATUS_LABEL[g.status] ?? g.status).toLowerCase()}`).join(", ")}.</p>}
               <form action={deleteEnvelope}><input type="hidden" name="id" value={r.id} /><ConfirmButton message={r.isTemplate ? `Delete the template "${r.title}"? Documents already sent from it are kept.` : "Delete this draft?"} className="btn-danger">Delete {r.isTemplate ? "template" : "draft"}</ConfirmButton></form>
@@ -69,15 +75,29 @@ export default async function SignatureRequestPage({ params }: { params: Promise
             {r.declineReason && <p className="mt-4 rounded bg-red-50 p-3 text-sm text-red-800">Reason given: {r.declineReason}</p>}
           </Section>
           <aside className="space-y-4">
+            {isOpen(r.status) && <JustSentLinks id={r.id} />}
+            {myTurn && (
+              <div className="card space-y-2 border-amber-300 bg-amber-50 p-4 text-sm">
+                <h2 className="font-semibold">Your signature is needed</h2>
+                <p className="text-xs text-slate-600">You sign as {myTurn.role}.</p>
+                <Link href={`/admin/signatures/${r.id}/sign`} className="btn w-full">Review &amp; sign</Link>
+              </div>
+            )}
             <div className="card space-y-2 p-4 text-sm">
-              <h2 className="font-semibold">Signer</h2>
-              <div>{href ? <Link href={href} className="font-medium text-brand-600">{r.signerName}</Link> : r.signerName}</div>
-              <div className="text-xs text-slate-500">{r.signerType ? SIGNER_LABEL[r.signerType as SignerType] : ""}{r.signerCompany ? ` · ${r.signerCompany}` : ""}</div>
-              <div className="text-xs text-slate-500">{r.signerEmail}</div>
+              <h2 className="font-semibold">{multi ? "Signers" : "Signer"}</h2>
+              {multi ? (
+                <ol className="space-y-3">
+                  {parties.map((p, i) => <PartyRow key={p.slot} p={p} n={i + 1} href={p.slot === 0 ? href : null} />)}
+                </ol>
+              ) : <>
+                <div>{href ? <Link href={href} className="font-medium text-brand-600">{r.signerName}</Link> : r.signerName}</div>
+                <div className="text-xs text-slate-500">{r.signerType ? SIGNER_LABEL[r.signerType as SignerType] : ""}{r.signerCompany ? ` · ${r.signerCompany}` : ""}</div>
+                <div className="text-xs text-slate-500">{r.signerEmail}</div>
+              </>}
               <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">
                 {!uploaded && <><dt className="text-slate-500">Sent</dt><dd>{date(r.sentAt)}{r.createdBy ? ` by ${r.createdBy}` : ""}</dd></>}
-                {!uploaded && <><dt className="text-slate-500">Viewed</dt><dd>{date(r.viewedAt)}</dd></>}
-                <dt className="text-slate-500">Signed</dt><dd>{date(r.signedAt)}</dd>
+                {!uploaded && !multi && <><dt className="text-slate-500">Viewed</dt><dd>{date(r.viewedAt)}</dd></>}
+                <dt className="text-slate-500">{multi ? "Completed" : "Signed"}</dt><dd>{date(r.signedAt)}</dd>
                 {r.status === "SIGNED" && <><dt className="text-slate-500">Effect</dt><dd>{(r.kind === "NDA" || r.kind === "LOI") && r.investorId ? (r.autoApprove ? "Unlocked" : "Sent for review") : "Filed"}</dd></>}
               </dl>
             </div>
@@ -93,8 +113,8 @@ export default async function SignatureRequestPage({ params }: { params: Promise
             )}
             {isOpen(r.status) && (
               <div className="card space-y-3 p-4">
-                <h2 className="font-semibold">Waiting for signature</h2>
-                <RenewLinkPanel id={r.id} />
+                <h2 className="font-semibold">Waiting for {multi ? parties.filter((p) => due.includes(p.slot)).map((p) => p.name).join(" and ") : "signature"}</h2>
+                {parties.filter((p) => due.includes(p.slot) && p.issued).map((p) => <RenewLinkPanel key={p.slot} id={r.id} slot={p.slot} name={multi ? p.name : undefined} />)}
                 <form action={voidRequest} className="space-y-2">
                   <input type="hidden" name="id" value={r.id} />
                   <input name="reason" className="input py-1.5 text-sm" placeholder="Reason (optional)" />
@@ -120,9 +140,34 @@ export default async function SignatureRequestPage({ params }: { params: Promise
           locked={!editable}
           isTemplate={r.isTemplate}
           projects={listings}
-          settings={{ title: r.title, kind: r.kind, projectId: r.projectId ?? "", message: r.message ?? "", autoApprove: r.autoApprove, listingNda: r.listingNda }}
+          settings={{ title: r.title, kind: r.kind, projectId: r.projectId ?? "", message: r.message ?? "", autoApprove: r.autoApprove, listingNda: r.listingNda, signOrder: r.signOrder }}
+          signers={r.signers.map((c) => ({ slot: c.slot, role: c.role, ref: cosignerRef(c), order: c.signOrder }))}
+          people={[...team, ...signers]}
+          recipientName={r.isTemplate ? null : r.signerName}
         />
       )}
     </div>
+  );
+}
+
+const PARTY_STATUS: Record<Party["status"], { label: string; tone: "slate" | "blue" | "amber" | "green" | "red" }> = {
+  WAITING: { label: "Waiting for turn", tone: "slate" }, SENT: { label: "Sent", tone: "blue" }, VIEWED: { label: "Viewed", tone: "amber" }, SIGNED: { label: "Signed", tone: "green" }, DECLINED: { label: "Declined", tone: "red" },
+};
+
+/** One signer of a multi-signer request: order, role, who, and where they stand. */
+function PartyRow({ p, n, href }: { p: Party; n: number; href: string | null }) {
+  const st = PARTY_STATUS[p.status];
+  return (
+    <li className={`border-l-4 pl-2 ${signerColor(p.slot)} bg-transparent`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">{n}. {p.role}</div>
+          <div className="truncate font-medium text-slate-900">{href ? <Link href={href} className="text-brand-600">{p.name}</Link> : p.name}</div>
+          <div className="truncate text-xs text-slate-500">{p.kind}{p.company ? ` · ${p.company}` : ""}{p.email ? ` · ${p.email}` : ""}</div>
+        </div>
+        <Badge tone={st.tone}>{st.label}</Badge>
+      </div>
+      {p.signedAt && <div className="mt-0.5 text-xs text-slate-500">Signed <LocalTime value={p.signedAt} /></div>}
+    </li>
   );
 }
