@@ -286,7 +286,7 @@ export async function signRequest(_: SignState, f: FormData): Promise<SignState>
   if (effect) await logEvent(r.id, "UNLOCKED", effect);
 
   await notifyTeam(r, `Signed: ${r.title} — ${signerName}`, `${signerName}${r.signerCompany ? ` (${r.signerCompany})` : ""} signed "${r.title}".${effect ? ` ${effect}.` : ""}`);
-  if (r.signerEmail) await sendEmail({ to: r.signerEmail, subject: `Signed: ${r.title}`, text: `Hi ${signerName.split(" ")[0]},\n\nThank you for signing "${r.title}". You can download your signed copy from the same link for 30 days${r.investorId ? ", and any time from My Portal" : ""}.${effect && r.autoApprove && r.projectId ? "\n\nThe confidential details of the listing are now open to you in the DEAC Marketplace." : ""}\n\n— DEAC Team` });
+  if (r.signerEmail) await sendEmail({ to: r.signerEmail, toName: signerName, investorId: r.investorId, subject: `Signed: ${r.title}`, text: `Hi ${signerName.split(" ")[0]},\n\nThank you for signing "${r.title}". You can download your signed copy from the same link for 30 days${r.investorId ? ", and any time from My Portal" : ""}.${effect && r.autoApprove && r.projectId ? "\n\nThe confidential details of the listing are now open to you in the DEAC Marketplace." : ""}\n\n— DEAC Team` });
   refresh(r.id);
   revalidatePath("/admin/lois");
   revalidatePath("/portal");

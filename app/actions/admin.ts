@@ -117,7 +117,7 @@ export async function setInvestorStage(f: FormData) {
     const wasPending = inv.user.status !== "APPROVED";
     await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
     if (wasPending)
-      await sendEmail({ to: inv.email, toName: inv.name, fromUserId: admin.id, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— ${admin.name}, DEAC` });
+      await sendEmail({ to: inv.email, toName: inv.name, fromUserId: admin.id, investorId: inv.id, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— ${admin.name}, DEAC` });
   }
   if (inv.user && stage === "DECLINED") await db.user.update({ where: { id: inv.user.id }, data: { status: "REJECTED" } });
   revalidatePath(`/admin/investors/${id}`);
@@ -382,7 +382,7 @@ export async function reviewLoi(f: FormData) {
   revalidatePath("/admin/investors", "layout");
   if (status === "APPROVED") {
     if (loi.investor.stage === "APPROVED") await db.investor.update({ where: { id: loi.investorId }, data: { stage: "ACTIVE" } });
-    await sendEmail({ to: loi.investor.email, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The LOI-level details and documents are now open in your DEAC Marketplace portal. When you're ready to go deeper, confirm your interest on the listing to request the full data room.\n\n— DEAC Team` });
+    await sendEmail({ to: loi.investor.email, toName: loi.investor.name, fromUserId: admin.id, investorId: loi.investorId, subject: `Data room access: ${loi.project.code}`, text: `Hi ${loi.investor.name},\n\nYour letter of interest for ${loi.project.title} (${loi.project.code}) has been accepted. The LOI-level details and documents are now open in your DEAC Marketplace portal. When you're ready to go deeper, confirm your interest on the listing to request the full data room.\n\n— DEAC Team` });
   }
   revalidatePath("/admin/lois");
   revalidatePath(`/marketplace/${loi.projectId}`);
@@ -402,7 +402,7 @@ export async function reviewDealStep(f: FormData) {
     const next = d.step === "NDA"
       ? "Your NDA has been confirmed. The confidential project details and NDA-level documents are now open, and you can submit a letter of interest."
       : "Full diligence access is confirmed. The complete data room is now open.";
-    await sendEmail({ to: d.investor.email, subject: `${d.project.code}: ${d.step === "NDA" ? "NDA confirmed" : "Data room fully open"}`, text: `Hi ${d.investor.name},\n\n${next}\n\nOpen ${d.project.title} in your DEAC Marketplace portal to continue.\n\n— DEAC Team` });
+    await sendEmail({ to: d.investor.email, toName: d.investor.name, fromUserId: admin.id, investorId: d.investorId, subject: `${d.project.code}: ${d.step === "NDA" ? "NDA confirmed" : "Data room fully open"}`, text: `Hi ${d.investor.name},\n\n${next}\n\nOpen ${d.project.title} in your DEAC Marketplace portal to continue.\n\n— DEAC Team` });
   }
   revalidatePath("/admin/lois");
   revalidatePath(`/marketplace/${d.projectId}`);

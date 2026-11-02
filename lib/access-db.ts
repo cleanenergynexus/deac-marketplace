@@ -40,6 +40,6 @@ export async function confirmListingAccess(investorId: string, projectId: string
   await db.activity.create({ data: { investorId, projectId, kind: "SYSTEM", by, body: `Access to ${p.code} opened to ${STAGE_INFO[after].label} (Investor CRM stage).` } });
   await touchInterest(investorId, projectId, after === "DILIGENCE" ? "DILIGENCE" : after === "LOI" ? "LOI_APPROVED" : "NDA", by);
   const what = after === "NDA" ? "Your NDA has been confirmed. The confidential project details and NDA-level documents are now open, and you can submit a letter of interest." : after === "LOI" ? "Your letter of interest has been accepted. The LOI-level details and documents are now open." : "Full diligence access is confirmed. The complete data room is now open.";
-  await sendEmail({ to: inv.email, subject: `${p.code}: ${STAGE_INFO[after].label}`, text: `Hi ${inv.name},\n\n${what}\n\nOpen ${p.title} in your DEAC Marketplace portal to continue.\n\n— DEAC Team` });
+  await sendEmail({ to: inv.email, toName: inv.name, investorId, subject: `${p.code}: ${STAGE_INFO[after].label}`, text: `Hi ${inv.name},\n\n${what}\n\nOpen ${p.title} in your DEAC Marketplace portal to continue.\n\n— DEAC Team` });
   return after;
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { createInvestor } from "@/app/actions/admin";
 import { InvestorForm } from "@/components/InvestorForm";
+import { getTeam } from "@/lib/tasks-db";
 import { getAgents } from "@/lib/agents-db";
 import { PageHeader } from "@/components/ui";
 
@@ -20,7 +21,7 @@ export default async function NewInvestor({ searchParams }: { searchParams: Prom
     <div>
       <Link href={project ? `/admin/investors?listing=${project.id}` : "/admin/investors/contacts"} className="text-sm text-brand-600">← {project ? project.code : "Contacts"}</Link>
       <PageHeader title="Add investor" subtitle={project ? `They'll be added to ${project.code} · ${project.title} on the board.` : "An investor contact. Type their company: an existing one is picked, a new name creates it."} />
-      <div className="card p-6"><InvestorForm action={createInvestor} firms={firms.map((f) => f.name)} firm={firm?.name} projectId={project?.id} agents={agents} /></div>
+      <div className="card p-6"><InvestorForm action={createInvestor} firms={firms.map((f) => f.name)} firm={firm?.name} projectId={project?.id} agents={agents} team={(await getTeam()).map((u) => u.name)} /></div>
     </div>
   );
 }

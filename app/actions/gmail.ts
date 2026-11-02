@@ -14,6 +14,15 @@ function refreshRecords() {
   revalidatePath("/admin/agents");
 }
 
+export async function saveMySignature(_: { error?: string; ok?: boolean } | undefined, f: FormData): Promise<{ error?: string; ok?: boolean }> {
+  const me = await requireAdmin();
+  const sig = String(f.get("signature") ?? "").replace(/\r\n/g, "\n").trim();
+  if (sig.length > 1000) return { error: "Keep the signature under 1,000 characters." };
+  await db.user.update({ where: { id: me.id }, data: { emailSignature: sig || null } });
+  revalidatePath("/admin/account");
+  return { ok: true };
+}
+
 export async function unlinkGmail() {
   const me = await requireAdmin();
   await unlinkAccount(me.id);
@@ -61,7 +70,7 @@ export async function sendCrmEmail(f: FormData): Promise<SendState> {
       : null;
   if (!person) return { error: "That contact no longer exists." };
   if (!person.email) return { error: `${person.name} has no email address. Add one on the record first.` };
-  const mail = await sendEmail({ to: person.email, toName: person.name, subject, text, fromUserId: me.id });
+  const mail = await sendEmail({ to: person.email, toName: person.name, subject, text, fromUserId: me.id, investorId });
   if (mail.status === "FAILED") return { error: `The email didn't go out: ${mail.error ?? "unknown error"}` };
   if (mail.status === "LOGGED") return { error: "Nothing was sent: link your Gmail under My account (or set RESEND_API_KEY) to send from here. Use Log email to record an email you sent elsewhere." };
   await recordSentEmail({ investorId, contactId }, { subject, text, by: me.name, projectId, gmail: mail.gmail });

@@ -151,10 +151,11 @@ function nameAddr(name: string | null | undefined, email: string) {
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
 
 /** A plain-text email as Gmail's API wants it (base64url RFC 2822). */
-export function buildRaw(o: { fromName?: string | null; from: string; to: string; toName?: string | null; subject: string; text: string; replyTo?: string | null }): string {
+export function buildRaw(o: { fromName?: string | null; from: string; to: string; toName?: string | null; subject: string; text: string; replyTo?: string | null; cc?: string[] }): string {
   const headers = [
     `From: ${nameAddr(o.fromName, oneLine(o.from))}`,
     `To: ${nameAddr(o.toName, oneLine(o.to))}`,
+    ...(o.cc?.length ? [`Cc: ${o.cc.map(oneLine).join(", ")}`] : []),
     ...(o.replyTo ? [`Reply-To: ${oneLine(o.replyTo)}`] : []),
     `Subject: ${encodeWord(oneLine(o.subject))}`,
     "MIME-Version: 1.0",

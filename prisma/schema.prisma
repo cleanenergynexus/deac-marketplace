@@ -30,6 +30,7 @@ model User {
   tasks        Activity[] @relation("TaskAssignee")
   phone        String? // E.164. Shown to a team member's referral agents, and on the agent's own profile
   company      String? // referral agents: their own firm
+  emailSignature String? // team members: replaces the "— Name, DEAC" sign-off on emails the marketplace sends for them
   bookingUrl   String? // team members: meeting booking link (Calendly, HubSpot...) shown to their referral agents
   // Referral agents: the DEAC partner (a team login) who supports their deals and meetings.
   partnerId    String?
