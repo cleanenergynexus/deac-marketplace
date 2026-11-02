@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignatureList } from "@/components/SignatureList";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { addAgent, removeAgent, viewAsAgent } from "@/app/actions/agents-admin";
@@ -53,6 +54,10 @@ export default async function Agents() {
                     <input type="hidden" name="id" value={a.id} />
                     <button className="btn-ghost py-1.5">View as agent</button>
                   </form>
+                  <details className="mt-3 rounded-md border border-slate-200 p-2" id={`signatures-${a.id}`}>
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-700">NDAs &amp; agreements</summary>
+                    <div className="mt-2"><SignatureList signer={`AGENT:${a.id}`} /></div>
+                  </details>
                   {isAdmin && (
                     <form action={removeAgent} className="mt-2">
                       <input type="hidden" name="id" value={a.id} />

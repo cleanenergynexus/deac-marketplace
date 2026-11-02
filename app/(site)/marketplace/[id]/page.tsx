@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { db } from "@/lib/db";
 import { listingAccess, requireMember } from "@/lib/auth";
 import { requestDiligence, submitAnalysisRequest, submitLoi, submitNda } from "@/app/actions/member";
+import { startListingNda } from "@/app/actions/esign";
+import { listingNdaTemplate } from "@/lib/esign-db";
 import { ActionForm } from "@/components/ActionForm";
 import { Checks } from "@/components/Checks";
 import { Blurred, DealProgress } from "@/components/DealProgress";
@@ -74,6 +76,13 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
   const status = { nda: access.nda?.status as StepStatus | undefined, loi: access.loi?.status as StepStatus | undefined, diligence: access.diligence?.status as StepStatus | undefined };
   const next = nextStep(stage, status);
+  // E-signature NDA: the listing's NDA template (signed in the app), and any NDA already sent to this investor.
+  const esign = u.investorId && next.step === "NDA" && tab === "loi"
+    ? {
+        template: !!(await listingNdaTemplate(id)),
+        open: (await db.signatureRequest.findFirst({ where: { investorId: u.investorId, projectId: id, kind: "NDA", status: { in: ["SENT", "VIEWED"] }, isTemplate: false }, select: { id: true } }))?.id ?? null,
+      }
+    : { template: false, open: null };
   const favorite = u.investorId ? !!(await db.favorite.findUnique({ where: { investorId_projectId: { investorId: u.investorId, projectId: id } } })) : false;
   const requests = u.investorId && tab === "documents" ? await db.analysisRequest.findMany({ where: { projectId: id, investorId: u.investorId }, orderBy: { createdAt: "desc" } }) : [];
 
@@ -215,7 +224,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <p className="text-sm text-slate-600">{originated
               ? "You originated this listing, so you see all of it. Investors move through NDA, letter of interest and diligence here; your DEAC partner keeps you posted."
               : "As a referral agent you see this listing at the Teaser level. Your DEAC partner can share more with you or your investors."}</p>
-          ) : <NextStep projectId={p.id} ndaUrl={p.ndaUrl} next={next} isInvestor={!!u.investorId} preview={isAdmin} access={access} />}
+          ) : <NextStep projectId={p.id} ndaUrl={p.ndaUrl} next={next} isInvestor={!!u.investorId} preview={isAdmin} access={access} esign={esign} />}
         </div>
       </div>
     );
@@ -269,13 +278,22 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
 type Access = Awaited<ReturnType<typeof listingAccess>>;
 
-function NextStep({ projectId, ndaUrl, next, isInvestor, preview, access }: { projectId: string; ndaUrl: string | null; next: ReturnType<typeof nextStep>; isInvestor: boolean; preview: boolean; access: Access }) {
+function NextStep({ projectId, ndaUrl, next, isInvestor, preview, access, esign }: { projectId: string; ndaUrl: string | null; next: ReturnType<typeof nextStep>; isInvestor: boolean; preview: boolean; access: Access; esign: { template: boolean; open: string | null } }) {
   if (!next.step) return <p className="text-emerald-700">The full data room is open. The DEAC team will coordinate next steps with you directly.</p>;
   if (!isInvestor) return <p className="text-sm text-slate-500">{preview ? `Investors at this stage see the "${STAGE_INFO[next.step].step}" step here.` : ""}</p>;
   const declined = next.status === "DECLINED" && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">Your last request wasn&apos;t approved. Contact the DEAC team, or submit again.</p>;
 
   if (next.step === "NDA") {
     if (next.status === "PENDING") return <p className="text-slate-700">NDA signed by <span className="font-semibold">{access.nda?.signerName}</span> on {date(access.nda?.createdAt)}. The DEAC team is confirming it; you&apos;ll get an email when the confidential details open.</p>;
+    if (esign.open || esign.template) return (
+      <div id="nda">
+        {declined}
+        <p className="text-slate-700">Before a letter of interest, review and sign the NDA for this project. It takes about a minute: your details are prefilled from your profile, and you sign right here.</p>
+        {esign.open
+          ? <Link href={`/portal/sign/${esign.open}`} className="btn mt-4">Continue to sign the NDA</Link>
+          : <form action={startListingNda} className="mt-4"><input type="hidden" name="projectId" value={projectId} /><button className="btn">Review &amp; sign the NDA</button></form>}
+      </div>
+    );
     return (
       <div id="nda">
         {declined}

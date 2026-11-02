@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignatureList } from "@/components/SignatureList";
 import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -211,6 +212,11 @@ export default async function InvestorRecord({ params, searchParams }: { params:
               <div className="mt-1 text-xs text-slate-500">{[inv.company.investorType, shortPlace(inv.company), `${inv.company.investors.length + 1} contact${inv.company.investors.length ? "s" : ""}`].filter(Boolean).join(" · ")}</div>
             </Link>
           ) : <p className="text-sm text-slate-500">No company on file. <Link href="?tab=profile" className="text-brand-600">Add one</Link></p>}
+        </section>
+
+        <section className="card p-4" id="signatures">
+          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; contracts</h2>
+          <SignatureList signer={`INVESTOR:${inv.id}`} compact />
         </section>
 
         <section className="card p-4" id="listings">

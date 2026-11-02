@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentHome() {
   const me = await requireAgent();
-  const [partner, contacts, companies, investors, listings, activity, options] = await Promise.all([
+  const [partner, contacts, companies, investors, listings, activity, options, docs] = await Promise.all([
     getPartner(me.partnerId),
     db.contact.count({ where: agentContactWhere(me.id) }),
     db.developer.count({ where: agentCompanyWhere(me.id) }),
@@ -25,6 +25,7 @@ export default async function AgentHome() {
       take: 25,
     }),
     meetingOptions(me.id),
+    db.signatureRequest.findMany({ where: { agentId: me.id, isTemplate: false, status: { in: ["SENT", "VIEWED", "SIGNED"] } }, orderBy: { updatedAt: "desc" }, take: 20 }),
   ]);
   return (
     <div className="space-y-6">
@@ -35,6 +36,18 @@ export default async function AgentHome() {
         <Link href="/agent/listings"><Stat label="Listings" value={listings} sub="Projects of your developers" /></Link>
         <Link href="/agent/import"><Stat label="New listing" value="Import" sub="From a teaser, memo or web page" /></Link>
       </div>
+      {docs.length > 0 && (
+        <Section title="Your agreements with DEAC">
+          <ul className="divide-y divide-slate-100">{docs.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <span className="font-medium">{d.title}</span>
+              {d.status === "SIGNED"
+                ? <a href={`/api/esign/${d.id}?file=signed`} target="_blank" className="text-brand-600">Signed · open</a>
+                : <Link href={`/agent/sign/${d.id}`} className="btn py-1.5">Review &amp; sign</Link>}
+            </li>
+          ))}</ul>
+        </Section>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <Section title="Recent activity with your contacts">
           <ActivityFeed items={activity} showContact readOnly links={AGENT_LINKS} empty="Nothing yet. Once DEAC starts working with your contacts, every call, email and meeting shows here." />

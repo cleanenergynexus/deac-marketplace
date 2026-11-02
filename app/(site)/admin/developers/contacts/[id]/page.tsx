@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignatureList } from "@/components/SignatureList";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteContact, makePrimaryContact, setProjectContact, updateContact } from "@/app/actions/contacts";
@@ -135,6 +136,10 @@ export default async function ContactRecord({ params, searchParams }: { params: 
 
       {/* Right: associations */}
       <aside className="space-y-4 lg:col-start-2 xl:col-start-auto">
+        <section className="card p-4" id="signatures">
+          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; contracts</h2>
+          <SignatureList signer={`CONTACT:${contact.id}`} compact />
+        </section>
         <section className="card p-4">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="COMPANY" /> Company</h2>
           <Link href={`/admin/developers/${dev.id}`} className="block rounded-lg border border-slate-200 p-3 hover:border-brand-500">
