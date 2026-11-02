@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { isLogKind, parseWhen } from "@/lib/crm";
 import { addressFromForm } from "@/lib/address";
 import { getTeam, pickAssignee } from "@/lib/tasks-db";
+import { notifyTaskAssignee } from "@/lib/task-mail";
 import { STEP_SOURCE, STEP_STAGE, accessForColumn, advanceStage } from "@/lib/investor-crm";
 import { confirmListingAccess } from "@/lib/access-db";
 import { DEFAULT_INVESTOR_PIPELINE, funnelStages, normalizePipeline, pipelineLabel, placeStage, type PipelineConfig } from "@/lib/pipeline";
@@ -140,7 +141,7 @@ export async function logInvestorActivity(f: FormData) {
   if (projectId && !(await db.project.count({ where: { id: projectId } }))) throw new Error("That listing no longer exists.");
   const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTeam(), f.get("assigneeId")) : null;
   const createdAt = when && kind !== "TASK" ? when : new Date();
-  await db.activity.create({
+  const created = await db.activity.create({
     data: {
       investorId, projectId, kind, subject, body,
       outcome: kind === "CALL" || kind === "EMAIL" ? s(f, "outcome") : null,
@@ -149,6 +150,7 @@ export async function logInvestorActivity(f: FormData) {
     },
   });
   if (kind !== "TASK") await db.investor.update({ where: { id: investorId }, data: { lastContactAt: createdAt } });
+  else await notifyTaskAssignee(created, admin);
   revalidateInvestorCrm(investorId, inv.firmId);
   if (kind === "TASK") revalidatePath("/admin", "layout");
 }
