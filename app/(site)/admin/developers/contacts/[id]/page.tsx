@@ -23,7 +23,7 @@ import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
 import { staffLevel, visibleStaff } from "@/lib/tasks";
-import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +134,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
         </nav>
         <GmailRecordSync contactId={id} />
         <ActivityComposer key={tab.value} contactId={id} contactEmail={contact.email} sendFrom={{ gmail: (await getGmailAccount(me.id))?.email ?? null, resend: !!process.env.RESEND_API_KEY }} initialKind={tab.log} projects={dev.projects.map((p) => ({ id: p.id, label: `${p.code} · ${p.title}` }))} assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} />
-        <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} empty={tab.value === "activity" ? `Nothing logged with ${contact.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
+        <ActivityFeed items={items} assigning={{ options: assignees, allowUnassigned }} editing={await getTaskEditing(me, team)} empty={tab.value === "activity" ? `Nothing logged with ${contact.name} yet. Log a note, email, call, meeting or task above.` : `No ${tab.label.toLowerCase()} yet.`} />
       </main>
 
       {/* Right: associations */}

@@ -7,6 +7,7 @@ import { threadUrl } from "@/lib/gmail";
 import { LocalTime } from "@/components/LocalTime";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { AssigneeSelect, type Assignee } from "@/components/AssigneeSelect";
+import { TaskEditButton, type TaskEditing } from "@/components/TaskEditButton";
 
 export type FeedItem = Activity & {
   contact?: { id: string; name: string } | null;
@@ -28,9 +29,10 @@ const ADMIN_LINKS: FeedLinks = { contact: (id) => `/admin/developers/contacts/${
 
 /**
  * Contact / company timeline grouped by month, newest first. Tasks can be ticked off; logged entries can be deleted.
+ * `editing` adds an Edit button on tasks (title, details, due date, assignee, contact, project).
  * `readOnly` (referral agents) shows the same history with nothing to tick, reassign or delete.
  */
-export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet.", assigning, readOnly = false, links = ADMIN_LINKS }: { items: FeedItem[]; showContact?: boolean; empty?: string; assigning?: Assigning; readOnly?: boolean; links?: FeedLinks }) {
+export function ActivityFeed({ items, showContact = false, empty = "Nothing logged yet.", assigning, editing, readOnly = false, links = ADMIN_LINKS }: { items: FeedItem[]; showContact?: boolean; empty?: string; assigning?: Assigning; editing?: TaskEditing; readOnly?: boolean; links?: FeedLinks }) {
   if (!items.length) return <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{empty}</p>;
   return (
     <div className="space-y-5">
@@ -76,8 +78,11 @@ export function ActivityFeed({ items, showContact = false, empty = "Nothing logg
                       {a.project && <Link href={links.project(a.project.id)} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600 hover:text-brand-600" title={a.project.title}>{a.project.code}</Link>}
                       {a.by && <span>{a.kind === "EMAIL" && a.outcome === "RECEIVED" && a.mailbox ? "from" : "by"} {a.by}</span>}
                       {a.mailbox && a.gmailThreadId && !readOnly && <a href={threadUrl(a.mailbox, a.gmailThreadId)} target="_blank" rel="noreferrer" className="text-brand-600" title={`In ${a.mailbox}`}>Open in Gmail</a>}
+                      {a.kind === "TASK" && editing && !readOnly && (
+                        <span className="ml-auto"><TaskEditButton task={a} editing={{ ...editing, assignees: withCurrent(editing.assignees, a.assignee) }} className="text-slate-400 hover:text-brand-600" /></span>
+                      )}
                       {isLogKind(a.kind) && !readOnly && (
-                        <form action={deleteActivity} className="ml-auto">
+                        <form action={deleteActivity} className={a.kind === "TASK" && editing ? "" : "ml-auto"}>
                           <input type="hidden" name="id" value={a.id} />
                           <ConfirmButton message="Delete this entry from the timeline?" className="text-slate-400 hover:text-red-600">Delete</ConfirmButton>
                         </form>

@@ -18,7 +18,7 @@ import { formatPhone } from "@/lib/phone";
 import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { num, usd } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
-import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +109,7 @@ export default async function InvestorCompany({ params }: { params: Promise<{ id
         </div>
         <Section title="Activity">
           <p className="mb-3 text-xs text-slate-500">Everything logged with {firm.name}&apos;s people. Open a contact to log a note, email, call, meeting or task.</p>
-          <ActivityFeed items={activities} showContact />
+          <ActivityFeed items={activities} showContact editing={await getTaskEditing(me, team)} />
         </Section>
       </div>
     </div>
