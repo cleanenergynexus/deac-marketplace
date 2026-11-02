@@ -6,7 +6,8 @@ import { requireAdmin } from "@/lib/auth";
 import { isLogKind, parseWhen } from "@/lib/crm";
 import { addressFromForm } from "@/lib/address";
 import { getTeam, pickAssignee } from "@/lib/tasks-db";
-import { STEP_SOURCE, STEP_STAGE, advanceStage } from "@/lib/investor-crm";
+import { STEP_SOURCE, STEP_STAGE, accessForColumn, advanceStage } from "@/lib/investor-crm";
+import { confirmListingAccess } from "@/lib/access-db";
 import { DEFAULT_INVESTOR_PIPELINE, funnelStages, normalizePipeline, pipelineLabel, placeStage, type PipelineConfig } from "@/lib/pipeline";
 import { getInvestorPipeline, PIPELINE_ROW } from "@/lib/pipeline-db";
 import { INVESTOR_TYPES } from "@/lib/constants";
@@ -87,6 +88,8 @@ export async function addInterest(f: FormData) {
   for (const investorId of ids.filter((i) => !linked.has(i))) {
     await db.investorInterest.create({ data: { investorId, projectId, stage, source: STEP_SOURCE.ADDED } });
     await db.activity.create({ data: { investorId, projectId, kind: "STAGE", body: `Linked to ${p.code} (${p.title}) · ${pipelineLabel(stages, stage)}`, by: admin.name } });
+    const access = accessForColumn(stages, stage);
+    if (access) await confirmListingAccess(investorId, projectId, access, admin.name);
   }
   revalidateInvestorCrm(ids.length === 1 ? ids[0] : null);
 }
@@ -102,6 +105,13 @@ export async function setInterestStage(f: FormData) {
   if (row.stage === stage) return;
   await db.investorInterest.update({ where: { id }, data: { stage } });
   await db.activity.create({ data: { investorId: row.investorId, projectId: row.projectId, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${pipelineLabel(stages, stage)}`, by: admin.name } });
+  // The column stands for listing access too: "NDA Signed" confirms the NDA on the listing, and so on (never lowers it).
+  const access = accessForColumn(stages, stage);
+  if (access && (await confirmListingAccess(row.investorId, row.projectId, access, admin.name))) {
+    revalidatePath(`/admin/projects/${row.projectId}`);
+    revalidatePath(`/marketplace/${row.projectId}`);
+    revalidatePath("/admin/lois");
+  }
   revalidateInvestorCrm(row.investorId);
 }
 

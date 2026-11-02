@@ -68,3 +68,17 @@ export const firmKey = (name: string) => name.replace(/\s+/g, " ").trim().toLowe
 
 /** Badge color for an investor's membership stage (Applied, Approved Member...). */
 export const memberTone = (stage: string) => (stage === "APPLIED" ? "amber" : ["APPROVED", "ACTIVE"].includes(stage) ? "green" : stage === "DECLINED" ? "red" : "slate") as "amber" | "green" | "red" | "slate";
+
+/**
+ * Listing access a board column stands for: moving a tile to "NDA Signed" (or later) means the NDA is confirmed,
+ * "LOI Accepted" the LOI, "In Diligence" the full data room. Columns before those, or funnels without them, mean nothing.
+ */
+export function accessForColumn(stages: readonly PipelineStage[], stage: string): "NDA" | "LOI" | "DILIGENCE" | null {
+  const at = stages.findIndex((s) => s.value === stage);
+  if (at < 0 || stage === "PASSED") return null; // "Passed" sits at the end but opens nothing
+  const reached = (v: string) => { const i = stages.findIndex((s) => s.value === v); return i >= 0 && at >= i; };
+  if (reached(STEP_STAGE.DILIGENCE)) return "DILIGENCE";
+  if (reached(STEP_STAGE.LOI_APPROVED)) return "LOI";
+  if (reached(STEP_STAGE.NDA)) return "NDA";
+  return null;
+}

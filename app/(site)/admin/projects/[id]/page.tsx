@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { deleteProject, grantStage, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
+import { deleteProject, grantStage, reviewDealStep, reviewLoi, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
 import { ProjectForm } from "@/components/ProjectForm";
 import { StageSelect } from "@/components/StageSelect";
 import { funnelStages, projectStage } from "@/lib/pipeline";
@@ -30,11 +30,11 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
   const show = parseDisclosure(p.disclosure);
 
   // Every investor engaged on this listing, with the stage they've reached.
-  type Row = { investor: (typeof p.lois)[number]["investor"]; nda?: StepStatus; loi?: StepStatus; diligence?: StepStatus; amount?: number | null };
+  type Row = { investor: (typeof p.lois)[number]["investor"]; nda?: StepStatus; loi?: StepStatus; diligence?: StepStatus; amount?: number | null; ndaId?: string; loiId?: string; diligenceId?: string };
   const engaged = new Map<string, Row>();
   const row = (inv: Row["investor"]) => engaged.get(inv.id) ?? engaged.set(inv.id, { investor: inv }).get(inv.id)!;
-  for (const l of p.lois) Object.assign(row(l.investor), { loi: l.status as StepStatus, amount: l.amount });
-  for (const d of p.dealSteps) row(d.investor)[d.step === "NDA" ? "nda" : "diligence"] = d.status as StepStatus;
+  for (const l of p.lois) Object.assign(row(l.investor), { loi: l.status as StepStatus, amount: l.amount, loiId: l.id });
+  for (const d of p.dealSteps) Object.assign(row(d.investor), d.step === "NDA" ? { nda: d.status as StepStatus, ndaId: d.id } : { diligence: d.status as StepStatus, diligenceId: d.id });
 
   // Pre-fill the calculator from listing data when it hasn't been scored yet.
   const assetMap: Record<string, string> = { "Powered Land": "Powered Land", "Powered Shell": "Powered Shell", "Mining Facility": "Mining Facility", "Industrial Conversion": "Industrial Conversion", "Old Data Center": "Old Data Center" };
@@ -81,9 +81,9 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
                 <tr key={r.investor.id}>
                   <td className="td"><Link href={`/admin/investors/${r.investor.id}`} className="text-brand-600">{r.investor.name}</Link><div className="text-xs text-slate-500">{r.investor.firm}</div></td>
                   <td className="td"><Badge tone={st === "TEASER" ? "slate" : "green"}>{STAGE_INFO[st].label}</Badge></td>
-                  <td className="td">{r.nda ? <Badge tone={statusTone(r.nda)}>{r.nda}</Badge> : r.investor.ndaSigned ? <span className="text-xs text-slate-500">Master NDA</span> : "—"}</td>
-                  <td className="td">{r.loi ? <><Badge tone={statusTone(r.loi)}>{r.loi}</Badge> <span className="text-xs">{usd(r.amount)}</span></> : "—"}</td>
-                  <td className="td">{r.diligence ? <Badge tone={statusTone(r.diligence)}>{r.diligence}</Badge> : "—"}</td>
+                  <td className="td">{r.nda ? <Badge tone={statusTone(r.nda)}>{r.nda}</Badge> : r.investor.ndaSigned ? <span className="text-xs text-slate-500">Master NDA</span> : "—"}{r.nda === "PENDING" && r.ndaId && <Confirm id={r.ndaId} />}</td>
+                  <td className="td">{r.loi ? <><Badge tone={statusTone(r.loi)}>{r.loi}</Badge> <span className="text-xs">{usd(r.amount)}</span></> : "—"}{r.loi === "PENDING" && r.loiId && <Confirm id={r.loiId} loi />}</td>
+                  <td className="td">{r.diligence ? <Badge tone={statusTone(r.diligence)}>{r.diligence}</Badge> : "—"}{r.diligence === "PENDING" && r.diligenceId && <Confirm id={r.diligenceId} />}</td>
                 </tr>
               );
             })}</tbody></table>
@@ -103,5 +103,15 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
         </Section>
       </div>
     </div>
+  );
+}
+
+/** One-click confirm for a pending NDA / LOI / diligence step (same as the NDAs & LOIs queue). */
+function Confirm({ id, loi }: { id: string; loi?: boolean }) {
+  return (
+    <form action={loi ? reviewLoi : reviewDealStep} className="mt-1">
+      <input type="hidden" name="id" value={id} /><input type="hidden" name="status" value="APPROVED" />
+      <button className="text-xs font-semibold text-brand-600 hover:underline">{loi ? "Accept" : "Confirm"}</button>
+    </form>
   );
 }
