@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
@@ -24,7 +25,7 @@ export default async function AgentContact({ params, searchParams }: { params: P
   const me = await requireAgent();
   const contact = await db.contact.findFirst({
     where: { AND: [{ id }, agentContactWhere(me.id)] },
-    include: { developer: { include: { projects: { select: { id: true, code: true, title: true, mw: true, state: true, dealType: true, dealStage: true, pipelineStage: true, fundingNeeded: true }, orderBy: { createdAt: "asc" } } } } },
+    include: { developer: { include: { projects: { select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true, dealStage: true, pipelineStage: true, fundingNeeded: true }, orderBy: { createdAt: "asc" } } } } },
   });
   if (!contact) notFound();
   const dev = contact.developer;
@@ -84,7 +85,7 @@ export default async function AgentContact({ params, searchParams }: { params: P
             {dev.projects.map((p) => (
               <li key={p.id} className="rounded-lg border border-slate-200 p-3 text-sm">
                 <Link href={`/agent/listings/${p.id}`} className="font-medium text-slate-900 hover:text-brand-600">{p.title}</Link>
-                <div className="mt-0.5 text-xs text-slate-500"><span className="font-mono">{p.code}</span> · {num(p.mw)} MW · {p.state} · {usd(p.fundingNeeded)}</div>
+                <div className="mt-0.5 text-xs text-slate-500"><span className="font-mono">{p.code}</span> · {num(p.mw)} MW · {placeShort(p)} · {usd(p.fundingNeeded)}</div>
                 <div className="mt-1 flex flex-wrap gap-1">
                   <Badge tone={isClosedDeal(p.dealStage) ? "red" : "slate"}>{projectStageLabel(pipeline, p, dev.stage)}</Badge>
                 </div>

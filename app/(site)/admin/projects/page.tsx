@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { db } from "@/lib/db";
 import { Badge, PageHeader, Empty, statusTone } from "@/components/ui";
 import { dealTypeLabel } from "@/lib/constants";
@@ -22,7 +23,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
             <tbody className="divide-y divide-slate-100">{ps.map((p) => (
               <tr key={p.id} className="hover:bg-slate-50">
                 <td className="td font-mono text-xs">{p.code}</td>
-                <td className="td"><Link href={`/admin/projects/${p.id}`} className="font-medium text-brand-600">{p.title}</Link><div className="text-xs text-slate-500">{dealTypeLabel(p.dealType)} · {p.state}</div></td>
+                <td className="td"><Link href={`/admin/projects/${p.id}`} className="font-medium text-brand-600">{p.title}</Link><div className="text-xs text-slate-500">{dealTypeLabel(p.dealType)} · {placeShort(p)}</div></td>
                 <td className="td text-sm">{p.developer.company}</td>
                 <td className="td">{num(p.mw, 1)}</td>
                 <td className="td text-xs">{p.facilityType}</td>

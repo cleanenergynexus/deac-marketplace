@@ -1,3 +1,4 @@
+import { placeFull } from "@/lib/location";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -77,7 +78,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const requests = u.investorId && tab === "documents" ? await db.analysisRequest.findMany({ where: { projectId: id, investorId: u.investorId }, orderBy: { createdAt: "desc" } }) : [];
 
   const docs = p.documents.map((d) => ({ ...d, stage: docStage(d.access) })).sort((a, b) => stageRank(a.stage) - stageRank(b.stage));
-  const location = [p.city, p.state].filter(Boolean).join(", ");
+  const location = placeFull(p);
   const dealIdx = dealStageIndex(p.dealStage);
   const funds = parseUseOfFunds(p.useOfFunds);
 

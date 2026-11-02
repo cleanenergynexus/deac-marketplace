@@ -2,7 +2,8 @@ import { submitProject } from "@/app/actions/public";
 import { PhoneInput } from "@/components/PhoneInput";
 import { ActionForm } from "@/components/ActionForm";
 import { Field, Select } from "@/components/ui";
-import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
+import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES } from "@/lib/constants";
+import { ListingLocationFields } from "@/components/ListingLocationFields";
 import { OPTIONS } from "@/lib/valuation";
 import { MoneyInput } from "@/components/MoneyInput";
 
@@ -24,8 +25,7 @@ export default function SubmitProject() {
         <h2 className="font-semibold">The project</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Project name" className="sm:col-span-3"><input name="title" className="input" /></Field>
-          <Field label="State"><Select name="state" options={US_STATES} placeholder="Select…" required /></Field>
-          <Field label="City / county"><input name="city" className="input" /></Field>
+          <ListingLocationFields />
           <Field label="Capacity (MW)"><input name="mw" inputMode="decimal" required className="input" /></Field>
           <Field label="Facility type"><Select name="facilityType" options={FACILITY_TYPES} /></Field>
           <Field label="Seeking"><Select name="dealType" options={DEAL_TYPES} /></Field>

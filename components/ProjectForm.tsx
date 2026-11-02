@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { Developer, Project } from "@prisma/client";
 import type { ListingDraft } from "@/lib/importer";
 import { Field, Select } from "@/components/ui";
-import { DEAL_STAGES, DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
+import { DEAL_STAGES, DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES } from "@/lib/constants";
+import { ListingLocationFields } from "@/components/ListingLocationFields";
 import { OPTIONS } from "@/lib/valuation";
 import { SaveButton } from "@/components/SaveButton";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -50,8 +51,7 @@ export function ProjectForm({ p, developers, developerId, action, draft, develop
           </select>
         </Field>}
         {developerField ?? <Field label="Developer"><Select name="developerId" options={developers.map((x) => ({ value: x.id, label: x.company }))} defaultValue={p?.developerId ?? developerId} required /></Field>}
-        <Field label="State"><Select name="state" options={US_STATES} defaultValue={p ? p.state : d.state} required {...pickFirst} /></Field>
-        <Field label="City / county"><input name="city" defaultValue={p ? v(p.city) : d.city} className="input" /></Field>
+        <ListingLocationFields value={p ?? { country: d.country || null, state: d.state, county: d.county, city: d.city }} pickCountry={!!draft && !d.country} />
         <Field label="Capacity (MW)"><input name="mw" defaultValue={p ? v(p.mw) : d.mw} required className="input" /></Field>
         <Field label="Facility type"><Select name="facilityType" options={FACILITY_TYPES} defaultValue={p ? p.facilityType : d.facilityType} {...pickFirst} /></Field>
         <Field label="Deal type"><Select name="dealType" options={DEAL_TYPES} defaultValue={p ? p.dealType : d.dealType} {...pickFirst} /></Field>

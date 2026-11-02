@@ -10,7 +10,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { formatPhone } from "@/lib/phone";
 import type { ImportResult } from "@/lib/importer";
 
-const LABELS: Record<string, string> = { title: "Title", state: "State", mw: "Capacity (MW)", facilityType: "Facility type", dealType: "Deal type", fundingNeeded: "Funding needed", projectStatus: "Project status", summary: "Summary" };
+const LABELS: Record<string, string> = { title: "Title", country: "Country", mw: "Capacity (MW)", facilityType: "Facility type", dealType: "Deal type", fundingNeeded: "Funding needed", projectStatus: "Project status", summary: "Summary" };
 
 /** `agent`: a referral agent's import. Their listing is saved through createAgentListing as a draft for the DEAC team. */
 export function ImportWizard({ developers, developerId, enabled, agent = false }: { developers: Pick<Developer, "id" | "company">[]; developerId?: string; enabled: boolean; agent?: boolean }) {

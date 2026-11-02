@@ -2,6 +2,8 @@
 // turns its answer into a listing draft. Pure functions only, so they can be unit tested.
 import { DEAL_TYPES, FACILITY_TYPES, PROJECT_STATUSES, US_STATES } from "@/lib/constants";
 import { ASSET_TYPES, OPTIONS, type ValuationInputs } from "@/lib/valuation";
+import { COUNTRIES } from "@/lib/phone";
+import { STATE_NAMES } from "@/lib/regions";
 
 // Structured outputs allow at most 16 nullable (union) fields per request, so instead of null an unknown
 // value comes back as "" (text and choices) or -1 (numbers). Every field is required.
@@ -28,7 +30,9 @@ export const EXTRACTION_SCHEMA = {
     sponsorCompany: nStr,
     sponsorWebsite: nStr,
     contacts: { type: "array", items: contact },
-    state: nEnum(US_STATES),
+    country: nEnum(COUNTRIES.map((c) => c.iso)),
+    state: nStr,
+    county: nStr,
     city: nStr,
     address: nStr,
     mw: nNum,
@@ -61,7 +65,7 @@ export const EXTRACTION_SCHEMA = {
     missing: { type: "array", items: str },
   },
   required: [
-    "title", "sponsorCompany", "sponsorWebsite", "contacts", "state", "city", "address", "mw", "expansionMw", "acres", "buildingSqft",
+    "title", "sponsorCompany", "sponsorWebsite", "contacts", "country", "state", "county", "city", "address", "mw", "expansionMw", "acres", "buildingSqft",
     "facilityType", "dealType", "fundingNeeded", "projectStatus", "summary", "highlights", "totalCapex", "targetIrr", "equityMultiple",
     "leaseRateKwMo", "powerRateCents", "powerStatus", "monthsToPower", "codDate", "capitalStack", "economicsNotes", "utility", "scoring", "missing",
   ],
@@ -72,6 +76,7 @@ export const EXTRACTION_PROMPT = `You are an analyst at DEAC, a curated marketpl
 Read the attached deal document (teaser, offering memorandum, broker flyer, listing web page, email...) and fill in the listing fields. Rules:
 - Use only facts stated in the document. Never guess numbers. When a value is not stated, use "" for text and choices, and -1 for numbers.
 - mw: power available now or contracted for the first phase, in MW (convert kVA/kW; 1 MVA ≈ 1 MW). expansionMw: additional MW described as future or scalable capacity.
+- country: two-letter ISO code of the country the site is in (US for the United States). state: for US sites the two-letter state code (e.g. "TX"); elsewhere the state, province or region name as written. county: the county (or district) if stated, e.g. "Taylor County".
 - fundingNeeded: the asking price (for sale), or the capital raise / funding sought, in US dollars. -1 if not stated.
 - dealType: SALE, LEASE or FINANCING. If the document offers both sale and lease, pick SALE and mention the lease option in economicsNotes.
 - facilityType: the closest option. A building with power ready for data center fit-out is "Powered Shell"; land with power is "Powered Land"; an existing operating data center is "Turnkey Data Center" or "Old Data Center".
@@ -91,7 +96,9 @@ export type Extraction = {
   sponsorCompany: string | null;
   sponsorWebsite: string | null;
   contacts: ExtractedContact[];
+  country?: string | null;
   state: string | null;
+  county?: string | null;
   city: string | null;
   address: string | null;
   mw: number | null;
@@ -121,7 +128,7 @@ export type Extraction = {
 
 /** Prefilled values for the listing form. Strings, because they go straight into form inputs. */
 export type ListingDraft = {
-  title: string; state: string; city: string; mw: string; facilityType: string; dealType: string; fundingNeeded: string; projectStatus: string;
+  title: string; country: string; state: string; county: string; city: string; mw: string; facilityType: string; dealType: string; fundingNeeded: string; projectStatus: string;
   summary: string; highlights: string;
   totalCapex: string; targetIrr: string; equityMultiple: string; leaseRateKwMo: string; powerRateCents: string; powerStatus: string;
   monthsToPower: string; codDate: string; capitalStack: string; economicsNotes: string;
@@ -170,9 +177,15 @@ export function toImportResult(raw: Extraction, developers: { id: string; compan
   const site = [clean(raw.address), sqft ? `${Math.round(sqft).toLocaleString("en-US")} SF building` : "", acres ? `${acres} acres` : "", raw.utility ? `Utility: ${clean(raw.utility)}` : "", expansionMw ? `Expansion: +${expansionMw} MW` : ""].filter(Boolean);
   const economicsNotes = [clean(raw.economicsNotes), site.join(" · ")].filter(Boolean).join("\n");
 
+  // A US state (code or full name) with no country means the United States.
+  const rawState = clean(raw.state);
+  const usState = pick(rawState.toUpperCase(), US_STATES) || (Object.entries(STATE_NAMES).find(([, name]) => name.toLowerCase() === rawState.toLowerCase())?.[0] ?? "");
+  const country = pick(clean(raw.country).toUpperCase(), COUNTRIES.map((c) => c.iso)) || (usState ? "US" : "");
   const listing: ListingDraft = {
     title: clean(raw.title),
-    state: pick(raw.state, US_STATES),
+    country,
+    state: country === "US" ? usState : rawState,
+    county: clean(raw.county),
     city: clean(raw.city),
     mw: asText(mw),
     facilityType,
@@ -221,7 +234,7 @@ export function toImportResult(raw: Extraction, developers: { id: string; compan
     if (v) (valuation as Record<string, unknown>)[k] = v;
   }
 
-  const required: (keyof ListingDraft)[] = ["title", "state", "mw", "facilityType", "dealType", "fundingNeeded", "projectStatus", "summary"];
+  const required: (keyof ListingDraft)[] = ["title", "country", "mw", "facilityType", "dealType", "fundingNeeded", "projectStatus", "summary"];
   return {
     listing,
     developer,

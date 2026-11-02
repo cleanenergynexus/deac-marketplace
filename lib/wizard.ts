@@ -1,5 +1,6 @@
 // Document Wizard: the document types it writes, what it can read from a data room, and the
 // instructions Claude gets. Pure functions only, so they can be unit tested.
+import { isUS, placeFull } from "./location";
 import { dealTypeLabel } from "@/lib/constants";
 import { usd } from "@/lib/format";
 
@@ -82,7 +83,7 @@ export function planSources(files: SourceCandidate[]): SourcePlan {
 export type WizardOptions = { anonymous: boolean; webResearch: boolean; instructions: string; audience: string };
 
 export type ProjectFacts = {
-  code: string; title: string; state: string; city: string | null; mw: number; facilityType: string; dealType: string;
+  code: string; title: string; country: string; state: string; county: string | null; city: string | null; mw: number; facilityType: string; dealType: string;
   fundingNeeded: number; projectStatus: string; summary: string; highlights: string; term: string | null; useOfFunds: string;
   totalCapex: number | null; targetIrr: number | null; equityMultiple: number | null; leaseRateKwMo: number | null; powerRateCents: number | null;
   powerStatus: string | null; monthsToPower: number | null; codDate: string | null; capitalStack: string | null; economicsNotes: string | null;
@@ -98,7 +99,7 @@ export function projectFactsText(p: ProjectFacts, v: ValuationFacts) {
     "Listing record in the DEAC marketplace (entered by the DEAC team; documents may be more recent):",
     line("Listing code", p.code),
     line("Title", p.title),
-    line("Location", [p.city, p.state].filter(Boolean).join(", ")),
+    line("Location", [placeFull(p), isUS(p.country) ? "United States" : null].filter(Boolean).join(", ")),
     line("Capacity", `${p.mw} MW`),
     line("Facility type", p.facilityType),
     line("Deal type", dealTypeLabel(p.dealType)),
@@ -154,7 +155,7 @@ Short bullets on power, interconnection, fiber, water, substation.
 ## Next Steps
 How to proceed through DEAC: request access on the DEAC marketplace, sign the NDA to receive the full data room, then submit an LOI.
 
-${o.anonymous ? `This teaser is ANONYMOUS (blind teaser): do NOT name the sponsor/developer, landowner, utility contract counterparties or tenants, and do not give the street address, parcel numbers, city or exact coordinates. Describe the location at the level of region/metro area and state (e.g. "Dallas–Fort Worth area, Texas"). Use the listing code as the project name if a name is needed.` : "This teaser may name the project, sponsor and city, but never internal DEAC valuation figures."}
+${o.anonymous ? `This teaser is ANONYMOUS (blind teaser): do NOT name the sponsor/developer, landowner, utility contract counterparties or tenants, and do not give the street address, parcel numbers, city or exact coordinates. Describe the location at the level of region/metro area, state or province, and country (e.g. "Dallas–Fort Worth area, Texas" or "Madrid region, Spain"). Use the listing code as the project name if a name is needed.` : "This teaser may name the project, sponsor and city, but never internal DEAC valuation figures."}
 Never mention DEAC's internal valuation, value score or bid recommendation in a teaser.`;
 
 const REPORT_BRIEF = () => `Write a Project Report: a thorough diligence-style analysis of the project for DEAC and qualified investors.
@@ -191,7 +192,7 @@ Format rules for slides (they are turned into PowerPoint automatically):
 - No paragraphs longer than 30 words. No sub-headings inside a slide.
 
 Suggested slides: The Opportunity · Investment Highlights · Site Overview · Power & Interconnection · Infrastructure & Connectivity · Development Status & Timeline · Market Context · Transaction & Use of Funds · Economics · Sponsor & Team · Risks & Mitigants · Next Steps.
-${o.anonymous ? "This deck is ANONYMOUS: do not name the sponsor, landowner or counterparties, and give the location only at region/metro and state level." : ""}
+${o.anonymous ? "This deck is ANONYMOUS: do not name the sponsor, landowner or counterparties, and give the location only at region/metro, state/province and country level." : ""}
 Never show DEAC's internal valuation, value score or bid recommendation in the deck.`;
 
 const CUSTOM_BRIEF = (o: WizardOptions) => `Write the document described in this brief from the DEAC team:

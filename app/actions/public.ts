@@ -1,4 +1,5 @@
 "use server";
+import { codeRegion, locationFromForm, placeShort } from "@/lib/location";
 import { redirect } from "next/navigation";
 import { phoneFromForm } from "@/lib/phone";
 import { db } from "@/lib/db";
@@ -69,21 +70,21 @@ export async function applyForAccess(_: unknown, f: FormData) {
 export async function submitProject(_: unknown, f: FormData) {
   const email = s(f, "email")?.toLowerCase();
   const company = s(f, "company");
-  if (!email || !company || !s(f, "state") || !n(f, "mw")) return { error: "Company, email, state and MW are required." };
+  const place = locationFromForm(f);
+  if (!email || !company || !s(f, "country") || !n(f, "mw")) return { error: "Company, email, country and MW are required." };
 
   let dev = await db.developer.findFirst({ where: { email } });
   if (!dev) dev = await db.developer.create({ data: { company, contactName: s(f, "contactName") ?? "", email, phone: phoneFromForm(f, "phone"), website: s(f, "website"), experience: s(f, "experience"), source: "Website submission",
     contacts: { create: { name: s(f, "contactName") ?? company, email, phone: phoneFromForm(f, "phone"), source: "Website submission", isPrimary: true } } } });
 
   const count = await db.project.count();
-  const state = s(f, "state")!.toUpperCase();
+  const where = placeShort(place);
   await db.project.create({
     data: {
-      code: `DEAC-${state}-${String(count + 1).padStart(3, "0")}`,
-      title: s(f, "title") ?? `${n(f, "mw")} MW ${s(f, "facilityType") ?? "Data Center"} – ${state}`,
+      code: `DEAC-${codeRegion(place)}-${String(count + 1).padStart(3, "0")}`,
+      title: s(f, "title") ?? `${n(f, "mw")} MW ${s(f, "facilityType") ?? "Data Center"} – ${where}`,
       developerId: dev.id,
-      state,
-      city: s(f, "city"),
+      ...place,
       mw: n(f, "mw")!,
       facilityType: s(f, "facilityType") ?? "Powered Land",
       dealType: s(f, "dealType") ?? "FINANCING",
@@ -97,7 +98,7 @@ export async function submitProject(_: unknown, f: FormData) {
       pipelineStage: funnelStages(await getPipeline(), s(f, "dealType") ?? "FINANCING")[0].value,
     },
   });
-  await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? state}" via website.` } });
+  await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? where}" via website.` } });
   redirect("/developers/thanks");
 }
 

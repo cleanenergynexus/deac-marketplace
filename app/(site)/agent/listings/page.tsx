@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placeShort } from "@/lib/location";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
 import { agentProjectWhere } from "@/lib/agents";
@@ -30,7 +31,7 @@ export default async function AgentListings() {
                   <tr key={p.id}>
                     <td className="td"><Link href={`/agent/listings/${p.id}`} className="font-medium text-brand-600">{p.title}</Link><div className="font-mono text-xs text-slate-500">{p.code}</div></td>
                     <td className="td">{p.developer.company}</td>
-                    <td className="td text-sm">{num(p.mw)} MW · {p.state}<div className="text-xs text-slate-500">{usd(p.fundingNeeded)}</div></td>
+                    <td className="td text-sm">{num(p.mw)} MW · {placeShort(p)}<div className="text-xs text-slate-500">{usd(p.fundingNeeded)}</div></td>
                     <td className="td text-sm">{projectStageLabel(pipeline, p, p.developer.stage)}</td>
                     <td className="td"><Badge tone={statusTone(p.visibility)}>{VIS[p.visibility] ?? p.visibility}</Badge></td>
                     <td className="td"><Link href={`/agent/listings/${p.id}#data-room`} className="btn-ghost">{p._count.dataRoomFiles} file{p._count.dataRoomFiles === 1 ? "" : "s"} · Upload</Link></td>

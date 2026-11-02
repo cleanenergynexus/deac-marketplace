@@ -38,14 +38,20 @@ test("existing NDA / LOI history places a tile", () => {
 
 test("mandate fit", () => {
   const inv = { preferredStates: "TX,AZ", preferredRegions: "", dealTypes: "FINANCING", facilityTypes: "", mwMin: 50, mwMax: null };
-  assert.equal(fitsMandate(inv, { state: "TX", dealType: "FINANCING", facilityType: "Powered Land", mw: 120 }), true);
-  assert.equal(fitsMandate(inv, { state: "TX", dealType: "LEASE", facilityType: "Powered Land", mw: 120 }), false);
-  assert.equal(fitsMandate(inv, { state: "PR", dealType: "FINANCING", facilityType: "Powered Land", mw: 120 }), false);
-  assert.equal(fitsMandate(inv, { state: "TX", dealType: "FINANCING", facilityType: "Powered Land", mw: 20 }), false);
+  assert.equal(fitsMandate(inv, { country: "US", state: "TX", dealType: "FINANCING", facilityType: "Powered Land", mw: 120 }), true);
+  assert.equal(fitsMandate(inv, { country: "US", state: "TX", dealType: "LEASE", facilityType: "Powered Land", mw: 120 }), false);
+  assert.equal(fitsMandate(inv, { country: "US", state: "PR", dealType: "FINANCING", facilityType: "Powered Land", mw: 120 }), false);
+  assert.equal(fitsMandate(inv, { country: "US", state: "TX", dealType: "FINANCING", facilityType: "Powered Land", mw: 20 }), false);
   const open = { preferredStates: "", preferredRegions: "", dealTypes: "", facilityTypes: "", mwMin: null, mwMax: null };
-  assert.equal(fitsMandate(open, { state: "WV", dealType: "SALE", facilityType: "Industrial Conversion", mw: 60 }), true);
+  assert.equal(fitsMandate(open, { country: "US", state: "WV", dealType: "SALE", facilityType: "Industrial Conversion", mw: 60 }), true);
 });
 
 test("firm names match without case or spacing", () => {
   assert.equal(firmKey("  Meridian   Infrastructure Partners "), firmKey("meridian infrastructure partners"));
+});
+
+test("mandate markets cover listings outside the US", () => {
+  const eu = { preferredStates: "", preferredRegions: "W_C_EUROPE", dealTypes: "", facilityTypes: "", mwMin: null, mwMax: null };
+  assert.equal(fitsMandate(eu, { country: "ES", state: "Madrid", dealType: "SALE", facilityType: "Powered Land", mw: 50 }), true);
+  assert.equal(fitsMandate(eu, { country: "US", state: "TX", dealType: "SALE", facilityType: "Powered Land", mw: 50 }), false);
 });
