@@ -65,3 +65,16 @@ test("task order: open soonest first, undated after, then done newest first", ()
   ]);
   assert.deepEqual(out.map((t) => t.id), ["soon", "late", "undated", "done-new", "done-old"]);
 });
+
+test("task assigned email names the task, due date, links and who assigned it", async () => {
+  const { taskAssignedEmail } = await import("./tasks");
+  const m = taskAssignedEmail({ assigneeName: "Sue Lee", byName: "Ana", title: "Send NDA", body: "Use v2", due: new Date("2026-11-14T17:00:00Z"), about: ["Contact: Maria · Lone Star"], link: "https://x/admin/tasks" });
+  assert.equal(m.subject, "New task assigned to you: Send NDA");
+  assert.match(m.text, /^Hi Sue,/);
+  assert.match(m.text, /Ana assigned you a task on the DEAC Marketplace\./);
+  assert.match(m.text, /Due: Sat, Nov 14, 2026/);
+  assert.match(m.text, /Contact: Maria · Lone Star/);
+  assert.match(m.text, /Use v2/);
+  assert.match(m.text, /Open it: https:\/\/x\/admin\/tasks/);
+  assert.doesNotMatch(taskAssignedEmail({ assigneeName: "Sue", byName: "Ana", title: "T", body: "", due: null, about: [], link: "l" }).text, /Due:/);
+});

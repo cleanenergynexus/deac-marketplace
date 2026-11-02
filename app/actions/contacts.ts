@@ -9,6 +9,7 @@ import { phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
 import { findVisibleTask, getTeam, pickAssignee } from "@/lib/tasks-db";
 import { referrerFromForm } from "@/lib/agents-db";
+import { notifyTaskAssignee } from "@/lib/task-mail";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 
@@ -119,7 +120,7 @@ export async function logContactActivity(f: FormData) {
   const projectId = s(f, "projectId");
   if (projectId && !(await db.project.count({ where: { id: projectId, developerId: c.developerId } }))) throw new Error("That project is not at this contact's company.");
   const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTeam(), f.get("assigneeId")) : null;
-  await db.activity.create({
+  const created = await db.activity.create({
     data: {
       developerId: c.developerId,
       contactId,
@@ -134,6 +135,7 @@ export async function logContactActivity(f: FormData) {
       ...(when && kind !== "TASK" ? { createdAt: when } : {}),
     },
   });
+  if (kind === "TASK") await notifyTaskAssignee(created, admin);
   revalidateCrm(c.developerId, contactId);
   if (kind === "TASK") revalidatePath("/admin", "layout");
 }
@@ -153,7 +155,8 @@ export async function assignTask(f: FormData) {
   const { task: a, team } = await findVisibleTask(admin, String(f.get("id")));
   if (a.kind !== "TASK") return;
   const assigneeId = pickAssignee(admin, team, f.get("assigneeId") ?? "");
-  await db.activity.update({ where: { id: a.id }, data: { assigneeId } });
+  const updated = await db.activity.update({ where: { id: a.id }, data: { assigneeId } });
+  await notifyTaskAssignee(updated, admin, a.assigneeId);
   revalidateEntry(a);
   revalidatePath("/admin", "layout");
 }
@@ -201,7 +204,7 @@ export async function createTask(f: FormData) {
   const subject = s(f, "subject");
   if (!subject) throw new Error("Give the task a title.");
   const links = await taskLinks(f);
-  await db.activity.create({
+  const task = await db.activity.create({
     data: {
       kind: "TASK",
       subject,
@@ -212,6 +215,7 @@ export async function createTask(f: FormData) {
       by: admin.name,
     },
   });
+  await notifyTaskAssignee(task, admin);
   revalidateEntry(links);
   revalidatePath("/admin", "layout");
 }
@@ -227,10 +231,11 @@ export async function updateTask(f: FormData) {
   // Keeping the current assignee is always fine, even if this person couldn't pick them.
   const assigneeId = picked === (a.assigneeId ?? "") ? a.assigneeId : pickAssignee(admin, team, picked);
   const links = await taskLinks(f);
-  await db.activity.update({
+  const updated = await db.activity.update({
     where: { id: a.id },
     data: { subject, body: s(f, "body") ?? "", dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)), assigneeId, ...links },
   });
+  await notifyTaskAssignee(updated, admin, a.assigneeId); // only when it's now someone else's
   revalidateEntry(a); // the timeline it was on
   revalidateEntry(links); // and the one it's on now
   revalidatePath("/admin", "layout");

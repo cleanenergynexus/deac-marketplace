@@ -93,3 +93,23 @@ export function checkStaffChange(team: Staff[], change: { id: string; staffLevel
   if (change.staffLevel === "SUPPORT" && next.some((u) => u.managerId === change.id)) return "People report to this team member. Move their reports to another manager first.";
   return null;
 }
+
+/** The email a team member gets when a task is assigned to them. Plain text, no database access. */
+export function taskAssignedEmail(o: { assigneeName: string; byName: string; title: string; body: string; due: Date | null; about: string[]; link: string }) {
+  const due = o.due ? o.due.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric", year: "numeric" }) : null;
+  const lines = [
+    `Hi ${o.assigneeName.split(" ")[0]},`,
+    "",
+    `${o.byName} assigned you a task on the DEAC Marketplace.`,
+    "",
+    `Task: ${o.title}`,
+    ...(due ? [`Due: ${due}`] : []),
+    ...o.about,
+    ...(o.body ? ["", o.body] : []),
+    "",
+    `Open it: ${o.link}`,
+    "",
+    "— DEAC Marketplace",
+  ];
+  return { subject: `New task assigned to you: ${o.title}`, text: lines.join("\n") };
+}
