@@ -42,6 +42,7 @@ model User {
   // Indexed, not @unique: adding a unique column makes the build's `prisma db push` stop for a data-loss prompt.
   inviteTokenHash String?
   inviteExpiresAt DateTime?
+  signatures   SignatureRequest[] @relation("AgentSignatures")
   createdAt    DateTime @default(now())
 
   @@index([inviteTokenHash])
@@ -119,6 +120,7 @@ model Investor {
   campaignSends    CampaignRecipient[]
   interests        InvestorInterest[]
   favorites        Favorite[]
+  signatures       SignatureRequest[]
 
   @@index([firmId])
   @@index([referredById])
@@ -217,6 +219,7 @@ model Contact {
 
   projects   Project[]
   activities Activity[]
+  signatures SignatureRequest[]
 
   @@index([developerId])
   @@index([referredById])
@@ -294,6 +297,7 @@ model Project {
   activities       Activity[]
   interests        InvestorInterest[]
   favorites        Favorite[]
+  signatures       SignatureRequest[]
 }
 
 model Document {
@@ -494,4 +498,78 @@ model DataRoomTemplate {
   config    String // JSON
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+// ---------- E-signatures (lib/esign.ts) ----------
+// A template (isTemplate) is a PDF with signing fields placed on it, reused for many signers.
+// A request is one PDF sent to one signer: an investor contact, a developer contact or a referral agent.
+// source UPLOADED = a document already signed elsewhere, filed on the contact's record (no signing here).
+model SignatureRequest {
+  id             String    @id @default(cuid())
+  isTemplate     Boolean   @default(false)
+  templateId     String? // the template a request was made from
+  title          String
+  kind           String    @default("NDA") // NDA | LOI | CONTRACT | OTHER (lib/esign.ts DOC_KINDS)
+  projectId      String? // listing the document is about. NDA/LOI on a listing feed the staged disclosure.
+  project        Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sourceName     String // original file name
+  sourceKey      String // storage key of the unsigned PDF (the request's own copy)
+  sourceHash     String // SHA-256 of the unsigned PDF, printed on the certificate
+  pageCount      Int       @default(1)
+  fields         String    @default("[]") // JSON SignField[]: where the signer's details go, as page fractions
+  message        String? // note shown to the signer and in the email
+  autoApprove    Boolean   @default(true) // NDA/LOI: signing confirms the step (no review in NDAs & LOIs)
+  listingNda     Boolean   @default(false) // templates: investors sign it themselves from the listing's NDA step
+  signerType     String? // INVESTOR | CONTACT | AGENT
+  investorId     String?
+  investor       Investor? @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  contactId      String? // developer contact
+  contact        Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  agentId        String? // referral agent login
+  agent          User?     @relation("AgentSignatures", fields: [agentId], references: [id], onDelete: Cascade)
+  signerName     String?
+  signerEmail    String?
+  signerCompany  String?
+  status         String    @default("DRAFT") // TEMPLATE | DRAFT | SENT | VIEWED | SIGNED | DECLINED | VOIDED
+  source         String    @default("ESIGN") // ESIGN | UPLOADED
+  // Signing link: only the SHA-256 of the token is kept. Investors can also sign from My Portal while signed in.
+  tokenHash      String?
+  tokenExpiresAt DateTime?
+  values         String    @default("{}") // JSON: what the signer entered (signature images as PNG data URLs)
+  declineReason  String?
+  sentAt         DateTime?
+  viewedAt       DateTime?
+  signedAt       DateTime?
+  signedKey      String? // storage key of the signed PDF (or the uploaded signed file)
+  signedName     String?
+  signedType     String? // content type of the signed file
+  signedHash     String? // SHA-256 of the signed file
+  signedFileId   String? // copy filed in the listing's data room
+  createdBy      String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  events SignatureEvent[]
+
+  @@index([tokenHash])
+  @@index([investorId])
+  @@index([contactId])
+  @@index([agentId])
+  @@index([projectId])
+}
+
+// Audit trail of a signature request: created, sent, viewed, signed, declined, voided, link renewed.
+model SignatureEvent {
+  id        String           @id @default(cuid())
+  requestId String
+  request   SignatureRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  action    String // CREATED | SENT | VIEWED | SIGNED | DECLINED | VOIDED | LINK_RENEWED | UPLOADED | DATA_ROOM
+  detail    String?
+  by        String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime         @default(now())
+
+  @@index([requestId])
 }

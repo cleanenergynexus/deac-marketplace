@@ -4,12 +4,13 @@ import { db } from "@/lib/db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
-  const [pendingLois, pendingSteps, openReqs, applied, myTasks] = await Promise.all([
+  const [pendingLois, pendingSteps, openReqs, applied, myTasks, awaitingSignature] = await Promise.all([
     db.loi.count({ where: { status: "PENDING" } }),
     db.dealStep.count({ where: { status: "PENDING" } }),
     db.analysisRequest.count({ where: { status: { not: "DELIVERED" } } }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
     db.activity.count({ where: { kind: "TASK", assigneeId: me.id, doneAt: null } }),
+    db.signatureRequest.count({ where: { status: { in: ["SENT", "VIEWED"] } } }),
   ]);
   const items: NavItem[] = [
     { href: "/admin", label: "Dashboard" },
@@ -37,6 +38,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     },
     { href: "/admin/projects", label: "Listings", children: [{ href: "/admin/data-room-template", label: "Data room template" }] },
     { href: "/admin/lois", label: "NDAs & LOIs", count: pendingLois + pendingSteps },
+    { href: "/admin/signatures", label: "E-signatures", count: awaitingSignature },
     { href: "/admin/requests", label: "Intake requests", count: openReqs },
     { href: "/admin/outreach", label: "Outreach" },
     { href: "/admin/calculator", label: "Valuation calculator", children: [{ href: "/admin/scoring", label: "Scoring settings" }] },

@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { currentUser } from "@/lib/auth";
 import { Badge, PageHeader, Section, Empty, statusTone } from "@/components/ui";
-import { usd } from "@/lib/format";
+import { usd, date } from "@/lib/format";
+import { kindLabel } from "@/lib/esign";
 import { ProjectTile } from "@/components/ProjectTile";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { investorStage, nextStep, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
@@ -14,12 +15,15 @@ export default async function Portal() {
   const u = await currentUser();
   if (!u?.investorId) redirect("/login");
   if (u.status !== "APPROVED") redirect("/pending");
-  const [lois, steps, reqs, favs] = await Promise.all([
+  const [lois, steps, reqs, favs, docs] = await Promise.all([
     db.loi.findMany({ where: { investorId: u.investorId }, include: { project: true }, orderBy: { createdAt: "desc" } }),
     db.dealStep.findMany({ where: { investorId: u.investorId }, include: { project: true }, orderBy: { createdAt: "desc" } }),
     db.analysisRequest.findMany({ where: { investorId: u.investorId }, include: { project: true }, orderBy: { createdAt: "desc" } }),
     db.favorite.findMany({ where: { investorId: u.investorId, project: { visibility: { in: ["PRIVATE", "TEASER"] } } }, include: { project: true }, orderBy: { createdAt: "desc" } }),
+    db.signatureRequest.findMany({ where: { investorId: u.investorId, isTemplate: false, status: { in: ["SENT", "VIEWED", "SIGNED"] } }, include: { project: { select: { code: true } } }, orderBy: { updatedAt: "desc" } }),
   ]);
+  const toSign = docs.filter((d) => d.status !== "SIGNED");
+  const signed = docs.filter((d) => d.status === "SIGNED");
   // One row per listing the investor has engaged with (NDA, LOI or diligence).
   const deals = new Map<string, { project: (typeof lois)[number]["project"]; nda?: StepStatus; loi?: StepStatus; diligence?: StepStatus; amount?: number | null; since: Date }>();
   const row = (project: (typeof lois)[number]["project"], since: Date) => {
@@ -40,6 +44,17 @@ export default async function Portal() {
   return (
     <div className="space-y-6">
       <PageHeader title={`Welcome, ${u.name.split(" ")[0]}`} subtitle="Your favorites, NDAs, letters of interest, data rooms and analysis requests." />
+      {toSign.length > 0 && (
+        <section className="card border-amber-300 bg-amber-50 p-5">
+          <h2 className="text-lg font-semibold">Documents to sign ({toSign.length})</h2>
+          <ul className="mt-3 divide-y divide-amber-200">{toSign.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <span><span className="font-medium">{d.title}</span> <span className="text-xs text-slate-600">{kindLabel(d.kind)}{d.project ? ` · ${d.project.code}` : ""} · sent {date(d.sentAt)}</span></span>
+              <Link href={`/portal/sign/${d.id}`} className="btn py-1.5">Review &amp; sign</Link>
+            </li>
+          ))}</ul>
+        </section>
+      )}
       <Section title="Favorites">
         {favorites.length ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{favorites.map(({ project: p, stage, next }) => (
@@ -70,6 +85,16 @@ export default async function Portal() {
             })}</tbody></table>
         ) : <Empty>Nothing yet. <Link href="/marketplace" className="text-brand-600">Browse opportunities</Link> and sign an NDA to see more.</Empty>}
       </Section>
+      {signed.length > 0 && (
+        <Section title="Signed documents">
+          <ul className="divide-y divide-slate-100">{signed.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <span><span className="font-medium">{d.title}</span> <span className="text-xs text-slate-500">{kindLabel(d.kind)}{d.project ? ` · ${d.project.code}` : ""} · signed {date(d.signedAt)}</span></span>
+              <a href={`/api/esign/${d.id}?file=signed`} target="_blank" className="text-brand-600">Open</a>
+            </li>
+          ))}</ul>
+        </Section>
+      )}
       <Section title="Analysis requests">
         {reqs.length ? (
           <ul className="divide-y divide-slate-100">{reqs.map((r) => (
