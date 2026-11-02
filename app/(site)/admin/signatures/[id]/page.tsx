@@ -48,7 +48,7 @@ export default async function SignatureRequestPage({ params }: { params: Promise
               <p>Place the fields on the document below (they save on their own), then choose who signs. Each signer gets a personal link by email{r.isTemplate ? " and their own copy" : ""}; investors also see it in My Portal.</p>
               <p>The signer sees their details prefilled from their record, fills in anything missing, signs and clicks <b>I Agree</b>. The signed PDF gets a signing certificate and is saved {r.projectId ? "to this listing's data room, under Signed Documents" : "on the request"}.</p>
               {r.isTemplate && sentFrom.length > 0 && <p className="text-xs">Sent from this template: {sentFrom.map((g) => `${g._count} ${(STATUS_LABEL[g.status] ?? g.status).toLowerCase()}`).join(", ")}.</p>}
-              <form action={deleteEnvelope}><input type="hidden" name="id" value={r.id} /><ConfirmButton message={`Delete this ${r.isTemplate ? "template" : "draft"}?`} className="text-xs text-red-600">Delete {r.isTemplate ? "template" : "draft"}</ConfirmButton></form>
+              <form action={deleteEnvelope}><input type="hidden" name="id" value={r.id} /><ConfirmButton message={r.isTemplate ? `Delete the template "${r.title}"? Documents already sent from it are kept.` : "Delete this draft?"} className="btn-danger">Delete {r.isTemplate ? "template" : "draft"}</ConfirmButton></form>
             </div>
             <SendPanel id={r.id} options={signers} initial={r.isTemplate ? [] : [signerRef(r)].filter(Boolean)} isTemplate={r.isTemplate} />
           </div>

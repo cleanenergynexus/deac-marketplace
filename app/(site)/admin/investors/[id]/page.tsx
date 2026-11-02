@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignatureList } from "@/components/SignatureList";
+import { reviewDealStep, reviewLoi } from "@/app/actions/admin";
 import { placeShort } from "@/lib/location";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -63,8 +64,8 @@ export default async function InvestorRecord({ params, searchParams }: { params:
       referredBy: { select: { name: true } },
       company: { include: { investors: { where: { id: { not: id } }, orderBy: { name: "asc" }, select: { id: true, name: true, title: true, email: true } } } },
       interests: { include: { project: { select: { id: true, code: true, title: true, mw: true, dealType: true, country: true, state: true, visibility: true } } }, orderBy: { createdAt: "asc" } },
-      lois: { select: { projectId: true, status: true, amount: true } },
-      dealSteps: { select: { projectId: true, step: true, status: true } },
+      lois: { select: { id: true, projectId: true, status: true, amount: true } },
+      dealSteps: { select: { id: true, projectId: true, step: true, status: true } },
       analysisRequests: { include: { project: { select: { code: true } } } },
     },
   });
@@ -94,9 +95,9 @@ export default async function InvestorRecord({ params, searchParams }: { params:
   const firstName = inv.name.split(" ")[0];
   const login = loginState(inv.user);
   const steps = (projectId: string) => [
-    ...inv.dealSteps.filter((d) => d.projectId === projectId && d.step === "NDA").map((d) => ({ label: "NDA", status: d.status })),
-    ...inv.lois.filter((l) => l.projectId === projectId).map((l) => ({ label: `LOI${l.amount ? ` ${usd(l.amount)}` : ""}`, status: l.status })),
-    ...inv.dealSteps.filter((d) => d.projectId === projectId && d.step === "DILIGENCE").map((d) => ({ label: "Diligence", status: d.status })),
+    ...inv.dealSteps.filter((d) => d.projectId === projectId && d.step === "NDA").map((d) => ({ label: "NDA", status: d.status, id: d.id, loi: false })),
+    ...inv.lois.filter((l) => l.projectId === projectId).map((l) => ({ label: `LOI${l.amount ? ` ${usd(l.amount)}` : ""}`, status: l.status, id: l.id, loi: true })),
+    ...inv.dealSteps.filter((d) => d.projectId === projectId && d.step === "DILIGENCE").map((d) => ({ label: "Diligence", status: d.status, id: d.id, loi: false })),
   ];
 
   return (
@@ -235,6 +236,12 @@ export default async function InvestorRecord({ params, searchParams }: { params:
                   {steps(it.projectId).length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">{steps(it.projectId).map((s) => <Badge key={s.label} tone={STEP_TONE[s.status as keyof typeof STEP_TONE] ?? "slate"}>{s.label} {s.status.toLowerCase()}</Badge>)}</div>
                   )}
+                  {steps(it.projectId).filter((x) => x.status === "PENDING").map((x) => (
+                    <form key={x.id} action={x.loi ? reviewLoi : reviewDealStep} className="mt-1.5 flex items-center justify-between gap-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                      <input type="hidden" name="id" value={x.id} /><input type="hidden" name="status" value="APPROVED" />
+                      <span>{x.label} waiting</span><button className="font-semibold text-brand-700 hover:underline">{x.loi ? "Accept" : "Confirm"}</button>
+                    </form>
+                  ))}
                   <div className="mt-2"><StageSelect interestId={it.id} stage={placeStage(st, it.stage)} stages={st} className="w-full" /></div>
                   <form action={removeInterest} className="mt-1 text-right">
                     <input type="hidden" name="id" value={it.id} />

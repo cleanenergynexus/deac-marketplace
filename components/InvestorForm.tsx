@@ -49,7 +49,7 @@ export function InvestorForm({ inv, action, firms = [], firm, projectId, agents 
       <Field label="Notes"><textarea name="notes" rows={3} defaultValue={inv?.notes ?? ""} className="input" /></Field>
       <div className="flex gap-6 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" name="accredited" defaultChecked={inv?.accredited} /> Accredited / QIB</label>
-        <label className="flex items-center gap-2"><input type="checkbox" name="ndaSigned" defaultChecked={inv?.ndaSigned} /> NDA signed</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="ndaSigned" defaultChecked={inv?.ndaSigned} /> Master NDA on file (opens NDA access on every listing)</label>
       </div>
       {inv ? <SaveButton label="Save changes" /> : <button className="btn">Create investor</button>}
     </form>

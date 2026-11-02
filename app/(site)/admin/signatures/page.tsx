@@ -4,6 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { signerHref } from "@/lib/esign-db";
 import { kindLabel, SIGNER_LABEL, STATUS_LABEL, statusBadge, type SignerType } from "@/lib/esign";
 import { Badge, Empty, PageHeader } from "@/components/ui";
+import { ConfirmButton } from "@/components/ConfirmButton";
+import { deleteEnvelope } from "@/app/actions/esign";
 import { date } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +68,7 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
           <table className="w-full">
             <thead className="border-b border-slate-200"><tr>
               <th className="th">Document</th>
-              {templates ? <><th className="th">Listing</th><th className="th">Fields</th><th className="th">Listing NDA</th></> : <><th className="th">Signer</th><th className="th">Listing</th><th className="th">Status</th><th className="th">Sent</th><th className="th">Signed</th></>}
+              {templates ? <><th className="th">Listing</th><th className="th">Fields</th><th className="th">Listing NDA</th><th className="th"></th></> : <><th className="th">Signer</th><th className="th">Listing</th><th className="th">Status</th><th className="th">Sent</th><th className="th">Signed</th></>}
             </tr></thead>
             <tbody className="divide-y divide-slate-100">{rows.map((r) => {
               const href = signerHref(r);
@@ -78,6 +80,12 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
                       <td className="td text-sm">{r.project?.code ?? <span className="text-slate-400">Any</span>}</td>
                       <td className="td text-sm">{(JSON.parse(r.fields) as unknown[]).length}</td>
                       <td className="td">{r.listingNda ? <Badge tone="green">On</Badge> : <span className="text-xs text-slate-400">—</span>}</td>
+                      <td className="td text-right">
+                        <span className="inline-flex items-center gap-3">
+                          <Link href={`/admin/signatures/new?templateId=${r.id}`} className="text-sm font-medium text-brand-600">Send</Link>
+                          <form action={deleteEnvelope}><input type="hidden" name="id" value={r.id} /><ConfirmButton message={`Delete the template "${r.title}"? Documents already sent from it are kept.`} className="text-sm text-red-600 hover:underline">Delete</ConfirmButton></form>
+                        </span>
+                      </td>
                     </>
                   ) : (
                     <>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { STEP_STAGE, advanceStage, firmKey, fitsMandate, stepFromHistory } from "./investor-crm";
+import { STEP_STAGE, accessForColumn, advanceStage, firmKey, fitsMandate, stepFromHistory } from "./investor-crm";
 import { DEFAULT_INVESTOR_PIPELINE, normalizePipeline, parsePipeline } from "./pipeline";
 import { INVESTOR_PIPELINE_STAGES } from "./constants";
 
@@ -54,4 +54,15 @@ test("mandate markets cover listings outside the US", () => {
   const eu = { preferredStates: "", preferredRegions: "W_C_EUROPE", dealTypes: "", facilityTypes: "", mwMin: null, mwMax: null };
   assert.equal(fitsMandate(eu, { country: "ES", state: "Madrid", dealType: "SALE", facilityType: "Powered Land", mw: 50 }), true);
   assert.equal(fitsMandate(eu, { country: "US", state: "TX", dealType: "SALE", facilityType: "Powered Land", mw: 50 }), false);
+});
+
+test("board columns stand for listing access", () => {
+  assert.equal(accessForColumn(stages, "INTERESTED"), null);
+  assert.equal(accessForColumn(stages, "NDA_SIGNED"), "NDA");
+  assert.equal(accessForColumn(stages, "LOI_SUBMITTED"), "NDA");
+  assert.equal(accessForColumn(stages, "LOI_ACCEPTED"), "LOI");
+  assert.equal(accessForColumn(stages, "IN_DILIGENCE"), "DILIGENCE");
+  assert.equal(accessForColumn(stages, "CLOSED"), "DILIGENCE");
+  assert.equal(accessForColumn(stages, "PASSED"), null);
+  assert.equal(accessForColumn(stages, "NOPE"), null);
 });
