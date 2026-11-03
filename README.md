@@ -85,6 +85,12 @@ Listing documents can point at data room files: **Share on listing** in the data
 
 Claude writes in the background (`after()`, within the page's 300 s limit); the draft page refreshes itself. Drafts are Markdown, edited side by side with a live preview, then **Save to data room** files a branded PDF (decks: 16:9 PDF and an editable .pptx) in "08 Marketing & Teaser" or "09 Reports & Analysis" (an existing matching folder is reused). Saving again replaces the same file, so listing shares keep working. Code: `lib/wizard.ts` (prompts, limits), `lib/wizard-run.ts` (Claude call), `lib/office.ts` (Office text), `lib/wizard-export.ts` (PDF / PowerPoint). Needs `ANTHROPIC_API_KEY`.
 
+### Screening Tool
+
+**Developer CRM → Screening** (or **🔎 Screening** on a listing) qualifies a project before it goes to investors. Questions come from the editable **Screening template** (seven DEAC categories by default: sponsor, site & real estate incl. occupancy, power & interconnection incl. phasing and onsite generation, fiber, permitting & environmental, engineering & construction, financial & capitalization). Questions can be "Canada only", and `{partner}` is replaced by the template's partner name (default WDC).
+
+**✨ Pre-research with AI** has Claude read the listing record, the data room files you pick, CRM notes / calls / emails logged on the project or sponsor, your own notes and (optionally) the web, then answer every question with status (answered, partial, gap, conflict, not applicable), sources and a specific follow-up question for the sponsor, plus a summary and red flags. Web research runs first (web search + fetch), then a structured-output call answers the questions. The team can mark answers verified or override them; re-running AI keeps team answers. Open questions are collected into a copyable questionnaire / email draft, and **Save PDF to data room** files the screening report. Code: `lib/screening.ts` (template, prompts, merge logic), `lib/screening-run.ts` (Claude calls), `app/actions/screening.ts`.
+
 ## Developer CRM funnels
 
 The Developer CRM board has one funnel per deal type (For Lease, Investment / Financing, For Sale), picked with the tabs above the board. A project shows in the funnel for its deal type; a company with no project yet shows in every funnel. Wide boards scroll sideways with the bar above the columns, the bar below them (it stays pinned to the bottom of the window), the ← → buttons, or the trackpad.

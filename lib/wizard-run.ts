@@ -14,7 +14,7 @@ import {
 type SourceNote = { name: string; status: "read" | "skipped"; reason?: string };
 
 /** Turns the chosen data room files into Claude content blocks, noting anything it had to skip. */
-async function loadSources(projectId: string, fileIds: string[]) {
+export async function loadSources(projectId: string, fileIds: string[]) {
   const [files, folders] = await Promise.all([
     db.dataRoomFile.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true, name: true, size: true, folderId: true, storageKey: true } }),
     db.dataRoomFolder.findMany({ where: { projectId }, select: { id: true, parentId: true, name: true } }),
@@ -56,7 +56,7 @@ async function loadSources(projectId: string, fileIds: string[]) {
   return { blocks, notes };
 }
 
-async function valuationFacts(valuationInputs: string | null): Promise<ValuationFacts> {
+export async function valuationFacts(valuationInputs: string | null): Promise<ValuationFacts> {
   const inputs = parseInputs(valuationInputs);
   if (!inputs) return null;
   const e = evaluate(inputs, await getScoring());
@@ -64,7 +64,7 @@ async function valuationFacts(valuationInputs: string | null): Promise<Valuation
 }
 
 /** Web pages Claude cited or opened, de-duplicated. */
-function webSourcesOf(content: Anthropic.Beta.BetaContentBlock[]) {
+export function webSourcesOf(content: Anthropic.Beta.BetaContentBlock[]) {
   const seen = new Map<string, string>();
   for (const b of content) {
     if (b.type === "web_search_tool_result" && Array.isArray(b.content)) for (const r of b.content) if (r.type === "web_search_result") seen.set(r.url, r.title);
