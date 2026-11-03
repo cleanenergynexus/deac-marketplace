@@ -36,7 +36,7 @@ export function SignerPicker({ options, initial = [], multiple = true }: { optio
         <>
           <div className="flex gap-2">
             <input className="input flex-1" placeholder="Search name, email or company" value={q} onChange={(e) => setQ(e.target.value)} />
-            <select className="input w-auto" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Signer type"><option value="">All</option>{kinds.map((k) => <option key={k}>{k}</option>)}</select>
+            <select className="input !w-auto shrink-0" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Signer type"><option value="">All</option>{kinds.map((k) => <option key={k}>{k}</option>)}</select>
           </div>
           <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
             {matches.map((o) => (

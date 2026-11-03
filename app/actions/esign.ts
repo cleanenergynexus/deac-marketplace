@@ -453,3 +453,27 @@ export async function startListingNda(f: FormData) {
   refresh();
   redirect(`/portal/sign/${r.id}`);
 }
+
+/**
+ * Saves a document (draft, sent or signed) or a template as a new template: same PDF, fields, additional signers
+ * (e.g. the DEAC countersigner) and settings, ready to send again. What anyone typed or signed is not copied.
+ */
+export async function saveAsTemplate(f: FormData) {
+  const admin = await requireAdmin();
+  const src = await db.signatureRequest.findUnique({ where: { id: String(f.get("id")) } });
+  if (!src || src.source !== "ESIGN") return;
+  const bytes = await readPdf(src.sourceKey);
+  if (!bytes) return;
+  const sourceKey = await saveGenerated("esign", src.sourceName, bytes, "application/pdf");
+  const title = s(f, "title")?.slice(0, 200) ?? (src.isTemplate ? `${src.title} (copy)` : src.title);
+  const t = await db.signatureRequest.create({
+    data: {
+      isTemplate: true, status: "TEMPLATE", title, kind: src.kind, projectId: src.projectId, sourceName: src.sourceName, sourceKey, sourceHash: src.sourceHash,
+      pageCount: src.pageCount, fields: src.fields, message: src.message, autoApprove: src.autoApprove, signOrder: src.signOrder, createdBy: admin.name, createdById: admin.id,
+    },
+  });
+  await copyCosigners(src.id, t.id);
+  await logEvent(t.id, "CREATED", `Template saved from ${src.isTemplate ? "template" : "document"} "${src.title}"`, admin.name);
+  refresh();
+  redirect(`/admin/signatures/${t.id}?saved=1`);
+}

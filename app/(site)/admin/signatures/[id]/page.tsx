@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import type { Party } from "@/lib/esign-db";
-import { deleteEnvelope, voidRequest } from "@/app/actions/esign";
+import { deleteEnvelope, saveAsTemplate, voidRequest } from "@/app/actions/esign";
 import { cosignerRef, listingOptions, loadSignerOptions, partiesOf, signerHref, signerRef, teamOptions } from "@/lib/esign-db";
 import { dueSlots, isOpen, kindLabel, parseFields, SIGNER_LABEL, signerColor, STATUS_LABEL, statusBadge, type SignerType } from "@/lib/esign";
 import { SignFieldEditor } from "@/components/SignFieldEditor";
@@ -15,9 +15,10 @@ import { date } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignatureRequestPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SignatureRequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const me = await requireAdmin();
   const { id } = await params;
+  const { saved } = await searchParams;
   const r = await db.signatureRequest.findUnique({ where: { id }, include: { project: { select: { id: true, code: true, title: true } }, events: { orderBy: { createdAt: "asc" } }, signers: { orderBy: { slot: "asc" } } } });
   if (!r) notFound();
   const editable = r.isTemplate || r.status === "DRAFT";
@@ -46,6 +47,11 @@ export default async function SignatureRequestPage({ params }: { params: Promise
         </span>}
         action={<Link href={r.isTemplate ? "/admin/signatures?tab=templates" : "/admin/signatures"} className="btn-ghost">All {r.isTemplate ? "templates" : "documents"}</Link>}
       />
+      {saved && r.isTemplate && (
+        <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
+          Saved as a template, with its fields{r.signers.length ? " and signers" : ""}. It&apos;s under <Link href="/admin/signatures?tab=templates" className="font-semibold underline">E-signatures → Templates</Link>, and you can pick it under <b>From a template</b> whenever you send a document. Send it now below, or adjust it first (changes save on their own).
+        </p>
+      )}
 
       {editable && (
         <Section title={r.isTemplate ? "Send this template" : "Send for signature"}>
@@ -54,7 +60,9 @@ export default async function SignatureRequestPage({ params }: { params: Promise
               <p>Place the fields on the document below (they save on their own), then choose who {multi ? "receives it" : "signs"}.{multi ? <> Signers sign in the order set under <b>Signers</b>; each gets their link when it&apos;s their turn.</> : <> Need a countersignature? Add a signer under <b>Signers</b>.</>} Each signer gets a personal link by email{r.isTemplate ? " and their own copy" : ""}; investors also see it in My Portal.</p>
               <p>The signer sees their details prefilled from their record, fills in anything missing, signs and clicks <b>I Agree</b>. The signed PDF gets a signing certificate and is saved {r.projectId ? "to this listing's data room, under Signed Documents" : "on the request"}.</p>
               {r.isTemplate && sentFrom.length > 0 && <p className="text-xs">Sent from this template: {sentFrom.map((g) => `${g._count} ${(STATUS_LABEL[g.status] ?? g.status).toLowerCase()}`).join(", ")}.</p>}
+              {!r.isTemplate && <SaveTemplateForm id={r.id} title={r.title} hint="Keep this document, its fields and signers to send again later." />}
               <form action={deleteEnvelope}><input type="hidden" name="id" value={r.id} /><ConfirmButton message={r.isTemplate ? `Delete the template "${r.title}"? Documents already sent from it are kept.` : "Delete this draft?"} className="btn-danger">Delete {r.isTemplate ? "template" : "draft"}</ConfirmButton></form>
+              {r.isTemplate && <SaveTemplateForm id={r.id} title={`${r.title} (copy)`} label="Duplicate template" hint="Make a copy to adapt, e.g. for another listing." />}
             </div>
             <SendPanel id={r.id} options={signers} initial={r.isTemplate ? [] : [signerRef(r)].filter(Boolean)} isTemplate={r.isTemplate} />
           </div>
@@ -122,6 +130,7 @@ export default async function SignatureRequestPage({ params }: { params: Promise
                 </form>
               </div>
             )}
+            {!uploaded && <SaveTemplateForm id={r.id} title={r.title} hint="Reuse this document: same PDF, fields and signers, ready to send to someone else." />}
             {(r.status === "DECLINED" || r.status === "VOIDED") && (
               <div className="card space-y-2 p-4 text-sm">
                 <Link href={`/admin/signatures/new?signer=${encodeURIComponent(signerRef(r))}${r.templateId ? `&templateId=${r.templateId}` : ""}`} className="btn w-full">Send a new one</Link>
@@ -169,5 +178,18 @@ function PartyRow({ p, n, href }: { p: Party; n: number; href: string | null }) 
       </div>
       {p.signedAt && <div className="mt-0.5 text-xs text-slate-500">Signed <LocalTime value={p.signedAt} /></div>}
     </li>
+  );
+}
+
+/** "Save as template": a copy of the PDF, fields, signers and settings, to send again later. */
+function SaveTemplateForm({ id, title, label = "Save as template", hint }: { id: string; title: string; label?: string; hint: string }) {
+  return (
+    <form action={saveAsTemplate} className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+      <input type="hidden" name="id" value={id} />
+      <div className="text-sm font-semibold text-slate-800">{label}</div>
+      <p className="text-xs text-slate-500">{hint}</p>
+      <input name="title" defaultValue={title} aria-label="Template name" className="input py-1.5 text-sm" />
+      <button className="btn-ghost w-full py-1.5">{label}</button>
+    </form>
   );
 }
