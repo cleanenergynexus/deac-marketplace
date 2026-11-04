@@ -130,7 +130,7 @@ export function WizardDocEditor({ doc, storageReady }: { doc: Doc; storageReady:
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="card space-y-3 p-4 text-sm">
-          <h3 className="font-semibold">In the data room</h3>
+          <h3 className="font-semibold">In the Data Room</h3>
           {doc.saved.length ? (
             <>
               <ul className="space-y-1">{doc.saved.map((f) => <li key={f.url}><a href={f.url} target="_blank" rel="noreferrer" className="text-brand-600 underline">{f.name}</a></li>)}</ul>
@@ -156,7 +156,7 @@ function Sources({ doc }: { doc: Doc }) {
   const skipped = doc.sourceNotes.filter((n) => n.status === "skipped");
   return (
     <div className="space-y-2">
-      <h3 className="font-semibold">What Claude used</h3>
+      <h3 className="font-semibold">What Claude Used</h3>
       <p className="text-xs text-slate-500">
         {[doc.options.anonymous && "Anonymous version", doc.options.webResearch ? "Web research on" : "Data room only", doc.options.audience && `Audience: ${doc.options.audience}`].filter(Boolean).join(" · ")}
       </p>

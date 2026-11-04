@@ -13,7 +13,7 @@ export default async function AcceptInvite({ params }: { params: Promise<{ token
   if (!user || user.role !== "INVESTOR" || inviteExpired(user.inviteExpiresAt)) {
     return (
       <div className="mx-auto max-w-sm card p-6">
-        <h1 className="text-xl font-bold">This invite link has expired</h1>
+        <h1 className="text-xl font-bold">This Invite Link Has Expired</h1>
         <p className="mt-2 text-sm text-slate-600">It may have been used already or replaced by a newer link. Ask your DEAC contact for a new invite, or <Link href="/login" className="text-brand-600">sign in</Link> if you already set a password.</p>
       </div>
     );

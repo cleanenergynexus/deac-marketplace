@@ -13,7 +13,7 @@ export default async function ScoringSettings() {
   return (
     <div>
       <PageHeader
-        title="Scoring settings"
+        title="Scoring Settings"
         subtitle={<>Points for each characteristic and selection behind the lead score in the <Link href="/admin/calculator" className="text-brand-600">valuation calculator</Link>. Starts from the DEAC workbook values. {row ? `Last saved ${date(row.updatedAt)}${row.updatedBy ? ` by ${row.updatedBy}` : ""}.` : "Not edited yet."}</>}
       />
       <ScoringEditor initial={parseScoring(row?.config)} action={saveScoring} />

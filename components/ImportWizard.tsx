@@ -98,7 +98,7 @@ function Review({ result, sourceName, developers, developerId, agent, onRestart 
           <input type="hidden" name="valuation" value={JSON.stringify(result.valuation)} />
           {devChoice === "__new__" && (
             <>
-              <h3 className="font-semibold">New developer</h3>
+              <h3 className="font-semibold">New Developer</h3>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Company"><input name="devCompany" defaultValue={result.developer.company} required className="input" /></Field>
                 <Field label="Contact name"><input name="devContactName" defaultValue={result.developer.contactName} className="input" /></Field>
@@ -110,7 +110,7 @@ function Review({ result, sourceName, developers, developerId, agent, onRestart 
           )}
           {result.contacts.length > 0 && (
             <div className="text-sm">
-              <h3 className="font-semibold">Contacts found</h3>
+              <h3 className="font-semibold">Contacts Found</h3>
               <ul className="mt-1 list-disc pl-5 text-slate-600">{result.contacts.map((c, i) => <li key={i}>{[c.name, c.role && `(${c.role})`, c.company, c.email, formatPhone(c.phone)].filter(Boolean).join(" · ")}</li>)}</ul>
               <p className="mt-1 text-xs text-slate-500">Saved to the developer&apos;s activity log.</p>
             </div>

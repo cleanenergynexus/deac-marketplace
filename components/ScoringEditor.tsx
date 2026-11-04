@@ -104,7 +104,7 @@ export function ScoringEditor({ initial, action }: { initial: ScoringConfig; act
         ))}
       </div>
 
-      <h2 className="pt-2 text-lg font-semibold">Number-based characteristics</h2>
+      <h2 className="pt-2 text-lg font-semibold">Number-Based Characteristics</h2>
       <p className="text-sm text-slate-600">These use a sliding scale: points = starting points + points per unit × the entered number, never below 0 or above the maximum. Use a negative &quot;per unit&quot; when a bigger number is worse.</p>
       <div className="grid gap-4 lg:grid-cols-3">
         {NUMERIC_ORDER.map((k) => {

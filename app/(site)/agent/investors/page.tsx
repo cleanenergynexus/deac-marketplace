@@ -18,7 +18,7 @@ export default async function AgentInvestors() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Investor contacts" subtitle="Investors you referred. Open one to see the listings they're working and their activity." action={<Link href="/agent/refer" className="btn-ghost">Refer an investor</Link>} />
+      <PageHeader title="Investor Contacts" subtitle="Investors you referred. Open one to see the listings they're working and their activity." action={<Link href="/agent/refer" className="btn-ghost">Refer an investor</Link>} />
       <Section title={`Contacts (${investors.length})`}>
         {investors.length ? (
           <div className="overflow-x-auto">

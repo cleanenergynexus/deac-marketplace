@@ -60,7 +60,7 @@ export default async function AgentContact({ params, searchParams }: { params: P
           </div>
         </div>
         <div className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold">Request a meeting</h2>
+          <h2 className="mb-3 text-sm font-semibold">Request a Meeting</h2>
           <MeetingRequestForm contacts={options} about={`dev:${contact.id}`} partnerName={partner?.name} />
         </div>
       </aside>
@@ -79,7 +79,7 @@ export default async function AgentContact({ params, searchParams }: { params: P
 
       <aside className="space-y-4 lg:col-start-2 xl:col-start-auto">
         <section className="card p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {dev.company} projects ({dev.projects.length})</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {dev.company} Projects ({dev.projects.length})</h2>
           {!dev.projects.length && <p className="text-sm text-slate-500">No projects yet. <Link href="/agent/import" className="text-brand-600">Import a listing</Link>.</p>}
           <ul className="space-y-3">
             {dev.projects.map((p) => (

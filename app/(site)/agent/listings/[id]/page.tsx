@@ -69,11 +69,11 @@ export default async function AgentListing({ params, searchParams }: { params: P
       {p.summary && <Section title="Summary"><p className="whitespace-pre-wrap text-sm text-slate-700">{p.summary}</p></Section>}
 
       <div id="data-room" className="scroll-mt-4">
-        <Section title="Data room">
+        <Section title="Data Room">
           <p className="mb-4 text-sm text-slate-600">Add documents for this project (site plans, utility letters, financials…). The DEAC team reviews and organizes them. Uploads go one way: files in the data room can&apos;t be opened or downloaded from here. It holds {p._count.dataRoomFiles} file{p._count.dataRoomFiles === 1 ? "" : "s"} in total.</p>
           {preview ? <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">The agent sees an upload box here. It&apos;s turned off in the preview.</p>
             : <AgentUploader projectId={p.id} folders={folders} storage={storageMode()} uploadMethod={blobUploadMethod()} />}
-          <h3 className="mb-2 mt-6 text-sm font-semibold">Your uploads ({p.dataRoomFiles.length})</h3>
+          <h3 className="mb-2 mt-6 text-sm font-semibold">Your Uploads ({p.dataRoomFiles.length})</h3>
           {p.dataRoomFiles.length ? (
             <ul className="divide-y divide-slate-100 text-sm">
               {p.dataRoomFiles.map((f) => (
@@ -87,7 +87,7 @@ export default async function AgentListing({ params, searchParams }: { params: P
         </Section>
       </div>
 
-      <Section title="Activity on this project">
+      <Section title="Activity on This Project">
         <ActivityFeed items={feed} showContact readOnly links={AGENT_LINKS} empty="Nothing logged on this project yet." />
       </Section>
     </div>

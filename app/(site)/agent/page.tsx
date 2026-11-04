@@ -37,7 +37,7 @@ export default async function AgentHome() {
         <Link href="/agent/import"><Stat label="New listing" value="Import" sub="From a teaser, memo or web page" /></Link>
       </div>
       {docs.length > 0 && (
-        <Section title="Your agreements with DEAC">
+        <Section title="Your Agreements with DEAC">
           <ul className="divide-y divide-slate-100">{docs.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
               <span className="font-medium">{d.title}</span>
@@ -49,13 +49,13 @@ export default async function AgentHome() {
         </Section>
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <Section title="Recent activity with your contacts">
+        <Section title="Recent Activity with Your Contacts">
           <ActivityFeed items={activity} showContact readOnly links={AGENT_LINKS} empty="Nothing yet. Once DEAC starts working with your contacts, every call, email and meeting shows here." />
         </Section>
         <div className="space-y-4">
           <PartnerCard partner={partner} />
           <div className="card p-5">
-            <h2 className="mb-3 font-semibold">Request a meeting</h2>
+            <h2 className="mb-3 font-semibold">Request a Meeting</h2>
             <MeetingRequestForm contacts={options} partnerName={partner?.name} />
           </div>
         </div>

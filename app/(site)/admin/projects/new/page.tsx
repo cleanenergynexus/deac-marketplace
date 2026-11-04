@@ -10,7 +10,7 @@ export default async function NewProject({ searchParams }: { searchParams: Promi
   const developer = developers.find((d) => d.id === developerId);
   return (
     <div>
-      <PageHeader title={developer ? `New project for ${developer.company}` : "New listing"} />
+      <PageHeader title={developer ? `New Project for ${developer.company}` : "New Listing"} />
       <NewListingTabs active="manual" developer={developer} />
       <div className="card p-6"><ProjectForm developers={developers} developerId={developer?.id} action={createProject} /></div>
     </div>

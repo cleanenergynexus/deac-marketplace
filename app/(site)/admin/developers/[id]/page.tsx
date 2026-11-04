@@ -82,7 +82,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
                   <td className="td"><Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></td></tr>
               ))}</tbody></table></div>)}
           </Section>
-          <Section title="Company profile">
+          <Section title="Company Profile">
             {hasAddress(dev) && (
               <a href={mapsHref(dev)} target="_blank" rel="noreferrer" className="mb-4 block text-sm text-slate-700 hover:text-brand-600">
                 {addressLines(dev).map((l) => <span key={l} className="block">{l}</span>)}
@@ -90,7 +90,7 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
             )}
             <DeveloperForm dev={dev} action={updateDeveloper} agents={agents} />
           </Section>
-          <Section title="Team & bios (shown on listings)">
+          <Section title="Team & Bios (Shown on Listings)">
             <div className="grid gap-3 sm:grid-cols-2">
               {dev.team.map((m) => (
                 <div key={m.id} className="rounded-lg border border-slate-200 p-3 text-sm">

@@ -2,6 +2,8 @@
 // screening answers, and the instructions Claude gets when it pre-researches a project.
 // Pure functions only, so they can be unit tested.
 
+import { titleCase } from "./format";
+
 // ---------- template ----------
 
 /** ALL = every project. CA = only projects in Canada. */
@@ -26,7 +28,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
   partnerName: "WDC",
   categories: [
     {
-      id: "sponsor", title: "Sponsor information", note: "",
+      id: "sponsor", title: "Sponsor Information", note: "",
       questions: [
         q("sponsor-location", "Location of the project."),
         q("sponsor-owner", "Who owns the project / site?"),
@@ -35,7 +37,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "site", title: "Site & real estate", note: "",
+      id: "site", title: "Site & Real Estate", note: "",
       questions: [
         q("site-location", "Site location (address / parcel, acreage)."),
         q("site-owner", "Site owner of record."),
@@ -47,7 +49,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "power", title: "Power & interconnection", note: "Please distinguish load-service rights from generation / export interconnection, and total site load from IT load.",
+      id: "power", title: "Power & Interconnection", note: "Please distinguish load-service rights from generation / export interconnection, and total site load from IT load.",
       questions: [
         q("power-utility", "Serving utility."),
         q("power-capacity", "Confirmed load capacity (MW) and energization date."),
@@ -67,7 +69,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "fiber", title: "Fiber connectivity", note: "",
+      id: "fiber", title: "Fiber Connectivity", note: "",
       questions: [
         q("fiber-providers", "Fiber providers at or near the site, and distance to the nearest long-haul / metro route."),
         q("fiber-diversity", "Diverse routes / entrances available or planned, and lit vs. dark fiber."),
@@ -75,7 +77,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "permitting", title: "Permitting & environmental", note: "",
+      id: "permitting", title: "Permitting & Environmental", note: "",
       questions: [
         q("permit-zoning", "Zoning and land-use entitlements: current status and what is still required."),
         q("permit-environmental", "Environmental studies and approvals (Phase I ESA, wetlands, species, air, water) and their status."),
@@ -84,7 +86,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "engineering", title: "Engineering & construction", note: "",
+      id: "engineering", title: "Engineering & Construction", note: "",
       questions: [
         q("eng-plans", "Engineering plans completed to date (site plan, conceptual / schematic design, electrical one-line)."),
         q("eng-design-basis", "Design basis: building / campus layout, density (kW per rack), cooling and redundancy."),
@@ -93,7 +95,7 @@ export const DEFAULT_SCREENING: ScreeningTemplate = {
       ],
     },
     {
-      id: "capital", title: "Financial & capitalization", note: "",
+      id: "capital", title: "Financial & Capitalization", note: "",
       questions: [
         q("cap-budget", "Indicative phase-one budget."),
         q("cap-funding", "Who funds site control, studies, deposits, generation and infrastructure?"),
@@ -123,7 +125,7 @@ export function normalizeTemplate(raw: unknown): ScreeningTemplate {
   };
   const categories: ScreeningCategory[] = [];
   for (const c of Array.isArray(r.categories) ? r.categories.slice(0, MAX_CATEGORIES) : []) {
-    const title = clean(c?.title, 120);
+    const title = titleCase(clean(c?.title, 120));
     if (!title) continue;
     const questions: ScreeningQuestion[] = [];
     for (const x of Array.isArray(c.questions) ? c.questions.slice(0, MAX_QUESTIONS) : []) {
@@ -269,7 +271,7 @@ export function screeningMarkdown(cats: ScreeningCategory[], answers: ScreeningA
   ];
   if (m.decisionNote.trim()) lines.push("", m.decisionNote.trim());
   if (m.summary.trim()) lines.push("", "## Summary", "", m.summary.trim());
-  if (m.redFlags.length) lines.push("", "## Red flags", "", ...m.redFlags.map((f) => `- ${f}`));
+  if (m.redFlags.length) lines.push("", "## Red Flags", "", ...m.redFlags.map((f) => `- ${f}`));
   for (const c of cats) {
     lines.push("", `## ${c.title}`);
     if (c.note) lines.push("", `_${c.note}_`);
@@ -284,10 +286,10 @@ export function screeningMarkdown(cats: ScreeningCategory[], answers: ScreeningA
   const qs = sponsorQuestions(cats, answers);
   if (qs.length) {
     let n = 0;
-    lines.push("", "## Open questions for the sponsor", "");
+    lines.push("", "## Open Questions for the Sponsor", "");
     for (const g of qs) lines.push(`**${g.title}**`, "", ...g.items.map((i) => `${++n}. ${i.text}`), "");
   }
-  if (m.webSources.length) lines.push("", "## Web sources", "", ...m.webSources.map((s) => `- ${s.title}: ${s.url}`));
+  if (m.webSources.length) lines.push("", "## Web Sources", "", ...m.webSources.map((s) => `- ${s.title}: ${s.url}`));
   return lines.join("\n").trim() + "\n";
 }
 

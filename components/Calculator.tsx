@@ -104,7 +104,7 @@ function BidCalculator({ initial, onSave, scoring = DEFAULT_SCORING }: Props) {
           )}
         </div>
         <div className="card p-5 text-sm">
-          <div className="mb-2 font-semibold">Factor adjustments</div>
+          <div className="mb-2 font-semibold">Factor Adjustments</div>
           {Object.entries(r.factors).map(([k, f]) => (
             <div key={k} className="flex justify-between py-0.5">
               <span className="text-slate-600">{FACTOR_LABELS[k]}</span>
@@ -113,7 +113,7 @@ function BidCalculator({ initial, onSave, scoring = DEFAULT_SCORING }: Props) {
           ))}
         </div>
         <details className="card p-5 text-sm">
-          <summary className="cursor-pointer font-semibold">Score points</summary>
+          <summary className="cursor-pointer font-semibold">Score Points</summary>
           <div className="mt-2">
             {Object.entries(r.points).map(([k, pts]) => (
               <div key={k} className="flex justify-between py-0.5"><span className="text-slate-600">{SCORING_LABELS[k as keyof typeof SCORING_LABELS]}</span><span>{Math.round(pts * 100) / 100}</span></div>

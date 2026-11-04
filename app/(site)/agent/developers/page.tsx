@@ -17,7 +17,7 @@ export default async function AgentDevelopers() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Developer contacts" subtitle="Developers you referred and the people at their companies. Open one to follow its projects and activity." action={<Link href="/agent/refer" className="btn-ghost">Refer a developer</Link>} />
+      <PageHeader title="Developer Contacts" subtitle="Developers you referred and the people at their companies. Open one to follow its projects and activity." action={<Link href="/agent/refer" className="btn-ghost">Refer a developer</Link>} />
       <Section title={`Contacts (${contacts.length})`}>
         {contacts.length ? (
           <div className="overflow-x-auto">

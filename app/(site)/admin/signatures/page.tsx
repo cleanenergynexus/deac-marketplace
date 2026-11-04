@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 
 const FILTERS = [
   { key: "", label: "All" },
-  { key: "open", label: "Waiting for signature" },
+  { key: "open", label: "Waiting for Signature" },
   { key: "SIGNED", label: "Signed" },
   { key: "DRAFT", label: "Drafts" },
-  { key: "closed", label: "Declined & voided" },
+  { key: "closed", label: "Declined & Voided" },
 ] as const;
 
 /** E-signatures: every document sent for signature or filed as signed, and the reusable templates. */
@@ -39,7 +39,7 @@ export default async function Signatures({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-5">
       <PageHeader
-        title="E-signatures"
+        title="E-Signatures"
         subtitle="Send NDAs, LOIs and contracts for electronic signature, or file documents signed elsewhere on a contact's record. Signed copies get a signing certificate and go to the listing's data room."
         action={<div className="flex flex-wrap gap-2">
           <Link href="/admin/signatures/upload" className="btn-ghost">Upload signed document</Link>

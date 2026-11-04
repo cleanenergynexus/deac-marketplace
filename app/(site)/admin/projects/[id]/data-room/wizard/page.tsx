@@ -29,7 +29,7 @@ export default async function WizardPage({ params }: { params: Promise<{ id: str
       <Link href={`/admin/projects/${p.id}/data-room`} className="text-sm text-brand-600">← Data room</Link>
       <PageHeader title="Document Wizard" subtitle={<>{p.code} · {p.title}. Claude reads the files you pick from this data room (and, if you want, the web) and writes a first draft. You review and edit it, then save it into the data room as a PDF.</>} />
       <DocumentWizard projectId={p.id} code={p.code} folders={p.dataRoomFolders} files={p.dataRoomFiles} generatedIds={generatedIds} enabled={importerEnabled()} />
-      <Section title="Drafts for this project">
+      <Section title="Drafts for This Project">
         <WizardDocList projectId={p.id} docs={p.wizardDocs} />
       </Section>
     </div>

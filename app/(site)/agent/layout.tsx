@@ -7,12 +7,12 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   const view = await agentView();
   const items: NavItem[] = [
     { href: "/agent", label: "Overview" },
-    { href: "/agent/developers", label: "Developer contacts" },
-    { href: "/agent/investors", label: "Investor contacts" },
-    { href: "/agent/listings", label: "Listings & data rooms", children: [{ href: "/agent/import", label: "Import a listing" }] },
+    { href: "/agent/developers", label: "Developer Contacts" },
+    { href: "/agent/investors", label: "Investor Contacts" },
+    { href: "/agent/listings", label: "Listings & Data Rooms", children: [{ href: "/agent/import", label: "Import a Listing" }] },
     { href: "/marketplace", label: "Opportunities" },
-    { href: "/agent/refer", label: "Refer a contact" },
-    { href: "/agent/account", label: "My account" },
+    { href: "/agent/refer", label: "Refer a Contact" },
+    { href: "/agent/account", label: "My Account" },
   ];
   return (
     <>

@@ -59,7 +59,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
         dataRoom={{ projectId: p.id, folders: p.dataRoomFolders, files: p.dataRoomFiles }} /></Section>
 
       <div id="disclosure">
-        <Section title="Investor disclosure" action={<Link href={`/marketplace/${p.id}?as=TEASER`} className="text-sm text-brand-600">Preview by stage</Link>}>
+        <Section title="Investor Disclosure" action={<Link href={`/marketplace/${p.id}?as=TEASER`} className="text-sm text-brand-600">Preview by stage</Link>}>
           <p className="mb-4 text-sm text-slate-600">Investors start at the teaser and see more as you confirm each step: NDA, LOI, then full diligence. Pick the stage that opens each part of the listing. Headline facts (MW, facility, location, funding, status) are always visible to approved members.</p>
           <form action={saveDisclosure} className="space-y-3">
             <input type="hidden" name="projectId" value={p.id} />
@@ -72,7 +72,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
         </Section>
       </div>
 
-      <Section title="Investor access" action={<Link href="/admin/lois" className="text-sm text-brand-600">Review queue</Link>}>
+      <Section title="Investor Access" action={<Link href="/admin/lois" className="text-sm text-brand-600">Review queue</Link>}>
         {engaged.size ? (
           <table className="w-full"><thead><tr><th className="th">Investor</th><th className="th">Stage</th><th className="th">NDA</th><th className="th">LOI</th><th className="th">Diligence</th></tr></thead>
             <tbody className="divide-y divide-slate-100">{[...engaged.values()].map((r) => {
@@ -98,7 +98,7 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
       </Section>
 
       <div id="valuation">
-        <Section title="Valuation & lead score (internal only)">
+        <Section title="Valuation & Lead Score (Internal Only)">
           <Calculator initial={initial} onSave={save} scoring={scoring} />
         </Section>
       </div>

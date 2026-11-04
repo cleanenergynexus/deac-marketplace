@@ -62,7 +62,7 @@ export default async function AdminHome() {
       {myTasks.length > 0 && (
         <Link href="/admin/tasks" className={`flex items-center justify-between rounded-lg p-4 text-sm hover:opacity-90 ${myOverdue ? "bg-red-50 text-red-900" : "bg-brand-50 text-brand-900"}`}>
           <span>You have <b>{myTasks.length}</b> open task{myTasks.length === 1 ? "" : "s"}{myOverdue ? <>, <b>{myOverdue}</b> overdue</> : ""}{myToday ? <>, <b>{myToday}</b> due today</> : ""}</span>
-          <span className="font-semibold">My tasks →</span>
+          <span className="font-semibold">My Tasks →</span>
         </Link>
       )}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -72,7 +72,7 @@ export default async function AdminHome() {
         <Stat label="Capital sought" value={usd(live.reduce((a, p) => a + p.fundingNeeded, 0))} />
       </div>
       <div className="grid gap-6 xl:grid-cols-2">
-        <Section title="Investor pipeline">
+        <Section title="Investor Pipeline">
           <div className="space-y-5">
             {investorFunnels.map((f) => (
               <div key={f.value}>
@@ -86,7 +86,7 @@ export default async function AdminHome() {
             </div>
           </div>
         </Section>
-        <Section title="Developer pipeline">
+        <Section title="Developer Pipeline">
           <div className="space-y-5">
             {funnels.map((f) => (
               <div key={f.value}>
@@ -102,7 +102,7 @@ export default async function AdminHome() {
             <li key={l.id} className="flex items-center justify-between py-2"><span><b>{l.investor.name}</b> → {l.project.code}</span><Badge tone={statusTone(l.status)}>{l.status}</Badge></li>
           ))}</ul>
         </Section>
-        <Section title="Recent activity">
+        <Section title="Recent Activity">
           <ul className="space-y-2 text-sm">{activity.map((a) => (
             <li key={a.id} className="flex gap-2"><span className="w-20 shrink-0 text-xs text-slate-500">{date(a.createdAt)}</span><span><b>{a.investor?.name ?? a.developer?.company}</b>: {a.body}</span></li>
           ))}</ul>

@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const items: NavItem[] = [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/tasks", label: "Tasks", count: myTasks },
-    { href: "/admin/access", label: "Access requests", count: applied },
+    { href: "/admin/access", label: "Access Requests", count: applied },
     {
       href: "/admin/investors",
       label: "Investor CRM",
@@ -37,14 +37,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         { href: "/admin/developers/funnels", label: "Funnels" },
       ],
     },
-    { href: "/admin/projects", label: "Listings", children: [{ href: "/admin/data-room-template", label: "Data room template" }] },
+    { href: "/admin/projects", label: "Listings", children: [{ href: "/admin/data-room-template", label: "Data Room Template" }] },
     { href: "/admin/lois", label: "NDAs & LOIs", count: pendingLois + pendingSteps },
-    { href: "/admin/signatures", label: "E-signatures", count: awaitingSignature },
-    { href: "/admin/requests", label: "Intake requests", count: openReqs },
+    { href: "/admin/signatures", label: "E-Signatures", count: awaitingSignature },
+    { href: "/admin/requests", label: "Intake Requests", count: openReqs },
     { href: "/admin/outreach", label: "Outreach" },
-    { href: "/admin/calculator", label: "Valuation calculator", children: [{ href: "/admin/scoring", label: "Scoring settings" }] },
-    { href: "/admin/team", label: "Team", children: [{ href: "/admin/agents", label: "Referral agents" }] },
-    { href: "/admin/account", label: "My account" },
+    { href: "/admin/calculator", label: "Valuation Calculator", children: [{ href: "/admin/scoring", label: "Scoring Settings" }] },
+    { href: "/admin/team", label: "Team", children: [{ href: "/admin/agents", label: "Referral Agents" }] },
+    { href: "/admin/account", label: "My Account" },
   ];
   return (
     <div className="grid gap-6 lg:grid-cols-[200px_1fr]">

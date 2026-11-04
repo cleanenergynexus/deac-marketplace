@@ -22,7 +22,7 @@ export default async function NewSignature({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader
-        title={asTemplate ? "New template" : "Send a document for signature"}
+        title={asTemplate ? "New Template" : "Send a Document for Signature"}
         subtitle={asTemplate ? "Upload the PDF once, place the fields, and reuse it for every signer." : "Choose the PDF, then place where the signer signs and fills in their details."}
         action={<Link href="/admin/signatures" className="btn-ghost">Back</Link>}
       />

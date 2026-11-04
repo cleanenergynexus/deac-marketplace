@@ -13,7 +13,7 @@ export default async function AccessRequests() {
   const pending = await db.user.findMany({ where: { role: "INVESTOR", status: "PENDING" }, include: { investor: true }, orderBy: { createdAt: "asc" } });
   return (
     <div>
-      <PageHeader title="Access requests" subtitle="Investors who applied through the website. Approving unlocks the private portfolio for them." />
+      <PageHeader title="Access Requests" subtitle="Investors who applied through the website. Approving unlocks the private portfolio for them." />
       {pending.length ? (
         <div className="space-y-4">
           {pending.map(({ id, investor: i, createdAt }) =>

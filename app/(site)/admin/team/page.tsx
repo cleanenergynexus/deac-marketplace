@@ -25,7 +25,7 @@ export default async function Team() {
           <div key={l.value} className="card p-4 text-sm"><Badge tone={TONE[l.value]}>{l.label}</Badge><p className="mt-2 text-slate-600">{l.help}</p></div>
         ))}
       </div>
-      <Section title={`Team members (${team.length})`}>
+      <Section title={`Team Members (${team.length})`}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead><tr><th className="th">Name</th><th className="th">Email</th><th className="th">{isAdmin ? "Access level · Reports to" : "Access level"}</th>{!isAdmin && <th className="th">Reports to</th>}<th className="th">Added</th><th className="th"></th></tr></thead>
@@ -61,7 +61,7 @@ export default async function Team() {
         </div>
       </Section>
       {isAdmin && (
-        <Section title="Add a team member">
+        <Section title="Add a Team Member">
           <ActionForm action={addTeamAdmin} submitLabel="Add team member" success="Team member added. Share the temporary password with them privately; they can change it under My account." className="grid gap-4 sm:grid-cols-3">
             <Field label="Name"><input name="name" required className="input" /></Field>
             <Field label="Email"><input name="email" type="email" required className="input" /></Field>

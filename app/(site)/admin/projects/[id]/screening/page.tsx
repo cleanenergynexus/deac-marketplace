@@ -40,7 +40,7 @@ export default async function ProjectScreeningPage({ params }: { params: Promise
     <div className="space-y-4">
       <Link href={`/admin/projects/${p.id}`} className="text-sm text-brand-600">← {p.title}</Link>
       <PageHeader
-        title="Project screening"
+        title="Project Screening"
         subtitle={<>{p.code} · {p.title} · <Link href={`/admin/developers/${p.developerId}`} className="text-brand-600">{p.developer.company}</Link>. Qualify the project against the <Link href="/admin/screening/template" className="text-brand-600">screening template</Link>: let Claude pre-research it, confirm or correct each answer, then send the sponsor only the questions that are still open.</>}
         action={<Link href={`/admin/projects/${p.id}/data-room`} className="btn-ghost">📁 Data room{p.dataRoomFiles.length ? ` (${p.dataRoomFiles.length})` : ""}</Link>}
       />

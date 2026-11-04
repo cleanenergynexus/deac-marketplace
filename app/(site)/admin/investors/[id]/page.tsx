@@ -219,12 +219,12 @@ export default async function InvestorRecord({ params, searchParams }: { params:
         </section>
 
         <section className="card p-4" id="signatures">
-          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; contracts</h2>
+          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; Contracts</h2>
           <SignatureList signer={`INVESTOR:${inv.id}`} compact />
         </section>
 
         <section className="card p-4" id="listings">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {firstName}&apos;s listings ({inv.interests.length})</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {firstName}&apos;s Listings ({inv.interests.length})</h2>
           {!inv.interests.length && <p className="text-sm text-slate-500">Not on a listing yet. Add the listings {firstName} is interested in below.</p>}
           <ul className="space-y-3">
             {inv.interests.map((it) => {
@@ -268,7 +268,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
 
         {fits.length > 0 && (
           <section className="card p-4">
-            <h2 className="mb-2 text-sm font-semibold">Fits {firstName}&apos;s mandate ({fits.length})</h2>
+            <h2 className="mb-2 text-sm font-semibold">Fits {firstName}&apos;s Mandate ({fits.length})</h2>
             <ul className="divide-y divide-slate-100 text-sm">
               {fits.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-2 py-2">
@@ -286,14 +286,14 @@ export default async function InvestorRecord({ params, searchParams }: { params:
 
         {inv.analysisRequests.length > 0 && (
           <section className="card p-4">
-            <h2 className="mb-2 text-sm font-semibold">Intake requests</h2>
+            <h2 className="mb-2 text-sm font-semibold">Intake Requests</h2>
             <ul className="space-y-2 text-sm">{inv.analysisRequests.map((r) => <li key={r.id} className="flex justify-between"><span>{r.project.code} · {r.format ?? "—"}</span><Badge tone={statusTone(r.status)}>{r.status}</Badge></li>)}</ul>
           </section>
         )}
 
         {inv.company && (
           <section className="card p-4">
-            <h2 className="mb-2 text-sm font-semibold">Other contacts at {inv.company.name} ({inv.company.investors.length})</h2>
+            <h2 className="mb-2 text-sm font-semibold">Other Contacts at {inv.company.name} ({inv.company.investors.length})</h2>
             <ul className="space-y-2">
               {inv.company.investors.map((c) => (
                 <li key={c.id}>

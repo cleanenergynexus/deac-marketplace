@@ -46,9 +46,9 @@ export function canAssign(viewer: Staff, team: Staff[], assigneeId: string | nul
 export type TaskScope = "mine" | "team" | "all";
 export function taskScopes(level: string | null | undefined): { value: TaskScope; label: string }[] {
   const l = staffLevel(level);
-  const scopes: { value: TaskScope; label: string }[] = [{ value: "mine", label: "My tasks" }];
-  if (l === "MANAGER") scopes.push({ value: "team", label: "My team's tasks" });
-  if (l === "ADMIN") scopes.push({ value: "all", label: "All tasks" });
+  const scopes: { value: TaskScope; label: string }[] = [{ value: "mine", label: "My Tasks" }];
+  if (l === "MANAGER") scopes.push({ value: "team", label: "My Team's Tasks" });
+  if (l === "ADMIN") scopes.push({ value: "all", label: "All Tasks" });
   return scopes;
 }
 export function taskScope(v: string | undefined, level: string | null | undefined): TaskScope {

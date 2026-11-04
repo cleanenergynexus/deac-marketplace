@@ -9,7 +9,7 @@ export default async function Pending() {
   if (u.status === "APPROVED") redirect("/marketplace");
   return (
     <div className="mx-auto max-w-lg card p-8 text-center">
-      <h1 className="text-xl font-bold">{u.status === "REJECTED" ? "Application not approved" : "Application received"}</h1>
+      <h1 className="text-xl font-bold">{u.status === "REJECTED" ? "Application Not Approved" : "Application Received"}</h1>
       <p className="mt-3 text-slate-600">
         {u.status === "REJECTED"
           ? "Thank you for your interest. Your application doesn't match our current network criteria. We'll keep your profile on file."

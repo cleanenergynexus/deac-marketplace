@@ -21,7 +21,7 @@ export default async function Lois() {
   );
   return (
     <div className="space-y-6">
-      <PageHeader title="NDAs, LOIs & diligence" subtitle="Each confirmation opens more of the listing and data room for that investor, and emails them. Set what each stage shows on the listing's admin page." />
+      <PageHeader title="NDAs, LOIs & Diligence" subtitle="Each confirmation opens more of the listing and data room for that investor, and emails them. Set what each stage shows on the listing's admin page." />
 
       <Section title="1 · NDAs">
         {ndas.length ? (
@@ -41,7 +41,7 @@ export default async function Lois() {
         ) : <Empty>No NDAs signed yet.</Empty>}
       </Section>
 
-      <Section title="2 · Letters of interest">
+      <Section title="2 · Letters of Interest">
       {lois.length ? (
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -70,7 +70,7 @@ export default async function Lois() {
       ) : <Empty>No letters of interest yet.</Empty>}
       </Section>
 
-      <Section title="3 · Full diligence requests">
+      <Section title="3 · Full Diligence Requests">
         {diligence.length ? (
           <div className="overflow-x-auto"><table className="w-full">
             <thead className="border-b border-slate-200"><tr><th className="th">Investor</th><th className="th">Project</th><th className="th">Message</th><th className="th">Date</th><th className="th">Status</th><th className="th"></th></tr></thead>

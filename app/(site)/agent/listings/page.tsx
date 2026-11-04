@@ -20,7 +20,7 @@ export default async function AgentListings() {
   ]);
   return (
     <div className="space-y-6">
-      <PageHeader title="Listings & data rooms" subtitle="Projects of the developers you referred. Add documents to a project's data room, or import a new listing." action={<Link href="/agent/import" className="btn">Import a listing</Link>} />
+      <PageHeader title="Listings & Data Rooms" subtitle="Projects of the developers you referred. Add documents to a project's data room, or import a new listing." action={<Link href="/agent/import" className="btn">Import a listing</Link>} />
       <Section title={`Listings (${projects.length})`}>
         {projects.length ? (
           <div className="overflow-x-auto">

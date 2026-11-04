@@ -59,7 +59,7 @@ export default async function AgentInvestor({ params, searchParams }: { params: 
           </div>
         </div>
         <div className="card p-5">
-          <h2 className="mb-3 text-sm font-semibold">Request a meeting</h2>
+          <h2 className="mb-3 text-sm font-semibold">Request a Meeting</h2>
           <MeetingRequestForm contacts={options} about={`inv:${inv.id}`} partnerName={partner?.name} />
         </div>
       </aside>
@@ -79,7 +79,7 @@ export default async function AgentInvestor({ params, searchParams }: { params: 
 
       <aside className="space-y-4 lg:col-start-2 xl:col-start-auto">
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-semibold">Listings {inv.name.split(" ")[0]} is working ({inv.interests.length})</h2>
+          <h2 className="mb-3 text-sm font-semibold">Listings {inv.name.split(" ")[0]} Is Working ({inv.interests.length})</h2>
           {!inv.interests.length && <p className="text-sm text-slate-500">Not linked to a listing yet.</p>}
           <ul className="space-y-3">
             {inv.interests.map((it) => (

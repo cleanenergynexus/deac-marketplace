@@ -97,9 +97,9 @@ test("progress, sponsor questions and the report", () => {
   const md = screeningMarkdown(cats, answers, { code: "DEAC-TX-001", title: "Abilene | 100 MW", summary: "Good site.", redFlags: ["Title dispute"], decision: "HOLD", decisionNote: "", webSources: [{ title: "Oncor", url: "https://oncor.com" }] });
   assert.match(md, /^# Project Screening: Abilene \| 100 MW/);
   assert.match(md, /Decision: \*\*Hold\*\*/);
-  assert.match(md, /## Red flags\n\n- Title dispute/);
+  assert.match(md, /## Red Flags\n\n- Title dispute/);
   assert.match(md, /\| Location of the project\. \| \*\*Answered\*\*: Abilene, TX \| listing \|/);
-  assert.match(md, /## Open questions for the sponsor/);
+  assert.match(md, /## Open Questions for the Sponsor/);
   assert.match(md, /- Oncor: https:\/\/oncor\.com/);
 });
 

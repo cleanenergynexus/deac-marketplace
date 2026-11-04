@@ -6,7 +6,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const { next } = await searchParams;
   return (
     <div className="mx-auto max-w-sm card p-6">
-      <h1 className="text-xl font-bold">Sign in</h1>
+      <h1 className="text-xl font-bold">Sign In</h1>
       <p className="mt-1 text-sm text-slate-600">Members and DEAC team only.</p>
       <ActionForm action={login} submitLabel="Sign in" className="mt-5 space-y-3">
         <input type="hidden" name="next" value={next ?? ""} />
