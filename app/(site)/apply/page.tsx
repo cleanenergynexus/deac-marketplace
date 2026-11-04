@@ -10,7 +10,7 @@ import { MoneyInput } from "@/components/MoneyInput";
 export default function Apply() {
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold">Request investor access</h1>
+      <h1 className="text-2xl font-bold">Request Investor Access</h1>
       <p className="mt-1 text-sm text-slate-600">DEAC is a private, curated network. Tell us about your mandate so we can match you with the right opportunities.</p>
       <ActionForm action={applyForAccess} submitLabel="Submit application" className="card mt-6 space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2">

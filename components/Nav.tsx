@@ -11,9 +11,9 @@ export async function Nav() {
   const tabs: Tab[] = [{ label: "Overview", href: "/" }];
   if (s && (s.role === "ADMIN" || s.role === "AGENT" || (s.role === "INVESTOR" && s.status === "APPROVED"))) tabs.push({ label: "Opportunities", href: "/marketplace" });
   if (s?.role === "INVESTOR") tabs.push({ label: "My Portal", href: "/portal" });
-  if (s?.role === "AGENT") tabs.push({ label: "Agent portal", href: "/agent" });
+  if (s?.role === "AGENT") tabs.push({ label: "Agent Portal", href: "/agent" });
   if (s?.role === "ADMIN") tabs.push({ label: "Admin", href: "/admin" });
-  if (!s) tabs.push({ label: "Submit a project", href: "/developers/submit" });
+  if (!s) tabs.push({ label: "Submit a Project", href: "/developers/submit" });
   return (
     <header className="sticky top-0 z-20">
       <div className="border-b border-white/10 bg-brand-900 text-white">

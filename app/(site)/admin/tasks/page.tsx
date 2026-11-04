@@ -65,7 +65,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
       />
 
       <details className="card p-4" open={!open.length}>
-        <summary className="cursor-pointer text-sm font-semibold">New task</summary>
+        <summary className="cursor-pointer text-sm font-semibold">New Task</summary>
         <div className="mt-4">
           <TaskForm assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} {...pickers} />
         </div>

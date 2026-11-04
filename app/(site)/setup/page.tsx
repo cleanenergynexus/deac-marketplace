@@ -14,7 +14,7 @@ export default async function Setup() {
   }
   return (
     <div className="mx-auto max-w-md card p-6">
-      <h1 className="text-xl font-bold">Create the first admin</h1>
+      <h1 className="text-xl font-bold">Create the First Admin</h1>
       <p className="mt-1 text-sm text-slate-600">This page disappears once an admin exists.</p>
       <ActionForm action={createFirstAdmin} submitLabel="Create admin" className="mt-5 space-y-3">
         <Field label="Setup token"><input name="token" type="password" required className="input" /></Field>

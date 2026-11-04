@@ -73,7 +73,7 @@ export default async function InvestorContacts({ searchParams }: { searchParams:
       ) : <Empty>{q || sp.stage || sp.type || sp.linked ? "No investors match." : "No investors yet."}</Empty>}
 
       <details className="card mt-6 p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Import contacts from CSV</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Import Contacts from CSV</summary>
         <p className="mt-2 text-xs text-slate-500">Columns (any order): name, email, firm, title, phone, investorType, states, source, tags. Existing emails are skipped; each firm becomes (or joins) a company. Works with exports from LinkedIn Sales Navigator, Apollo, HubSpot, Mailchimp.</p>
         <form action={importInvestors} className="mt-3 flex flex-wrap items-center gap-3">
           <input type="file" name="file" accept=".csv,text/csv" className="text-sm" />

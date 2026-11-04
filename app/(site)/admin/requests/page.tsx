@@ -10,7 +10,7 @@ export default async function Requests() {
   const reqs = await db.analysisRequest.findMany({ include: { investor: true, project: true }, orderBy: [{ status: "asc" }, { createdAt: "desc" }] });
   return (
     <div>
-      <PageHeader title="Investor intake requests" subtitle="How each investor wants the data organized. Attach a link to the package you prepare and mark it delivered." />
+      <PageHeader title="Investor Intake Requests" subtitle="How each investor wants the data organized. Attach a link to the package you prepare and mark it delivered." />
       {reqs.length ? (
         <div className="space-y-4">{reqs.map((r) => (
           <div key={r.id} className="card p-4">

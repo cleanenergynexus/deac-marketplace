@@ -632,7 +632,7 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
 function ShareDialog({ count, onClose, onShare }: { count: number; onClose: () => void; onShare: (s: Stage) => void }) {
   const [access, setAccess] = useState<Stage>("NDA");
   return (
-    <Modal title="Share on listing" onClose={onClose}>
+    <Modal title="Share on Listing" onClose={onClose}>
       {count ? (
         <>
           <p className="mb-3 text-sm text-slate-600">Adds {count} file{count > 1 ? "s" : ""} to the listing&apos;s Documents tab. Investors can open {count > 1 ? "them" : "it"} once they reach this tier. Files already on the listing move to this tier.</p>
@@ -665,7 +665,7 @@ function MoveDialog({ folders, childFolders, rootLabel, moving, onClose, onMove 
     </div>
   ));
   return (
-    <Modal title="Move to folder" onClose={onClose}>
+    <Modal title="Move to Folder" onClose={onClose}>
       <div className="max-h-72 overflow-y-auto rounded border border-slate-200 p-1">
         <button type="button" onClick={() => setTarget(null)} className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm font-medium ${target === null ? "bg-brand-100" : "hover:bg-slate-50"}`}>
           <FolderIcon className="h-4 w-4" />{rootLabel}

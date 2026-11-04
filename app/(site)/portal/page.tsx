@@ -46,7 +46,7 @@ export default async function Portal() {
       <PageHeader title={`Welcome, ${u.name.split(" ")[0]}`} subtitle="Your favorites, NDAs, letters of interest, data rooms and analysis requests." />
       {toSign.length > 0 && (
         <section className="card border-amber-300 bg-amber-50 p-5">
-          <h2 className="text-lg font-semibold">Documents to sign ({toSign.length})</h2>
+          <h2 className="text-lg font-semibold">Documents to Sign ({toSign.length})</h2>
           <ul className="mt-3 divide-y divide-amber-200">{toSign.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <span><span className="font-medium">{d.title}</span> <span className="text-xs text-slate-600">{kindLabel(d.kind)}{d.project ? ` · ${d.project.code}` : ""} · sent {date(d.sentAt)}</span></span>
@@ -70,7 +70,7 @@ export default async function Portal() {
           ))}</div>
         ) : <Empty>No favorites yet. Star ☆ any listing in <Link href="/marketplace" className="text-brand-600">Opportunities</Link> to keep it here, no NDA needed.</Empty>}
       </Section>
-      <Section title="Your deals">
+      <Section title="Your Deals">
         {list.length ? (
           <table className="w-full"><thead><tr><th className="th">Project</th><th className="th">LOI amount</th><th className="th">Your access</th><th className="th">Next step</th><th className="th"></th></tr></thead>
             <tbody className="divide-y divide-slate-100">{list.map((d) => {
@@ -86,7 +86,7 @@ export default async function Portal() {
         ) : <Empty>Nothing yet. <Link href="/marketplace" className="text-brand-600">Browse opportunities</Link> and sign an NDA to see more.</Empty>}
       </Section>
       {signed.length > 0 && (
-        <Section title="Signed documents">
+        <Section title="Signed Documents">
           <ul className="divide-y divide-slate-100">{signed.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
               <span><span className="font-medium">{d.title}</span> <span className="text-xs text-slate-500">{kindLabel(d.kind)}{d.project ? ` · ${d.project.code}` : ""} · signed {date(d.signedAt)}</span></span>
@@ -95,7 +95,7 @@ export default async function Portal() {
           ))}</ul>
         </Section>
       )}
-      <Section title="Analysis requests">
+      <Section title="Analysis Requests">
         {reqs.length ? (
           <ul className="divide-y divide-slate-100">{reqs.map((r) => (
             <li key={r.id} className="flex items-center justify-between py-2 text-sm"><span>{r.project.code} · {r.focusAreas.split(",").join(", ")}</span><span className="flex items-center gap-3">{r.deliverableUrl && <a href={r.deliverableUrl} className="text-brand-600">Download</a>}<Badge tone={statusTone(r.status)}>{r.status}</Badge></span></li>

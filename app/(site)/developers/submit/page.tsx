@@ -10,10 +10,10 @@ import { MoneyInput } from "@/components/MoneyInput";
 export default function SubmitProject() {
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold">Submit a data center project</h1>
+      <h1 className="text-2xl font-bold">Submit a Data Center Project</h1>
       <p className="mt-1 text-sm text-slate-600">Developers and owners: share your project and our team will evaluate it for the DEAC investor network. Submissions are confidential.</p>
       <ActionForm action={submitProject} submitLabel="Submit project" className="card mt-6 space-y-6 p-6">
-        <h2 className="font-semibold">Your company</h2>
+        <h2 className="font-semibold">Your Company</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Company"><input name="company" required className="input" /></Field>
           <Field label="Contact name"><input name="contactName" required className="input" /></Field>
@@ -22,7 +22,7 @@ export default function SubmitProject() {
           <Field label="Website" className="sm:col-span-2"><input name="website" className="input" /></Field>
           <Field label="Track record (projects, MW delivered)" className="sm:col-span-2"><textarea name="experience" rows={3} className="input" /></Field>
         </div>
-        <h2 className="font-semibold">The project</h2>
+        <h2 className="font-semibold">The Project</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Project name" className="sm:col-span-3"><input name="title" className="input" /></Field>
           <ListingLocationFields />

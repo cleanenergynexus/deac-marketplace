@@ -26,7 +26,7 @@ export default async function ProjectDataRoom({ params }: { params: Promise<{ id
   return (
     <div className="space-y-4">
       <Link href={`/admin/projects/${p.id}`} className="text-sm text-brand-600">← {p.title}</Link>
-      <PageHeader title="Data room" subtitle={<>{p.code} · Every file for this project, organized in folders. Only the DEAC team opens these files (referral agents can add files but not open them). Use <b>Share on listing</b> to release files to investors by tier.</>}
+      <PageHeader title="Data Room" subtitle={<>{p.code} · Every file for this project, organized in folders. Only the DEAC team opens these files (referral agents can add files but not open them). Use <b>Share on listing</b> to release files to investors by tier.</>}
         action={<div className="flex flex-wrap gap-2"><Link href={`/admin/projects/${p.id}/data-room/wizard`} className="btn">✨ Document Wizard</Link><Link href={`/admin/projects/${p.id}#documents`} className="btn-ghost">Listing documents</Link></div>} />
       {storage === "missing" && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -43,7 +43,7 @@ export default async function ProjectDataRoom({ params }: { params: Promise<{ id
         files={p.dataRoomFiles.map((f) => ({ id: f.id, folderId: f.folderId, name: f.name, size: f.size, contentType: f.contentType, uploadedBy: f.uploadedBy, updatedAt: f.updatedAt.toISOString(), shared: f.documents.length ? docStage(f.documents[0].access) : null }))}
       />
       {p.wizardDocs.length > 0 && (
-        <Section title="Document Wizard drafts" action={<Link href={`/admin/projects/${p.id}/data-room/wizard`} className="text-sm text-brand-600">New document →</Link>}>
+        <Section title="Document Wizard Drafts" action={<Link href={`/admin/projects/${p.id}/data-room/wizard`} className="text-sm text-brand-600">New document →</Link>}>
           <WizardDocList projectId={p.id} docs={p.wizardDocs} />
         </Section>
       )}

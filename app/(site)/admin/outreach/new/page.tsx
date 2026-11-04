@@ -7,7 +7,7 @@ import { SUB_REGIONS } from "@/lib/regions";
 export default function NewCampaign() {
   return (
     <div>
-      <PageHeader title="New campaign" subtitle="Pick a segment, write the message, review recipients, then send." />
+      <PageHeader title="New Campaign" subtitle="Pick a segment, write the message, review recipients, then send." />
       <form action={createCampaign} className="card space-y-5 p-6">
         <Field label="Internal name"><input name="name" required className="input" placeholder="New listing: 60 MW Texas powered shell" /></Field>
         <h3 className="font-semibold">Segment</h3>
@@ -15,7 +15,7 @@ export default function NewCampaign() {
         <Field label="Investor types"><Checks name="investorTypes" options={INVESTOR_TYPES} /></Field>
         <Field label="Deal type interest"><Checks name="dealTypes" options={DEAL_TYPES} /></Field>
         <Field label="Regions of interest"><Checks name="regions" options={SUB_REGIONS.map((r) => ({ value: r.code, label: r.label }))} /></Field>
-        <details><summary className="label cursor-pointer">US states</summary><div className="mt-2"><Checks name="states" options={US_STATES} /></div></details>
+        <details><summary className="label cursor-pointer">US States</summary><div className="mt-2"><Checks name="states" options={US_STATES} /></div></details>
         <Field label="Tag contains"><input name="tags" className="input max-w-xs" /></Field>
         <h3 className="font-semibold">Message</h3>
         <Field label="Subject"><input name="subject" required className="input" /></Field>

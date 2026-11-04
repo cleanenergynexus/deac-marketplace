@@ -112,7 +112,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
           </div>
         </div>
         <details className="card p-5" open>
-          <summary className="cursor-pointer text-sm font-semibold">About this contact</summary>
+          <summary className="cursor-pointer text-sm font-semibold">About This Contact</summary>
           <div className="mt-4"><ContactForm contact={contact} action={updateContact} compact country={dev.country} agents={agents} /></div>
         </details>
         {otherContacts.length > 0 && (
@@ -140,7 +140,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
       {/* Right: associations */}
       <aside className="space-y-4 lg:col-start-2 xl:col-start-auto">
         <section className="card p-4" id="signatures">
-          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; contracts</h2>
+          <h2 className="mb-3 text-sm font-semibold">NDAs &amp; Contracts</h2>
           <SignatureList signer={`CONTACT:${contact.id}`} compact />
         </section>
         <section className="card p-4">
@@ -153,7 +153,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {contact.name.split(" ")[0]}&apos;s projects ({mine.length})</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><CrmIcon name="PROJECT" /> {contact.name.split(" ")[0]}&apos;s Projects ({mine.length})</h2>
           {!mine.length && <p className="text-sm text-slate-500">No projects assigned to this contact.</p>}
           <ul className="space-y-3">
             {mine.map((p) => (
@@ -172,7 +172,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
 
         {others.length > 0 && (
           <section className="card p-4">
-            <h2 className="mb-2 text-sm font-semibold">Other {dev.company} projects</h2>
+            <h2 className="mb-2 text-sm font-semibold">Other {dev.company} Projects</h2>
             <ul className="divide-y divide-slate-100 text-sm">
               {others.map((p) => {
                 const owner = dev.contacts.find((c) => c.id === projectContactId(p, dev.contacts));
@@ -195,7 +195,7 @@ export default async function ContactRecord({ params, searchParams }: { params: 
         )}
 
         <section className="card p-4">
-          <h2 className="mb-2 text-sm font-semibold">Other contacts at {dev.company} ({otherContacts.length})</h2>
+          <h2 className="mb-2 text-sm font-semibold">Other Contacts at {dev.company} ({otherContacts.length})</h2>
           <ul className="space-y-2">
             {otherContacts.map((c) => (
               <li key={c.id}>

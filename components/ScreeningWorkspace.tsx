@@ -67,10 +67,10 @@ export function ScreeningWorkspace(props: WorkspaceProps) {
 
       {(props.summary || props.redFlags.length > 0) && (
         <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-          {props.summary && <section className="card p-5"><h2 className="mb-2 font-semibold">AI screening summary</h2><p className="whitespace-pre-line text-sm text-slate-700">{props.summary}</p></section>}
+          {props.summary && <section className="card p-5"><h2 className="mb-2 font-semibold">AI Screening Summary</h2><p className="whitespace-pre-line text-sm text-slate-700">{props.summary}</p></section>}
           {props.redFlags.length > 0 && (
             <section className="card border-red-200 bg-red-50/40 p-5">
-              <h2 className="mb-2 font-semibold text-red-800">🚩 Red flags</h2>
+              <h2 className="mb-2 font-semibold text-red-800">🚩 Red Flags</h2>
               <ul className="list-disc space-y-1 pl-5 text-sm text-red-900">{props.redFlags.map((f, i) => <li key={i}>{f}</li>)}</ul>
             </section>
           )}
@@ -78,7 +78,7 @@ export function ScreeningWorkspace(props: WorkspaceProps) {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Screening questions</h2>
+        <h2 className="text-lg font-semibold">Screening Questions</h2>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Only show open questions</label>
       </div>
       {categories.map((c, ci) => {
@@ -141,7 +141,7 @@ function RunPanel(props: WorkspaceProps & { open: boolean; onStarted: () => void
     <section className="card space-y-4 p-5">
       {failed}
       <div>
-        <h2 className="font-semibold">Pre-research with AI</h2>
+        <h2 className="font-semibold">Pre-Research with AI</h2>
         <p className="mt-1 text-sm text-slate-600">Claude reads what the sponsor gave you (listing details, the files you pick and the notes logged in the CRM), optionally researches the web, and answers each screening question with its sources. Anything it can&apos;t confirm becomes a gap with a ready-to-send question for the sponsor. Answers your team already entered are kept.</p>
       </div>
       {!props.aiEnabled && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">AI research needs an Anthropic API key: add <code>ANTHROPIC_API_KEY</code> in Vercel → Settings → Environment Variables, then redeploy. You can still fill in the screening by hand below.</p>}
@@ -256,7 +256,7 @@ function SponsorPanel({ categories, answers, title, sponsorEmail, sponsorName }:
   return (
     <section className="card p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Questions for the sponsor</h2>
+        <h2 className="text-lg font-semibold">Questions for the Sponsor</h2>
         {groups.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-ghost" onClick={copy}>{copied ? "✓ Copied" : "Copy questions"}</button>
@@ -288,7 +288,7 @@ function DecisionPanel({ projectId, decision, decisionNote }: WorkspaceProps) {
   const [pending, start] = useTransition();
   return (
     <section className="card p-5">
-      <h2 className="mb-3 text-lg font-semibold">Screening decision</h2>
+      <h2 className="mb-3 text-lg font-semibold">Screening Decision</h2>
       <div className="flex flex-wrap gap-2">
         {DECISIONS.filter((x): x is Exclude<Decision, ""> => !!x).map((x) => (
           <button key={x} type="button" aria-pressed={d === x} onClick={() => { setD(d === x ? "" : x); setMsg({}); }}
@@ -313,13 +313,13 @@ function SourcesPanel({ sourceNotes, webSources, researchNotes }: WorkspaceProps
   const skipped = sourceNotes.filter((s) => s.status === "skipped");
   return (
     <section className="card space-y-3 p-5 text-sm">
-      <h2 className="text-lg font-semibold">What Claude looked at</h2>
+      <h2 className="text-lg font-semibold">What Claude Looked At</h2>
       {read.length > 0 && <div><b>Data room files read:</b><ul className="list-disc pl-5 text-slate-700">{read.map((s) => <li key={s.name}>{s.name}{s.reason ? ` (${s.reason})` : ""}</li>)}</ul></div>}
       {skipped.length > 0 && <div className="text-amber-900"><b>Skipped:</b><ul className="list-disc pl-5">{skipped.map((s) => <li key={s.name}>{s.name}: {s.reason}</li>)}</ul></div>}
       {webSources.length > 0 && <div><b>Web sources:</b><ul className="list-disc pl-5">{webSources.map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">{s.title || s.url}</a></li>)}</ul></div>}
       {researchNotes && (
         <details className="rounded border border-slate-200 p-3">
-          <summary className="cursor-pointer font-medium">Web research notes</summary>
+          <summary className="cursor-pointer font-medium">Web Research Notes</summary>
           <div className="mt-2"><MarkdownView markdown={researchNotes} /></div>
         </details>
       )}

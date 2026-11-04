@@ -28,7 +28,7 @@ export default async function Account({ searchParams }: { searchParams: Promise<
   const notice = gmail ? GMAIL_NOTICE[gmail] : null;
   return (
     <div className="space-y-6">
-      <PageHeader title="My account" subtitle={`${me?.name} · ${me?.email}`} />
+      <PageHeader title="My Account" subtitle={`${me?.name} · ${me?.email}`} />
       <Section title="Gmail">
         {notice && <p className={`mb-4 rounded p-3 text-sm ${notice.tone === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{notice.text}{gmail === "error" && msg ? ` ${msg}` : ""}</p>}
         <GmailPanel
@@ -36,7 +36,7 @@ export default async function Account({ searchParams }: { searchParams: Promise<
           missing={gmailSetupMissing()}
         />
       </Section>
-      <Section title="Email signature">
+      <Section title="Email Signature">
         <p className="mb-3 text-sm text-slate-600">
           Ends the emails the marketplace sends for you: invites, signature requests, approvals and emails from a contact&apos;s Activity. It replaces the
           standard &quot;— {me?.name}, DEAC&quot; line. Leave it empty to keep that line.
@@ -47,14 +47,14 @@ export default async function Account({ searchParams }: { searchParams: Promise<
           </Field>
         </ActionForm>
       </Section>
-      <Section title="Contact details for referral agents">
+      <Section title="Contact Details for Referral Agents">
         <p className="mb-3 text-sm text-slate-600">Referral agents you partner with see these on their portal, so they can call you or book a meeting.</p>
         <ActionForm action={updateMyProfile} submitLabel="Save" success="Saved." className="grid max-w-xl gap-4 sm:grid-cols-2">
           <Field label="Phone"><PhoneInput name="phone" defaultValue={me?.phone} /></Field>
           <Field label="Meeting booking link"><input name="bookingUrl" type="url" defaultValue={me?.bookingUrl ?? ""} className="input" placeholder="https://calendly.com/…" /></Field>
         </ActionForm>
       </Section>
-      <Section title="Change password">
+      <Section title="Change Password">
         <ActionForm action={changeOwnPassword} submitLabel="Update password" success="Password updated." className="grid max-w-md gap-4">
           <Field label="Current password"><input name="current" type="password" required className="input" /></Field>
           <Field label="New password (10+ characters)"><input name="next" type="password" minLength={10} required className="input" /></Field>

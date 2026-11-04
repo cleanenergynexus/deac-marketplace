@@ -7,14 +7,14 @@ export function PartnerCard({ partner }: { partner: Partner | null }) {
   if (!partner) {
     return (
       <div className="card p-5 text-sm">
-        <h2 className="font-semibold">Your DEAC partner</h2>
+        <h2 className="font-semibold">Your DEAC Partner</h2>
         <p className="mt-2 text-slate-600">A partner hasn&apos;t been assigned yet. Meeting requests go to the DEAC team in the meantime.</p>
       </div>
     );
   }
   return (
     <div className="card p-5 text-sm">
-      <h2 className="font-semibold">Your DEAC partner</h2>
+      <h2 className="font-semibold">Your DEAC Partner</h2>
       <p className="mt-1 text-slate-500">Supports your transactions and schedules your meetings.</p>
       <div className="mt-3 text-base font-semibold">{partner.name}</div>
       <a href={`mailto:${partner.email}`} className="block truncate text-brand-600">{partner.email}</a>

@@ -14,7 +14,7 @@ export default async function ScreeningTemplatePage() {
     <div>
       <Link href="/admin/screening" className="text-sm text-brand-600">← Screening</Link>
       <PageHeader
-        title="Screening template"
+        title="Screening Template"
         subtitle={<>The categories and questions every project is <Link href="/admin/screening" className="text-brand-600">screened</Link> against, and that Claude researches. &quot;Canada only&quot; questions appear just for projects in Canada. Editing a question keeps the answers already given to it. {row ? `Last saved ${date(row.updatedAt)}${row.updatedBy ? ` by ${row.updatedBy}` : ""}.` : "Using the DEAC default."}</>}
       />
       <ScreeningTemplateEditor initial={parseTemplate(row?.config)} action={saveScreeningTemplate} />

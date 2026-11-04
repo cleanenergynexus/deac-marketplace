@@ -94,7 +94,7 @@ export default async function InvestorCompany({ params }: { params: Promise<{ id
             )}
           </Section>
 
-          <Section title="Company profile">
+          <Section title="Company Profile">
             {hasAddress(firm) && (
               <a href={mapsHref(firm)} target="_blank" rel="noreferrer" className="mb-4 block text-sm text-slate-700 hover:text-brand-600">
                 {addressLines(firm).map((l) => <span key={l} className="block">{l}</span>)}

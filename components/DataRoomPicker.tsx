@@ -74,7 +74,7 @@ export function DataRoomPicker({ folders, files, taken, onPick, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
       <div role="dialog" aria-label="Add from data room" className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold">Add from data room</h3>
+        <h3 className="text-lg font-semibold">Add from Data Room</h3>
         <p className="mb-3 text-sm text-slate-600">Tick files (or a whole folder) to add to the listing&apos;s documents. Investors can open them once they reach the tier you pick.</p>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files" className="input mb-2" />
         <div className="min-h-[200px] flex-1 overflow-y-auto rounded border border-slate-200 p-1">

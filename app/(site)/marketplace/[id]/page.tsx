@@ -191,7 +191,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           ) : <p className="mt-3 text-sm text-slate-500">Documents are being uploaded.</p>}
         </div>
         <div className="rounded-lg bg-slate-50 p-5">
-          <h3 className="font-semibold">Need the materials packaged for your analysis?</h3>
+          <h3 className="font-semibold">Need the Materials Packaged for Your Analysis?</h3>
           <p className="mb-3 text-sm text-slate-600">Tell us how you underwrite and we&apos;ll organize the data room for you.</p>
           {requests.map((r) => (
             <div key={r.id} className="mb-3 rounded border border-slate-200 bg-white p-2 text-xs">
@@ -201,7 +201,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           ))}
           {u.investorId ? (
             <details>
-              <summary className="cursor-pointer text-sm font-semibold text-brand-600">Request an analysis package</summary>
+              <summary className="cursor-pointer text-sm font-semibold text-brand-600">Request an Analysis Package</summary>
               <ActionForm action={submitAnalysisRequest} submitLabel="Submit request" success="Got it. Our team will organize the materials for you." className="mt-3 grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="projectId" value={p.id} />
                 <Field label="Focus areas" group className="sm:col-span-2"><Checks name="focusAreas" options={FOCUS_AREAS} /></Field>

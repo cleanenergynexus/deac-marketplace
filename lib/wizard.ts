@@ -12,7 +12,7 @@ export const KIND_INFO: Record<WizardKind, { label: string; blurb: string; icon:
   TEASER: { label: "Project Teaser", icon: "📣", blurb: "One to two pages for first contact with investors: key terms, highlights and next steps. Can hide the site location and sponsor.", folder: "08 Marketing & Teaser", folderMatch: /teaser|marketing/i },
   REPORT: { label: "Project Report", icon: "📊", blurb: "Full analysis of the project: site, power, permitting, economics, sponsor, risks, gaps and a recommendation.", folder: "09 Reports & Analysis", folderMatch: /report|analysis/i },
   DECK: { label: "Pitch Deck", icon: "🖥️", blurb: "10 to 14 investor slides. Saved as PDF and as an editable PowerPoint.", folder: "08 Marketing & Teaser", folderMatch: /teaser|marketing/i },
-  CUSTOM: { label: "Custom report", icon: "✍️", blurb: "Anything else: summarize chosen documents, answer a question, compare options, research a topic. You write the brief.", folder: "09 Reports & Analysis", folderMatch: /report|analysis/i },
+  CUSTOM: { label: "Custom Report", icon: "✍️", blurb: "Anything else: summarize chosen documents, answer a question, compare options, research a topic. You write the brief.", folder: "09 Reports & Analysis", folderMatch: /report|analysis/i },
 };
 
 export const WIZARD_STATUSES = ["GENERATING", "READY", "FAILED"] as const;

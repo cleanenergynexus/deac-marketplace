@@ -21,7 +21,7 @@ export function TaskEditButton({ task, editing, className = "text-xs text-slate-
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 pt-[10vh] text-left text-sm font-normal whitespace-normal" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
           <div role="dialog" aria-modal="true" aria-label="Edit task" className="card w-full max-w-xl p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">Edit task</h2>
+              <h2 className="text-base font-semibold text-slate-900">Edit Task</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-xl leading-none text-slate-400 hover:text-slate-700">×</button>
             </div>
             <TaskForm {...editing} task={task} onDone={() => setOpen(false)} onCancel={() => setOpen(false)} />

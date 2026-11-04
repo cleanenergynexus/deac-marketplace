@@ -51,7 +51,7 @@ export function DocumentWizard({ projectId, code, folders, files, generatedIds, 
         </p>
       )}
 
-      <Step n={1} title="What should Claude write?">
+      <Step n={1} title="What Should Claude Write?">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {WIZARD_KINDS.map((k) => (
             <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
@@ -64,7 +64,7 @@ export function DocumentWizard({ projectId, code, folders, files, generatedIds, 
         </div>
       </Step>
 
-      <Step n={2} title="Which data room files should it read?" aside={<SourceSummary files={files} checked={checked} />}>
+      <Step n={2} title="Which Data Room Files Should It Read?" aside={<SourceSummary files={files} checked={checked} />}>
         <SourceFilePicker folders={folders} files={files} checked={checked} onChange={setChecked} generatedIds={generatedIds}
           emptyText={`This data room is empty. Upload files first${webResearch || kind === "CUSTOM" ? ", or let Claude work from the listing details and the web" : ""}.`} />
       </Step>

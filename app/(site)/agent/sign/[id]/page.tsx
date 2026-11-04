@@ -2,7 +2,7 @@ import { findForSigner } from "@/lib/esign-db";
 import { SigningScreen } from "@/components/SigningScreen";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Review and sign — DEAC" };
+export const metadata = { title: "Review and Sign — DEAC" };
 
 /** A signed-in referral agent signs an agreement DEAC sent them. */
 export default async function AgentSign({ params }: { params: Promise<{ id: string }> }) {

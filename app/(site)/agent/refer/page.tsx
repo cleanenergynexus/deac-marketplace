@@ -11,7 +11,7 @@ export default async function Refer() {
   await requireAgent();
   return (
     <div className="space-y-6">
-      <PageHeader title="Refer a contact" subtitle="Share a developer or investor with DEAC. They're added to the CRM under your name, your DEAC partner is notified, and you can follow everything that happens with them here." />
+      <PageHeader title="Refer a Contact" subtitle="Share a developer or investor with DEAC. They're added to the CRM under your name, your DEAC partner is notified, and you can follow everything that happens with them here." />
       <div className="grid gap-6 xl:grid-cols-2">
         <Section title="Developer">
           <ActionForm action={referDeveloper} submitLabel="Refer developer" success="Thanks! The developer is in the DEAC CRM and your partner has been notified. Find them under Developer contacts." className="grid gap-3 sm:grid-cols-2">

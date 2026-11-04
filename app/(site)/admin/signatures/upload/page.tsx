@@ -13,7 +13,7 @@ export default async function UploadSigned({ searchParams }: { searchParams: Pro
   const [listings, signers] = await Promise.all([listingOptions(), loadSignerOptions()]);
   return (
     <div>
-      <PageHeader title="Upload a signed document" subtitle="Keep an NDA, LOI or contract that was signed on paper or in another tool with the contact's record. Nothing is sent to them." action={<Link href="/admin/signatures" className="btn-ghost">Back</Link>} />
+      <PageHeader title="Upload a Signed Document" subtitle="Keep an NDA, LOI or contract that was signed on paper or in another tool with the contact's record. Nothing is sent to them." action={<Link href="/admin/signatures" className="btn-ghost">Back</Link>} />
       <UploadSignedForm listings={listings} signers={signers} initial={sp} />
     </div>
   );

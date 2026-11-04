@@ -54,7 +54,7 @@ export default async function SignatureRequestPage({ params, searchParams }: { p
       )}
 
       {editable && (
-        <Section title={r.isTemplate ? "Send this template" : "Send for signature"}>
+        <Section title={r.isTemplate ? "Send This Template" : "Send for Signature"}>
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="space-y-2 text-sm text-slate-600">
               <p>Place the fields on the document below (they save on their own), then choose who {multi ? "receives it" : "signs"}.{multi ? <> Signers sign in the order set under <b>Signers</b>; each gets their link when it&apos;s their turn.</> : <> Need a countersignature? Add a signer under <b>Signers</b>.</>} Each signer gets a personal link by email{r.isTemplate ? " and their own copy" : ""}; investors also see it in My Portal.</p>
@@ -71,7 +71,7 @@ export default async function SignatureRequestPage({ params, searchParams }: { p
 
       {!editable && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <Section title="Audit trail">
+          <Section title="Audit Trail">
             <ol className="space-y-3">
               {r.events.map((e) => (
                 <li key={e.id} className="text-sm">
@@ -86,7 +86,7 @@ export default async function SignatureRequestPage({ params, searchParams }: { p
             {isOpen(r.status) && <JustSentLinks id={r.id} />}
             {myTurn && (
               <div className="card space-y-2 border-amber-300 bg-amber-50 p-4 text-sm">
-                <h2 className="font-semibold">Your signature is needed</h2>
+                <h2 className="font-semibold">Your Signature Is Needed</h2>
                 <p className="text-xs text-slate-600">You sign as {myTurn.role}.</p>
                 <Link href={`/admin/signatures/${r.id}/sign`} className="btn w-full">Review &amp; sign</Link>
               </div>
@@ -111,7 +111,7 @@ export default async function SignatureRequestPage({ params, searchParams }: { p
             </div>
             {r.status === "SIGNED" && (
               <div className="card space-y-2 p-4 text-sm">
-                <h2 className="font-semibold">Signed copy</h2>
+                <h2 className="font-semibold">Signed Copy</h2>
                 <a href={`/api/esign/${r.id}?file=signed`} target="_blank" className="btn w-full">Open signed {r.signedType === "application/pdf" ? "PDF" : "file"}</a>
                 <a href={`/api/esign/${r.id}?file=signed&download`} className="btn-ghost w-full py-1.5">Download</a>
                 {r.signedFileId && r.projectId && <Link href={`/admin/projects/${r.projectId}/data-room`} className="block text-xs text-brand-600">In the data room → Signed Documents</Link>}
