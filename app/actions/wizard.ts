@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { importerEnabled } from "@/lib/extract";
-import { cleanName, uniqueName } from "@/lib/dataroom";
-import { deleteStored, saveGenerated, storageMode } from "@/lib/storage";
+import { cleanName } from "@/lib/dataroom";
+import { storageMode } from "@/lib/storage";
+import { generatedFolder, putGeneratedFile } from "@/lib/generated-files";
 import { runWizard } from "@/lib/wizard-run";
 import { deckPdf, deckPptx, documentPdf } from "@/lib/wizard-export";
 import { markdownTitle } from "@/lib/markdown";
@@ -76,33 +77,8 @@ export async function saveDraft(docId: string, input: { title: string; markdown:
 }
 
 /** Folder the document is filed in: an existing matching top-level folder, or a new one. */
-async function targetFolder(projectId: string, kind: WizardKind) {
-  const top = await db.dataRoomFolder.findMany({ where: { projectId, parentId: null }, select: { id: true, name: true }, orderBy: { name: "asc" } });
-  const match = top.find((f) => KIND_INFO[kind].folderMatch.test(f.name));
-  if (match) return match.id;
-  const files = await db.dataRoomFile.findMany({ where: { projectId, folderId: null }, select: { name: true } });
-  const name = uniqueName(KIND_INFO[kind].folder, [...top, ...files].map((x) => x.name));
-  return (await db.dataRoomFolder.create({ data: { projectId, parentId: null, name } })).id;
-}
-
-/** Saves or replaces one generated file. Replacing keeps the file id, so listing links keep working. */
-async function putFile(projectId: string, existingId: string | null, folderId: string, name: string, bytes: Uint8Array, contentType: string, by: string) {
-  const storageKey = await saveGenerated(projectId, name, bytes, contentType);
-  const existing = existingId ? await db.dataRoomFile.findFirst({ where: { id: existingId, projectId }, select: { id: true, storageKey: true } }) : null;
-  if (existing) {
-    await db.dataRoomFile.update({ where: { id: existing.id }, data: { storageKey, size: bytes.byteLength, contentType, uploadedBy: by } });
-    await deleteStored([existing.storageKey]);
-    return existing.id;
-  }
-  const [folders, files] = await Promise.all([
-    db.dataRoomFolder.findMany({ where: { projectId, parentId: folderId }, select: { name: true } }),
-    db.dataRoomFile.findMany({ where: { projectId, folderId }, select: { name: true } }),
-  ]);
-  const f = await db.dataRoomFile.create({
-    data: { projectId, folderId, name: uniqueName(name, [...folders, ...files].map((x) => x.name)), size: bytes.byteLength, contentType, storageKey, uploadedBy: by },
-  });
-  return f.id;
-}
+const targetFolder = (projectId: string, kind: WizardKind) => generatedFolder(projectId, KIND_INFO[kind].folderMatch, KIND_INFO[kind].folder);
+const putFile = putGeneratedFile;
 
 /** Saves the draft into the data room: PDF for documents; PDF and PowerPoint for pitch decks. */
 export async function saveToDataRoom(docId: string): Promise<Result & { fileId?: string }> {

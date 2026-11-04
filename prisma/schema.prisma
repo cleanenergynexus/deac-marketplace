@@ -294,6 +294,7 @@ model Project {
   dataRoomFolders  DataRoomFolder[]
   dataRoomFiles    DataRoomFile[]
   wizardDocs       WizardDocument[]
+  screening        Screening?
   lois             Loi[]
   dealSteps        DealStep[]
   analysisRequests AnalysisRequest[]
@@ -374,6 +375,42 @@ model WizardDocument {
   updatedAt   DateTime @updatedAt
 
   @@index([projectId])
+}
+
+// Screening Tool: one screening per project (lib/screening.ts). Claude pre-researches the project against the
+// screening template; the team confirms or overrides each answer, and open questions go to the sponsor.
+model Screening {
+  id           String    @id @default(cuid())
+  projectId    String    @unique
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status       String    @default("IDLE") // IDLE | RUNNING | READY | FAILED (Claude's research run)
+  error        String?
+  startedAt    DateTime? // when the current / last run started
+  ranAt        DateTime? // when Claude last finished
+  ranBy        String?
+  options      String    @default("{}") // JSON ScreeningOptions: webResearch, notes
+  sourceIds    String    @default("[]") // data room file ids Claude read
+  sourceNotes  String    @default("[]") // JSON: files read and skipped (with reasons)
+  answers      String    @default("{}") // JSON ScreeningAnswers keyed by template question id: Claude's answer + the team's
+  summary      String    @default("")
+  redFlags     String    @default("[]") // JSON string[]
+  researchNotes String   @default("") // Markdown notes from web research
+  webSources   String    @default("[]") // JSON [{ title, url }]
+  decision     String    @default("") // "" | ADVANCE | HOLD | DECLINE
+  decisionNote String    @default("")
+  fileId       String? // screening report PDF saved in the data room (kept on re-save)
+  savedAt      DateTime?
+  updatedBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Screening template (Developer CRM → Screening template). One row, id "default". JSON shape: ScreeningTemplate in lib/screening.ts.
+model ScreeningTemplate {
+  id        String   @id @default("default")
+  config    String // JSON
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }
 
 // Letter of interest. APPROVED unlocks that project's data room for that investor.
