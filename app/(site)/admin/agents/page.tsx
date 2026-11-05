@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function Agents() {
   const me = await requireAdmin();
   const isAdmin = staffLevel(me.staffLevel) === "ADMIN";
-  const [agents, partners] = await Promise.all([
+  const [agents, partners, applications] = await Promise.all([
     db.user.findMany({
       where: { role: "AGENT" },
       include: {
@@ -31,10 +31,17 @@ export default async function Agents() {
       orderBy: { name: "asc" },
     }),
     db.user.findMany({ where: { role: "ADMIN" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.agentApplication.count({ where: { status: "PENDING" } }),
   ]);
   return (
     <div className="space-y-6">
       <PageHeader title="Referral Agents" subtitle="Outside agents who bring developers and investors to DEAC. Each agent signs in to their own portal and sees only the contacts they referred, with the activity on them." />
+      {applications > 0 && (
+        <Link href="/admin/access" className="flex items-center justify-between rounded-lg bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
+          <span><b>{applications}</b> referral agent application{applications === 1 ? "" : "s"} from the website to review</span>
+          <span className="font-semibold">Review →</span>
+        </Link>
+      )}
       <div className="grid gap-3 text-sm sm:grid-cols-3">
         <div className="card p-4"><b>Sees</b><p className="mt-1 text-slate-600">Only the contacts marked &quot;Referred by&quot; them (and, for a developer company they referred, its contacts and projects), plus the activity logged on them. View only.</p></div>
         <div className="card p-4"><b>Can do</b><p className="mt-1 text-slate-600">Refer new contacts, import a listing (saved as a draft for review), upload documents to their projects&apos; data rooms, and request meetings.</p></div>

@@ -678,3 +678,26 @@ model SignatureEvent {
 
   @@index([requestId])
 }
+
+/// "Become a Referral Agent" applications from the website. Approving one creates the agent's login (role AGENT)
+/// with the password they chose; until then nothing here can sign in or show up in agent pickers.
+model AgentApplication {
+  id           String    @id @default(cuid())
+  name         String
+  email        String
+  company      String?
+  title        String?
+  phone        String? // E.164
+  location     String? // where they're based / markets they cover
+  focus        String    @default("") // comma list: DEVELOPERS, INVESTORS
+  experience   String? // their background and network, in their words
+  source       String? // how they heard about DEAC
+  passwordHash String
+  status       String    @default("PENDING") // PENDING | APPROVED | DECLINED
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([email])
+  @@index([status])
+}

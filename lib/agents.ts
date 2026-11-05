@@ -8,6 +8,12 @@ export const AGENT_STATUSES = [
   { value: "SUSPENDED", label: "Suspended" },
 ] as const;
 export const isAgentStatus = (v: unknown): v is (typeof AGENT_STATUSES)[number]["value"] => AGENT_STATUSES.some((s) => s.value === v);
+/** "Who would you refer?" on the Become a Referral Agent form. */
+export const AGENT_FOCUS = [
+  { value: "DEVELOPERS", label: "Developers with projects" },
+  { value: "INVESTORS", label: "Investors" },
+] as const;
+export const agentFocusLabel = (csv: string) => csv.split(",").filter(Boolean).map((v) => AGENT_FOCUS.find((o) => o.value === v)?.label ?? v).join(", ");
 export const agentStatusLabel = (v: string) => AGENT_STATUSES.find((s) => s.value === v)?.label ?? v;
 
 /**

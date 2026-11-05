@@ -21,6 +21,7 @@ export default async function Home() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/apply" className="btn bg-white text-brand-900 hover:bg-slate-100">Request investor access</Link>
           <Link href="/developers/submit" className="btn-ghost border-white/30 bg-transparent text-white hover:bg-white/10">Submit a project</Link>
+          <Link href="/referral-agents/apply" className="btn-ghost border-white/30 bg-transparent text-white hover:bg-white/10">Become a Referral Agent</Link>
         </div>
         <div className="mt-10 grid max-w-xl grid-cols-3 gap-6 text-center">
           <div><div className="text-3xl font-bold">{agg._count}</div><div className="text-xs text-slate-400">Active opportunities</div></div>

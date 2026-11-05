@@ -31,6 +31,7 @@ export async function Nav() {
             <form action="/logout" method="post"><button className={link}>Sign out</button></form>
           ) : (
             <>
+              <Link href="/referral-agents/apply" className={`hidden whitespace-nowrap lg:inline ${link}`}>Become a Referral Agent</Link>
               <Link href="/login" className={`hidden sm:inline ${link}`}>Sign in</Link>
               <Link href="/apply" className="whitespace-nowrap rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-[#3B7FFF]">Request access</Link>
             </>
