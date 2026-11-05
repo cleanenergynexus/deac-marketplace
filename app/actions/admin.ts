@@ -10,6 +10,8 @@ import { evaluate, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { normalizeScoring, type ScoringConfig } from "@/lib/scoring";
 import { getScoring } from "@/lib/scoring-db";
 import { sendEmail } from "@/lib/email";
+import { emailSettings, welcomeEmail } from "@/lib/email-templates-db";
+import { campaignHtml } from "@/lib/email-templates";
 import { marketMatches, marketsOverlap } from "@/lib/regions";
 import { parseDocRows, planDocChanges } from "@/lib/documents";
 import { fileUrl } from "@/lib/dataroom";
@@ -117,7 +119,7 @@ export async function setInvestorStage(f: FormData) {
     const wasPending = inv.user.status !== "APPROVED";
     await db.user.update({ where: { id: inv.user.id }, data: { status: "APPROVED" } });
     if (wasPending)
-      await sendEmail({ to: inv.email, toName: inv.name, fromUserId: admin.id, investorId: inv.id, subject: "Your DEAC Marketplace membership is approved", text: `Hi ${inv.name.split(" ")[0]},\n\nWelcome to the DEAC private investor network. Your membership is approved and the full portfolio is now open to you.\n\nSign in: ${process.env.PUBLIC_APP_URL ?? ""}/login\n\n— ${admin.name}, DEAC` });
+      await sendEmail({ to: inv.email, toName: inv.name, fromUserId: admin.id, investorId: inv.id, ...(await welcomeEmail("INVESTOR_APPROVED", { firstName: inv.name.split(" ")[0], email: inv.email, sender: admin.name })) });
   }
   if (inv.user && stage === "DECLINED") await db.user.update({ where: { id: inv.user.id }, data: { status: "REJECTED" } });
   revalidatePath(`/admin/investors/${id}`);
@@ -445,7 +447,7 @@ export async function sendCampaign(f: FormData) {
   const recipients = await segmentInvestors(JSON.parse(c.segment));
   for (const inv of recipients) {
     const fill = (t: string) => t.replaceAll("{{name}}", inv.name.split(" ")[0]).replaceAll("{{firm}}", inv.firm ?? "your firm");
-    const res = await sendEmail({ to: inv.email, subject: fill(c.subject), text: fill(c.body) });
+    const res = await sendEmail({ to: inv.email, subject: fill(c.subject), text: fill(c.body), html: campaignHtml(fill(c.body), emailSettings()) });
     await db.campaignRecipient.create({ data: { campaignId: c.id, investorId: inv.id, status: res.status, error: res.error } });
     await db.activity.create({ data: { investorId: inv.id, kind: "EMAIL", body: `Campaign: ${c.subject}`, by: admin.name } });
     await db.investor.update({ where: { id: inv.id }, data: { lastContactAt: new Date(), stage: inv.stage === "PROSPECT" ? "CONTACTED" : inv.stage } });
@@ -470,7 +472,7 @@ export async function addTeamAdmin(_: unknown, f: FormData) {
   const problem = checkStaffChange([...team, { id: "new", name, staffLevel: level, managerId }], { id: "new", staffLevel: level, managerId });
   if (problem) return { error: problem };
   await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "ADMIN", status: "APPROVED", staffLevel: level, managerId } });
-  await sendEmail({ to: email, subject: "Your DEAC Marketplace team login", text: `Hi ${name.split(" ")[0]},\n\n${admin.name} added you to the DEAC Marketplace team.\n\nSign in at ${process.env.PUBLIC_APP_URL ?? ""}/login with this email. ${admin.name} will share your temporary password; please change it under My account after signing in.\n\n— DEAC Team` });
+  await sendEmail({ to: email, toName: name, ...(await welcomeEmail("TEAM_LOGIN", { firstName: name.split(" ")[0], email, sender: admin.name })) });
   revalidatePath("/admin/team");
   return { ok: true };
 }

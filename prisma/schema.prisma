@@ -701,3 +701,18 @@ model AgentApplication {
   @@index([email])
   @@index([status])
 }
+
+// Edited wording for the branded welcome emails (Admin → Outreach → Email Templates). key: TemplateKey in lib/email-templates.ts.
+// A missing row or blank field uses the default wording in code.
+model EmailTemplate {
+  key         String   @id
+  subject     String   @default("")
+  heading     String   @default("")
+  intro       String   @default("")
+  buttonLabel String   @default("")
+  steps       String   @default("")
+  closing     String   @default("")
+  footerNote  String   @default("")
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+}

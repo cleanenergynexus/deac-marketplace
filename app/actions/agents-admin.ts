@@ -9,6 +9,7 @@ import { hashPassword, requireAdmin, requireTeamAdmin } from "@/lib/auth";
 import { isAgentStatus } from "@/lib/agents";
 import { phoneFromForm } from "@/lib/phone";
 import { sendEmail } from "@/lib/email";
+import { welcomeEmail } from "@/lib/email-templates-db";
 
 type State = { error?: string; ok?: boolean } | undefined;
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
@@ -36,7 +37,7 @@ export async function addAgent(_: State, f: FormData): Promise<State> {
   if (partner === "bad") return { error: "Pick a DEAC partner from the team." };
   await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "AGENT", status: "APPROVED", company: s(f, "company"), phone: phoneFromForm(f, "phone"), partnerId: partner?.id ?? null } });
   const url = process.env.PUBLIC_APP_URL ?? "";
-  await sendEmail({ to: email, subject: "Your DEAC referral agent login", text: `Hi ${name.split(" ")[0]},\n\n${admin.name} set up your DEAC Marketplace referral agent account.\n\nSign in at ${url}/login with this email. ${admin.name} will share your temporary password; please change it under My account after signing in.${partner ? `\n\nYour DEAC partner is ${partner.name} (${partner.email}). They support your transactions and schedule your meetings.` : ""}\n\n— DEAC Team` });
+  await sendEmail({ to: email, toName: name, ...(await welcomeEmail("AGENT_LOGIN", { firstName: name.split(" ")[0], email, sender: admin.name, partner })) });
   if (partner) await sendEmail({ to: partner.email, subject: `You're now DEAC partner for referral agent ${name}`, text: `${admin.name} assigned you as the DEAC partner for referral agent ${name} (${email}). Their referrals and meeting requests will show up in your tasks.\n\n${url}/admin/agents` });
   refresh();
   return { ok: true };
@@ -111,7 +112,7 @@ export async function approveAgentApplication(_: State, f: FormData): Promise<St
     db.agentApplication.update({ where: { id: app.id }, data: { status: "APPROVED", reviewedById: admin.id, reviewedAt: new Date() } }),
   ]);
   const url = process.env.PUBLIC_APP_URL ?? "";
-  await sendEmail({ to: app.email, toName: app.name, fromUserId: admin.id, subject: "Welcome to DEAC: your referral agent login is ready", text: `Hi ${app.name.split(" ")[0]},\n\nYour application is approved. Sign in at ${url}/login with this email and the password you chose when you applied; you'll land on your referral agent portal.${partner ? `\n\nYour DEAC partner is ${partner.name} (${partner.email}). They support your transactions and schedule your meetings.` : ""}\n\n— ${admin.name}, DEAC` });
+  await sendEmail({ to: app.email, toName: app.name, fromUserId: admin.id, ...(await welcomeEmail("AGENT_APPROVED", { firstName: app.name.split(" ")[0], email: app.email, sender: admin.name, partner })) });
   if (partner && partner.id !== admin.id) await sendEmail({ to: partner.email, subject: `You're now DEAC partner for referral agent ${app.name}`, text: `${admin.name} approved ${app.name} (${app.email}) as a referral agent and assigned you as their DEAC partner. Their referrals and meeting requests will show up in your tasks.\n\n${url}/admin/agents` });
   refresh();
   revalidatePath("/admin/access");
