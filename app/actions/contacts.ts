@@ -7,7 +7,7 @@ import { syncPrimaryContact } from "@/lib/contacts-db";
 import { isLogKind, parseWhen } from "@/lib/crm";
 import { phoneFromForm } from "@/lib/phone";
 import { addressFromForm } from "@/lib/address";
-import { findVisibleTask, getTeam, pickAssignee } from "@/lib/tasks-db";
+import { findVisibleTask, getTaskPeople, pickAssignee } from "@/lib/tasks-db";
 import { referrerFromForm } from "@/lib/agents-db";
 import { notifyTaskAssignee } from "@/lib/task-mail";
 
@@ -119,7 +119,7 @@ export async function logContactActivity(f: FormData) {
   const when = parseWhen(s(f, "when"), tz);
   const projectId = s(f, "projectId");
   if (projectId && !(await db.project.count({ where: { id: projectId, developerId: c.developerId } }))) throw new Error("That project is not at this contact's company.");
-  const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTeam(), f.get("assigneeId")) : null;
+  const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTaskPeople(), f.get("assigneeId")) : null;
   const created = await db.activity.create({
     data: {
       developerId: c.developerId,
@@ -210,7 +210,7 @@ export async function createTask(f: FormData) {
       subject,
       body: s(f, "body") ?? "",
       dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)),
-      assigneeId: pickAssignee(admin, await getTeam(), f.get("assigneeId")),
+      assigneeId: pickAssignee(admin, await getTaskPeople(), f.get("assigneeId")),
       ...links,
       by: admin.name,
     },

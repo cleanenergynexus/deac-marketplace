@@ -11,6 +11,11 @@ import { Badge, Field, PageHeader, Section, Select, statusTone } from "@/compone
 import { DEFAULT_INPUTS, parseInputs, type ValuationInputs } from "@/lib/valuation";
 import { usd } from "@/lib/format";
 import { getScoring } from "@/lib/scoring-db";
+import { requireAdmin } from "@/lib/auth";
+import { assigneeOptions, staffLevel } from "@/lib/tasks";
+import { getTaskEditing, getTaskPeople, getTaskPickers, visibleTaskWhere } from "@/lib/tasks-db";
+import { TaskForm } from "@/components/TaskForm";
+import { ActivityFeed } from "@/components/ActivityFeed";
 import { docStage, investorStage, parseDisclosure, SECTIONS, STAGES, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
 
 const stageOptions = STAGES.map((s) => ({ value: s, label: `${STAGE_INFO[s].step}${s === "TEASER" ? " (all members)" : ""}` }));
@@ -27,6 +32,20 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
     getPipeline(),
   ]);
   if (!p) notFound();
+  // Tasks about this project, limited to the ones this team member may see.
+  const [me, people] = await Promise.all([requireAdmin(), getTaskPeople()]);
+  const [tasks, pickers, editing] = await Promise.all([
+    db.activity.findMany({
+      where: { AND: [visibleTaskWhere(me, people), { projectId: id }] },
+      include: { contact: { select: { id: true, name: true } }, investor: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } },
+      orderBy: [{ doneAt: { sort: "asc", nulls: "first" } }, { createdAt: "desc" }],
+      take: 100,
+    }),
+    getTaskPickers(),
+    getTaskEditing(me, people),
+  ]);
+  const assignees = assigneeOptions(me, people);
+  const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
   const show = parseDisclosure(p.disclosure);
 
   // Every investor engaged on this listing, with the stage they've reached.
@@ -96,6 +115,16 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
           <p className="text-xs text-slate-500 sm:col-span-4">Use this when an NDA or LOI was signed outside the portal. Choosing a lower stage revokes the later steps. An investor with a master NDA on their CRM record always has at least NDA access.</p>
         </form>
       </Section>
+
+      <div id="tasks">
+        <Section title="Tasks" action={<Link href="/admin/tasks" className="text-sm text-brand-600">All tasks</Link>}>
+          <details className="mb-4 rounded-lg border border-slate-200 p-4" open={!tasks.length}>
+            <summary className="cursor-pointer text-sm font-semibold">New Task for This Project</summary>
+            <div className="mt-4"><TaskForm assignees={assignees} me={me.id} allowUnassigned={allowUnassigned} {...pickers} defaults={{ projectId: p.id }} /></div>
+          </details>
+          <ActivityFeed items={tasks} showContact assigning={{ options: assignees, allowUnassigned }} editing={editing} empty="No tasks on this project yet. Assign one to a team member or a referral agent above." />
+        </Section>
+      </div>
 
       <div id="valuation">
         <Section title="Valuation & Lead Score (Internal Only)">

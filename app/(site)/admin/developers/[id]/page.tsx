@@ -21,14 +21,14 @@ import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
-import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function DeveloperDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await ensureContacts(id);
-  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
+  const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const dev = await db.developer.findUnique({ where: { id }, include: {
     team: { orderBy: { sortOrder: "asc" } },
     projects: true,

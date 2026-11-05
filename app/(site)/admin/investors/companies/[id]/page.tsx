@@ -18,7 +18,7 @@ import { formatPhone } from "@/lib/phone";
 import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { num, usd } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
-import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function InvestorCompany({ params }: { params: Promise<{ id
   const { id } = await params;
   await ensureFirms();
   await ensureInterests();
-  const [me, team, pipeline] = await Promise.all([requireAdmin(), getTeam(), getInvestorPipeline()]);
+  const [me, team, pipeline] = await Promise.all([requireAdmin(), getTaskPeople(), getInvestorPipeline()]);
   const firm = await db.investorFirm.findUnique({
     where: { id },
     include: {

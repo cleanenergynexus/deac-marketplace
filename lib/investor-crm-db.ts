@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { getTeam, visibleTaskWhere } from "@/lib/tasks-db";
+import { getTaskPeople, visibleTaskWhere } from "@/lib/tasks-db";
 import { getInvestorPipeline } from "@/lib/pipeline-db";
 import { funnelStages, pipelineLabel } from "@/lib/pipeline";
 import { STEP_SOURCE, STEP_STAGE, advanceStage, firmKey, stepFromHistory, type InterestStep } from "@/lib/investor-crm";
@@ -102,7 +102,7 @@ const LOGGED = ["NOTE", "EMAIL", "CALL", "MEETING", "TASK"];
 export async function loadInvestorCrm() {
   await ensureFirms();
   await ensureInterests();
-  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
+  const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const [firms, investors, touches, tasks] = await Promise.all([
     db.investorFirm.findMany({ orderBy: { name: "asc" } }),
     db.investor.findMany({

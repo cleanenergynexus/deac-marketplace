@@ -22,8 +22,8 @@ import { recommendation } from "@/lib/valuation";
 import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
-import { staffLevel, visibleStaff } from "@/lib/tasks";
-import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { assigneeOptions, staffLevel } from "@/lib/tasks";
+import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +54,8 @@ export default async function ContactRecord({ params, searchParams }: { params: 
   });
   if (!contact) notFound();
   const dev = contact.developer;
-  const [scoring, pipeline, me, team, agents] = await Promise.all([getScoring(), getPipeline(), requireAdmin(), getTeam(), getAgents()]);
-  const assignees = visibleStaff(me, team).map((u) => ({ id: u.id, name: u.name }));
+  const [scoring, pipeline, me, team, agents] = await Promise.all([getScoring(), getPipeline(), requireAdmin(), getTaskPeople(), getAgents()]);
+  const assignees = assigneeOptions(me, team);
   const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
 
   // The primary contact also carries company-wide history logged before contact records existed.

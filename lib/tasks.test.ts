@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canAssign, canSeeTask, checkStaffChange, sortTasks, staffLevel, taskScope, taskScopes, visibleAssigneeIds, visibleStaff, type Staff } from "./tasks";
+import { assigneeOptions, canAssign, canSeeTask, checkStaffChange, sortTasks, staffLevel, taskScope, taskScopes, visibleAssigneeIds, visibleStaff, type Staff } from "./tasks";
 
 const ana: Staff = { id: "ana", name: "Ana", staffLevel: "ADMIN", managerId: null };
 const max: Staff = { id: "max", name: "Max", staffLevel: "MANAGER", managerId: "ana" };
@@ -77,4 +77,27 @@ test("task assigned email names the task, due date, links and who assigned it", 
   assert.match(m.text, /Use v2/);
   assert.match(m.text, /Open it: https:\/\/x\/admin\/tasks/);
   assert.doesNotMatch(taskAssignedEmail({ assigneeName: "Sue", byName: "Ana", title: "T", body: "", due: null, about: [], link: "l" }).text, /Due:/);
+});
+
+test("referral agents: assigned through their DEAC partner", () => {
+  const amy: Staff = { id: "amy", name: "Amy", staffLevel: "SUPPORT", managerId: null, agent: true, partnerId: "sue" };
+  const bob: Staff = { id: "bob", name: "Bob", staffLevel: "SUPPORT", managerId: null, agent: true, partnerId: "zoe" };
+  const cal: Staff = { id: "cal", name: "Cal", staffLevel: "SUPPORT", managerId: null, agent: true, partnerId: null };
+  const old: Staff = { id: "old", name: "Old", staffLevel: "SUPPORT", managerId: null, agent: true, partnerId: "sue", suspended: true };
+  const people = [...team, amy, bob, cal, old];
+  // Admins: every agent, but suspended agents can't be picked.
+  assert.equal(canAssign(ana, people, "cal"), true);
+  assert.equal(canAssign(ana, people, "old"), false);
+  assert.deepEqual(assigneeOptions(ana, people).filter((o) => o.agent).map((o) => o.id), ["amy", "bob", "cal"]);
+  // Managers: agents partnered with them or their reports.
+  assert.deepEqual(visibleStaff(max, people).map((u) => u.id), ["max", "sue", "tom", "amy", "old"]);
+  assert.equal(canSeeTask(max, people, { assigneeId: "amy" }), true);
+  assert.equal(canSeeTask(max, people, { assigneeId: "bob" }), false);
+  // Support: their own agents only.
+  assert.equal(canAssign(sue, people, "amy"), true);
+  assert.equal(canAssign(sue, people, "bob"), false);
+  assert.equal(canSeeTask(zoe, people, { assigneeId: "bob" }), true);
+  // An agent with a Manager-like id in managerId never counts as someone's report.
+  assert.equal(canAssign(max, [...people, { id: "eve", name: "Eve", staffLevel: "ADMIN", managerId: "max", agent: true, partnerId: null }], "eve"), false);
+  assert.deepEqual(taskScopes("SUPPORT", true).map((s) => s.value), ["mine", "team"]);
 });

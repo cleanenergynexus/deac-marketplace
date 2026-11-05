@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./db";
-import { agentContactWhere, agentInvestorWhere } from "./agents";
+import { agentContactWhere, agentInvestorWhere, agentProjectWhere } from "./agents";
+import { sortTasks } from "./tasks";
 
 /** The agent's partner (name and how to reach them). */
 export function getPartner(partnerId: string | null) {
@@ -25,3 +26,31 @@ export const AGENT_LINKS = {
   investor: (id: string) => `/agent/investors/${id}`,
   project: (id: string) => `/agent/listings/${id}`,
 };
+
+/**
+ * Tasks the team assigned to this agent: open ones (soonest due first), then the last completed ones.
+ * Each says whether the agent can open its contact / investor / project in their portal; the team may assign
+ * a task about something the agent didn't refer, and then only its name shows.
+ */
+export async function agentTasks(agentId: string, { doneLimit = 20 }: { doneLimit?: number } = {}) {
+  const include = {
+    contact: { select: { id: true, name: true, developer: { select: { company: true } } } },
+    investor: { select: { id: true, name: true, firm: true } },
+    project: { select: { id: true, code: true, title: true } },
+  } as const;
+  const [open, done] = await Promise.all([
+    db.activity.findMany({ where: { kind: "TASK", assigneeId: agentId, doneAt: null }, include }),
+    doneLimit ? db.activity.findMany({ where: { kind: "TASK", assigneeId: agentId, doneAt: { not: null } }, include, orderBy: { doneAt: "desc" }, take: doneLimit }) : [],
+  ]);
+  const all = [...open, ...done];
+  const ids = (k: "contactId" | "investorId" | "projectId") => [...new Set(all.map((t) => t[k]).filter((v): v is string => !!v))];
+  const [contacts, investors, projects] = await Promise.all([
+    db.contact.findMany({ where: { AND: [{ id: { in: ids("contactId") } }, agentContactWhere(agentId)] }, select: { id: true } }),
+    db.investor.findMany({ where: { AND: [{ id: { in: ids("investorId") } }, agentInvestorWhere(agentId)] }, select: { id: true } }),
+    db.project.findMany({ where: { AND: [{ id: { in: ids("projectId") } }, agentProjectWhere(agentId)] }, select: { id: true } }),
+  ]);
+  const can = { contact: new Set(contacts.map((c) => c.id)), investor: new Set(investors.map((i) => i.id)), project: new Set(projects.map((p) => p.id)) };
+  return { open: sortTasks(open), done, can };
+}
+export type AgentTask = Awaited<ReturnType<typeof agentTasks>>["open"][number];
+export type AgentTaskLinks = Awaited<ReturnType<typeof agentTasks>>["can"];

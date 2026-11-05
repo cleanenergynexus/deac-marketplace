@@ -30,8 +30,8 @@ import { addressLines, hasAddress, mapsHref, shortPlace } from "@/lib/address";
 import { marketSummary } from "@/lib/regions";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
-import { staffLevel, visibleStaff } from "@/lib/tasks";
-import { getTaskEditing, getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { assigneeOptions, staffLevel } from "@/lib/tasks";
+import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +73,12 @@ export default async function InvestorRecord({ params, searchParams }: { params:
   });
   if (!inv) notFound();
   const [pipeline, me, team, listings, firms, agents] = await Promise.all([
-    getInvestorPipeline(), requireAdmin(), getTeam(),
+    getInvestorPipeline(), requireAdmin(), getTaskPeople(),
     db.project.findMany({ select: { id: true, code: true, title: true, mw: true, country: true, state: true, dealType: true, facilityType: true, visibility: true }, orderBy: { code: "asc" } }),
     db.investorFirm.findMany({ select: { name: true }, orderBy: { name: "asc" } }),
     getAgents(),
   ]);
-  const assignees = visibleStaff(me, team).map((u) => ({ id: u.id, name: u.name }));
+  const assignees = assigneeOptions(me, team);
   const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
 
   const all = await db.activity.findMany({

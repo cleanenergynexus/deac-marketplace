@@ -6,6 +6,8 @@ import { logInvestorActivity } from "@/app/actions/investors";
 import { sendCrmEmail } from "@/app/actions/gmail";
 import { CALL_OUTCOMES, EMAIL_DIRECTIONS, LOG_KINDS, type LogKind } from "@/lib/crm";
 import { CrmIcon } from "@/components/CrmIcons";
+import { AssigneeOptions } from "@/components/AssigneeOptions";
+import type { AssigneeOption } from "@/lib/tasks";
 
 type Props = {
   /** Developer CRM contact id, or the investor id when `investor` is set. */
@@ -17,8 +19,8 @@ type Props = {
   contactEmail: string | null;
   projects: { id: string; label: string }[];
   initialKind: LogKind;
-  /** Team members this person can assign tasks to, and who they are (the default assignee). */
-  assignees: { id: string; name: string }[];
+  /** Team members and referral agents this person can assign tasks to, and who they are (the default assignee). */
+  assignees: AssigneeOption[];
   me: string;
   allowUnassigned: boolean;
   /** How "Send email" goes out: from the team member's linked Gmail, or DEAC's address (Resend). Null = sending isn't set up. */
@@ -89,7 +91,7 @@ export function ActivityComposer({ contactId, investor = false, about = "project
             <label className="text-xs text-slate-500">Assign to
               <select name="assigneeId" defaultValue={me} className="input mt-1 w-48 py-1.5">
                 {allowUnassigned && <option value="">Unassigned</option>}
-                {assignees.map((a) => <option key={a.id} value={a.id}>{a.id === me ? `${a.name} (me)` : a.name}</option>)}
+                <AssigneeOptions options={assignees} me={me} />
               </select>
             </label>
           </>
