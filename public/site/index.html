@@ -181,9 +181,6 @@ h2 { font-size: clamp(30px, 3.6vw, 44px); font-weight: 700; margin-top: 12px; }
 .path b { font-family: var(--font-display); font-weight: 600; font-size: 17px; display: block; }
 .path span { font-size: 14.5px; color: var(--on-navy-muted); }
 .path .arr { font-size: 22px; color: var(--blue); }
-.path.member:hover { border-color: rgba(255,255,255,.18); background: none; }
-.path.member a { display: block; margin-top: 6px; font-size: 14.5px; color: var(--on-navy-muted); text-decoration: none; }
-.path.member a:hover { color: #fff; }
 @media (max-width: 900px) { .join .wrap { grid-template-columns: 1fr; padding-block: 64px; } }
 
 footer { background: var(--navy); color: var(--on-navy-muted); border-top: 1px solid rgba(255,255,255,.08); font-size: 14px; }
@@ -353,9 +350,7 @@ footer a:hover { color: #fff; }
       <div class="paths">
         <a class="path" href="https://marketplace.deacna.com/apply"><div><b>I'm an investor</b><span>Request access to the marketplace</span></div><span class="arr">→</span></a>
         <a class="path" href="https://marketplace.deacna.com/developers/submit"><div><b>I have a project</b><span>Submit a site for qualification</span></div><span class="arr">→</span></a>
-        <div class="path member">
-          <div><b>I'm a member</b><a href="https://marketplace.deacna.com/login">Sign in to the marketplace →</a><a href="https://marketplace.deacna.com/referral-agents/apply">Become a Referral Agent →</a></div>
-        </div>
+        <a class="path" href="https://marketplace.deacna.com/referral-agents/apply"><div><b>Referral Agent</b><span>Become a Referral Agent</span></div><span class="arr">→</span></a>
       </div>
     </div>
   </section>
