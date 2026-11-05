@@ -2,7 +2,8 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAgent } from "@/lib/auth";
 import { agentActivityWhere, agentCompanyWhere, agentContactWhere, agentInvestorWhere, agentProjectWhere, PUBLIC_TO_AGENTS } from "@/lib/agents";
-import { AGENT_LINKS, getPartner, meetingOptions } from "@/lib/agent-portal";
+import { AGENT_LINKS, agentTasks, getPartner, meetingOptions } from "@/lib/agent-portal";
+import { AgentTaskList } from "@/components/AgentTaskList";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { MeetingRequestForm } from "@/components/MeetingRequestForm";
 import { PartnerCard } from "@/components/PartnerCard";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentHome() {
   const me = await requireAgent();
-  const [partner, contacts, companies, investors, listings, activity, options, docs] = await Promise.all([
+  const [partner, contacts, companies, investors, listings, activity, options, docs, tasks] = await Promise.all([
     getPartner(me.partnerId),
     db.contact.count({ where: agentContactWhere(me.id) }),
     db.developer.count({ where: agentCompanyWhere(me.id) }),
@@ -26,6 +27,7 @@ export default async function AgentHome() {
     }),
     meetingOptions(me.id),
     db.signatureRequest.findMany({ where: { agentId: me.id, isTemplate: false, status: { in: ["SENT", "VIEWED", "SIGNED"] } }, orderBy: { updatedAt: "desc" }, take: 20 }),
+    agentTasks(me.id, { doneLimit: 0 }),
   ]);
   return (
     <div className="space-y-6">
@@ -36,6 +38,11 @@ export default async function AgentHome() {
         <Link href="/agent/listings"><Stat label="Listings" value={listings} sub="Projects of your developers" /></Link>
         <Link href="/agent/import"><Stat label="New listing" value="Import" sub="From a teaser, memo or web page" /></Link>
       </div>
+      {tasks.open.length > 0 && (
+        <Section title={`Your Tasks (${tasks.open.length})`} action={<Link href="/agent/tasks" className="text-sm text-brand-600">All tasks</Link>}>
+          <AgentTaskList tasks={tasks.open.slice(0, 5)} can={tasks.can} />
+        </Section>
+      )}
       {docs.length > 0 && (
         <Section title="Your Agreements with DEAC">
           <ul className="divide-y divide-slate-100">{docs.map((d) => (

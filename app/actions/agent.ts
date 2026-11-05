@@ -211,3 +211,23 @@ export async function changeAgentPassword(_: State, f: FormData): Promise<State>
   await db.user.update({ where: { id: agent.id }, data: { passwordHash: await hashPassword(next) } });
   return { ok: true };
 }
+
+// ---------- Tasks ----------
+
+/** Ticks off (or reopens) a task the team assigned to this agent. Completing one gives their DEAC partner a heads-up. */
+export async function toggleAgentTask(f: FormData) {
+  const agent = await actor();
+  if (!agent) return; // read-only preview
+  const t = await db.activity.findFirst({ where: { id: String(f.get("id")), kind: "TASK", assigneeId: agent.id } });
+  if (!t) throw new Error("That task is not assigned to you.");
+  const doneAt = t.doneAt ? null : new Date();
+  await db.activity.update({ where: { id: t.id }, data: { doneAt } });
+  if (doneAt) {
+    const partner = await partnerOf(agent);
+    if (partner && partner.id !== agent.id) {
+      await sendEmail({ to: partner.email, toName: partner.name, subject: `${agent.name} completed a task: ${t.subject || "Task"}`, text: `${agent.name} marked "${t.subject || "Task"}" as done on the DEAC Marketplace.\n\nOpen your tasks: ${appUrl()}/admin/tasks\n\n— DEAC Marketplace` }).catch((e) => console.error("[agent] couldn't email the partner", e));
+    }
+  }
+  revalidatePath("/agent", "layout");
+  revalidatePath("/admin", "layout");
+}

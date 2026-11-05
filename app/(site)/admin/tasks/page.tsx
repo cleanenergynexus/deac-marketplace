@@ -12,8 +12,8 @@ import { TaskForm } from "@/components/TaskForm";
 import { TaskEditButton } from "@/components/TaskEditButton";
 import { Badge, PageHeader } from "@/components/ui";
 import { taskState } from "@/lib/crm";
-import { sortTasks, staffLevel, staffLevelLabel, TASK_STATUSES, taskScope, taskScopes, taskStatus, visibleStaff, type TaskScope } from "@/lib/tasks";
-import { getTaskPickers, getTeam, visibleTaskWhere } from "@/lib/tasks-db";
+import { sortTasks, staffLevel, staffLevelLabel, TASK_STATUSES, taskScope, taskScopes, taskStatus, assigneeOptions, visibleStaff, type TaskScope } from "@/lib/tasks";
+import { getTaskPickers, getTaskPeople, visibleTaskWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +22,14 @@ type Search = { scope?: string; status?: string; who?: string };
 /** Everyone's tasks from the Developer and Investor CRMs, limited by access level: Admin all, Manager their team, Support their own. */
 export default async function Tasks({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
-  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
+  const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const level = staffLevel(me.staffLevel);
-  const scope = taskScope(sp.scope, level);
-  const status = taskStatus(sp.status);
   const people = visibleStaff(me, team);
+  const hasAgents = people.some((u) => u.agent);
+  const scope = taskScope(sp.scope, level, hasAgents);
+  const status = taskStatus(sp.status);
   const allowUnassigned = level === "ADMIN";
-  const assignees = people.map((u) => ({ id: u.id, name: u.name }));
+  const assignees = assigneeOptions(me, team);
 
   // Whose tasks this view covers. "who" narrows Team / All views to one person (or "none" = unassigned).
   const scopeIds: Record<TaskScope, string[] | null> = { mine: [me.id], team: people.map((u) => u.id), all: null };
@@ -47,7 +48,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
 
   // Outstanding / overdue per person, for the Team and All views.
   const perPerson = scope === "mine" ? [] : [
-    ...(scope === "all" ? team : people).map((u) => ({ id: u.id, name: u.name, level: u.staffLevel, open: open.filter((t) => t.assigneeId === u.id).length, overdue: overdue.filter((t) => t.assigneeId === u.id).length })),
+    ...(scope === "all" ? team : people).map((u) => ({ id: u.id, name: u.name, level: u.agent ? "AGENT" : u.staffLevel, open: open.filter((t) => t.assigneeId === u.id).length, overdue: overdue.filter((t) => t.assigneeId === u.id).length })),
     ...(scope === "all" ? [{ id: "none", name: "Unassigned", level: null, open: open.filter((t) => !t.assigneeId).length, overdue: overdue.filter((t) => !t.assigneeId).length }] : []),
   ].filter((p) => p.open || p.id === me.id || scope === "team");
 
@@ -60,7 +61,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
     <div className="space-y-5">
       <PageHeader
         title="Tasks"
-        subtitle={level === "ADMIN" ? "Every task in the Developer and Investor CRMs. You can assign tasks to anyone on the team." : level === "MANAGER" ? "Your tasks and your team's. You can assign tasks to yourself and the people who report to you." : "Tasks assigned to you."}
+        subtitle={level === "ADMIN" ? "Every task in the Developer and Investor CRMs. You can assign tasks to anyone on the team and to referral agents." : level === "MANAGER" ? "Your tasks and your team's. You can assign tasks to yourself, the people who report to you, and your team's referral agents." : hasAgents ? "Tasks assigned to you and to your referral agents." : "Tasks assigned to you."}
         action={<Badge tone="slate">{staffLevelLabel(level)} access</Badge>}
       />
 
@@ -72,7 +73,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
       </details>
 
       <nav className="flex gap-1 border-b border-slate-200">
-        {taskScopes(level).map((s) => (
+        {taskScopes(level, hasAgents).map((s) => (
           <Link key={s.value} href={link({ scope: s.value, who: undefined })} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${s.value === scope ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{s.label}</Link>
         ))}
       </nav>
@@ -81,7 +82,7 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {perPerson.map((p) => (
             <Link key={p.id} href={link({ who: who === p.id ? undefined : p.id })} className={`card flex items-center justify-between p-3 text-sm hover:border-brand-500 ${who === p.id ? "border-brand-500 ring-1 ring-brand-500" : ""}`}>
-              <span className="min-w-0"><span className="block truncate font-medium">{p.name}{p.id === me.id ? " (me)" : ""}</span>{p.level && <span className="text-xs text-slate-500">{staffLevelLabel(p.level)}</span>}</span>
+              <span className="min-w-0"><span className="block truncate font-medium">{p.name}{p.id === me.id ? " (me)" : ""}</span>{p.level && <span className="text-xs text-slate-500">{p.level === "AGENT" ? "Referral agent" : staffLevelLabel(p.level)}</span>}</span>
               <span className="text-right text-xs"><span className="block font-semibold text-slate-800">{p.open} open</span>{p.overdue > 0 && <span className="font-semibold text-red-600">{p.overdue} overdue</span>}</span>
             </Link>
           ))}

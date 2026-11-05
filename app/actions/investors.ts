@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { isLogKind, parseWhen } from "@/lib/crm";
 import { addressFromForm } from "@/lib/address";
-import { getTeam, pickAssignee } from "@/lib/tasks-db";
+import { getTaskPeople, pickAssignee } from "@/lib/tasks-db";
 import { notifyTaskAssignee } from "@/lib/task-mail";
 import { STEP_SOURCE, STEP_STAGE, accessForColumn, advanceStage } from "@/lib/investor-crm";
 import { confirmListingAccess } from "@/lib/access-db";
@@ -139,7 +139,7 @@ export async function logInvestorActivity(f: FormData) {
   const when = parseWhen(s(f, "when"), tz);
   const projectId = s(f, "projectId");
   if (projectId && !(await db.project.count({ where: { id: projectId } }))) throw new Error("That listing no longer exists.");
-  const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTeam(), f.get("assigneeId")) : null;
+  const assigneeId = kind === "TASK" ? pickAssignee(admin, await getTaskPeople(), f.get("assigneeId")) : null;
   const createdAt = when && kind !== "TASK" ? when : new Date();
   const created = await db.activity.create({
     data: {

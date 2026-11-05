@@ -7,12 +7,12 @@ import { getInvestorPipeline, getPipeline } from "@/lib/pipeline-db";
 import { usd, num, date } from "@/lib/format";
 import { requireAdmin } from "@/lib/auth";
 import { taskState } from "@/lib/crm";
-import { getTeam, visibleTimelineWhere } from "@/lib/tasks-db";
+import { getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
+  const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const [investors, developers, projects, lois, activity, pendingAccess, pipeline, interests, investorPipeline] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
     db.developer.findMany({ select: { stage: true, projects: { select: { dealType: true, pipelineStage: true } } } }),

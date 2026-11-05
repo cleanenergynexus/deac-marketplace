@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { getTeam, visibleTaskWhere } from "@/lib/tasks-db";
+import { getTaskPeople, visibleTaskWhere } from "@/lib/tasks-db";
 
 /**
  * Developers saved before contact records existed have their one contact on the company row.
@@ -35,7 +35,7 @@ const LOGGED = ["NOTE", "EMAIL", "CALL", "MEETING", "TASK"];
  */
 export async function loadCrm() {
   await ensureContacts();
-  const [me, team] = await Promise.all([requireAdmin(), getTeam()]);
+  const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const [developers, touches, tasks] = await Promise.all([
     db.developer.findMany({
       orderBy: { updatedAt: "desc" },

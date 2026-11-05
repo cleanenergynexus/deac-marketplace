@@ -12,17 +12,30 @@ export const isStaffLevel = (v: unknown): v is StaffLevel => STAFF_LEVELS.some((
 export const staffLevel = (v: string | null | undefined): StaffLevel => (isStaffLevel(v) ? v : "ADMIN");
 export const staffLevelLabel = (v: string | null | undefined) => STAFF_LEVELS.find((l) => l.value === staffLevel(v))!.label;
 
-export type Staff = { id: string; name: string; staffLevel: string; managerId: string | null };
+/**
+ * Someone a task can be assigned to: a team member, or a referral agent (`agent` set).
+ * Agents' tasks belong to the team through the agent's DEAC partner (`partnerId`).
+ */
+export type Staff = { id: string; name: string; staffLevel: string; managerId: string | null; agent?: boolean; partnerId?: string | null; suspended?: boolean };
 
 /**
- * Team members whose tasks this person can see and assign to.
- * Admin: everyone. Manager: themselves and their direct reports. Support: only themselves.
+ * Team members and referral agents whose tasks this person can see and assign to.
+ * Admin: everyone. Manager: themselves, their direct reports, and those people's referral agents.
+ * Support: themselves and their own referral agents.
  */
 export function visibleStaff<T extends Staff>(viewer: Staff, team: T[]): T[] {
   const level = staffLevel(viewer.staffLevel);
   if (level === "ADMIN") return team;
-  if (level === "MANAGER") return team.filter((u) => u.id === viewer.id || u.managerId === viewer.id);
-  return team.filter((u) => u.id === viewer.id);
+  const mine = team.filter((u) => !u.agent && (u.id === viewer.id || (level === "MANAGER" && u.managerId === viewer.id))).map((u) => u.id);
+  return team.filter((u) => (u.agent ? !!u.partnerId && mine.includes(u.partnerId) : mine.includes(u.id)));
+}
+
+/** A choice in an "Assign to" menu. Referral agents are listed in their own group. */
+export type AssigneeOption = { id: string; name: string; agent?: boolean };
+
+/** Who this person can pick in an "Assign to" menu: visible team members, then active referral agents. */
+export function assigneeOptions(viewer: Staff, team: Staff[]): AssigneeOption[] {
+  return visibleStaff(viewer, team).filter((u) => !u.suspended).map((u) => ({ id: u.id, name: u.name, ...(u.agent && { agent: true }) }));
 }
 
 /** Assignee ids this person can see, or null for "everything, including unassigned tasks" (Admins). */
@@ -39,20 +52,21 @@ export function canSeeTask(viewer: Staff, team: Staff[], task: { assigneeId: str
 /** Who can be picked as the assignee. Unassigned (null) is only allowed for Admins. */
 export function canAssign(viewer: Staff, team: Staff[], assigneeId: string | null): boolean {
   if (assigneeId === null) return staffLevel(viewer.staffLevel) === "ADMIN";
-  return visibleStaff(viewer, team).some((u) => u.id === assigneeId);
+  return assigneeOptions(viewer, team).some((u) => u.id === assigneeId);
 }
 
-/** Views on the Tasks page. Managers get "Team", Admins get "All". */
+/** Views on the Tasks page. Managers get "Team", Admins get "All", Support members who partner referral agents get their agents' tasks. */
 export type TaskScope = "mine" | "team" | "all";
-export function taskScopes(level: string | null | undefined): { value: TaskScope; label: string }[] {
+export function taskScopes(level: string | null | undefined, hasAgents = false): { value: TaskScope; label: string }[] {
   const l = staffLevel(level);
   const scopes: { value: TaskScope; label: string }[] = [{ value: "mine", label: "My Tasks" }];
   if (l === "MANAGER") scopes.push({ value: "team", label: "My Team's Tasks" });
+  if (l === "SUPPORT" && hasAgents) scopes.push({ value: "team", label: "My Agents' Tasks" });
   if (l === "ADMIN") scopes.push({ value: "all", label: "All Tasks" });
   return scopes;
 }
-export function taskScope(v: string | undefined, level: string | null | undefined): TaskScope {
-  const scopes = taskScopes(level);
+export function taskScope(v: string | undefined, level: string | null | undefined, hasAgents = false): TaskScope {
+  const scopes = taskScopes(level, hasAgents);
   return scopes.find((s) => s.value === v)?.value ?? "mine";
 }
 

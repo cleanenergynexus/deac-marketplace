@@ -1,12 +1,15 @@
 import { AdminNav, type NavItem } from "@/components/AdminNav";
 import { agentView } from "@/lib/auth";
 import { exitAgentView } from "@/app/actions/agents-admin";
+import { db } from "@/lib/db";
 
 /** Referral agent portal: only what this agent referred, read-only, plus referrals, imports, uploads and meeting requests. */
 export default async function AgentLayout({ children }: { children: React.ReactNode }) {
   const view = await agentView();
+  const myTasks = await db.activity.count({ where: { kind: "TASK", assigneeId: view.agent.id, doneAt: null } });
   const items: NavItem[] = [
     { href: "/agent", label: "Overview" },
+    { href: "/agent/tasks", label: "My Tasks", count: myTasks },
     { href: "/agent/developers", label: "Developer Contacts" },
     { href: "/agent/investors", label: "Investor Contacts" },
     { href: "/agent/listings", label: "Listings & Data Rooms", children: [{ href: "/agent/import", label: "Import a Listing" }] },

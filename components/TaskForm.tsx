@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createTask, updateTask } from "@/app/actions/contacts";
 import type { TaskPickers } from "@/lib/tasks-db";
+import type { AssigneeOption } from "@/lib/tasks";
+import { AssigneeOptions } from "@/components/AssigneeOptions";
 
 /** A saved task, as the edit form needs it. */
 export type EditableTask = {
@@ -17,11 +19,14 @@ export type EditableTask = {
 };
 
 type Props = TaskPickers & {
-  assignees: { id: string; name: string }[];
+  /** Team members and referral agents this person can assign to. */
+  assignees: AssigneeOption[];
   me: string;
   allowUnassigned: boolean;
   /** Editing an existing task instead of creating one. */
   task?: EditableTask;
+  /** New task only: the contact ("inv:<id>" for an investor) and project it starts linked to, e.g. on a project page. */
+  defaults?: { contactId?: string; projectId?: string };
   /** Called after a successful save (e.g. to close the edit dialog). */
   onDone?: () => void;
   onCancel?: () => void;
@@ -32,10 +37,10 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const dayInput = (d: Date | null) => (d ? `${new Date(d).getFullYear()}-${pad(new Date(d).getMonth() + 1)}-${pad(new Date(d).getDate())}` : "");
 
 /** New task (or edit an existing one): title, due date, who it's for, and the CRM contact / project it's about. */
-export function TaskForm({ assignees, me, allowUnassigned, contacts, investors = [], projects, task, onDone, onCancel }: Props) {
+export function TaskForm({ assignees, me, allowUnassigned, contacts, investors = [], projects, task, defaults, onDone, onCancel }: Props) {
   const editing = !!task;
-  const [contactId, setContactId] = useState(task?.investorId ? `inv:${task.investorId}` : task?.contactId ?? "");
-  const [projectId, setProjectId] = useState(task?.projectId ?? "");
+  const [contactId, setContactId] = useState(task ? (task.investorId ? `inv:${task.investorId}` : task.contactId ?? "") : defaults?.contactId ?? "");
+  const [projectId, setProjectId] = useState(task ? task.projectId ?? "" : defaults?.projectId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -61,8 +66,8 @@ export function TaskForm({ assignees, me, allowUnassigned, contacts, investors =
           if (task) { await updateTask(f); onDone?.(); return; }
           await createTask(f);
           form.current?.reset();
-          setContactId("");
-          setProjectId("");
+          setContactId(defaults?.contactId ?? "");
+          setProjectId(defaults?.projectId ?? "");
           setSaved(true);
         } catch (e) { setError(e instanceof Error ? e.message : "Couldn't save the task."); }
       }}
@@ -79,7 +84,7 @@ export function TaskForm({ assignees, me, allowUnassigned, contacts, investors =
       <label className="text-xs text-slate-500">Assign to
         <select name="assigneeId" defaultValue={task ? task.assigneeId ?? "" : me} className="input mt-1">
           {(allowUnassigned || (task && !task.assigneeId)) && <option value="">Unassigned</option>}
-          {people.map((a) => <option key={a.id} value={a.id}>{a.id === me ? `${a.name} (me)` : a.name}</option>)}
+          <AssigneeOptions options={people} me={me} />
         </select>
       </label>
       <label className="text-xs text-slate-500">Contact
