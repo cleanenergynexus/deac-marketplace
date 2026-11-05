@@ -588,12 +588,14 @@ model SignatureRequest {
   autoApprove    Boolean   @default(true) // NDA/LOI: signing confirms the step (no review in NDAs & LOIs)
   listingNda     Boolean   @default(false) // templates: investors sign it themselves from the listing's NDA step
   signerType     String? // INVESTOR | CONTACT | AGENT
+  // Deleting the person keeps the request (signed documents and their audit trail are records); the link is cleared
+  // and signerName / signerEmail / signerCompany still say who it was.
   investorId     String?
-  investor       Investor? @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  investor       Investor? @relation(fields: [investorId], references: [id], onDelete: SetNull)
   contactId      String? // developer contact
-  contact        Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact        Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
   agentId        String? // referral agent login
-  agent          User?     @relation("AgentSignatures", fields: [agentId], references: [id], onDelete: Cascade)
+  agent          User?     @relation("AgentSignatures", fields: [agentId], references: [id], onDelete: SetNull)
   signerName     String?
   signerEmail    String?
   signerCompany  String?
