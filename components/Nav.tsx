@@ -13,7 +13,7 @@ export async function Nav() {
   if (s?.role === "INVESTOR") tabs.push({ label: "My Portal", href: "/portal" });
   if (s?.role === "AGENT") tabs.push({ label: "Agent Portal", href: "/agent" });
   if (s?.role === "ADMIN") tabs.push({ label: "Admin", href: "/admin" });
-  if (!s) tabs.push({ label: "Submit a Project", href: "/developers/submit" });
+  if (!s) tabs.push({ label: "Submit a Project", href: "/developers/submit" }, { label: "Become a Referral Agent", href: "/referral-agents/apply" });
   return (
     <header className="sticky top-0 z-20">
       <div className="border-b border-white/10 bg-brand-900 text-white">
@@ -31,7 +31,6 @@ export async function Nav() {
             <form action="/logout" method="post"><button className={link}>Sign out</button></form>
           ) : (
             <>
-              <Link href="/referral-agents/apply" className={`hidden whitespace-nowrap lg:inline ${link}`}>Become a Referral Agent</Link>
               <Link href="/login" className={`hidden sm:inline ${link}`}>Sign in</Link>
               <Link href="/apply" className="whitespace-nowrap rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-[#3B7FFF]">Request access</Link>
             </>
