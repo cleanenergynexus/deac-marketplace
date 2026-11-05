@@ -150,8 +150,10 @@ function nameAddr(name: string | null | undefined, email: string) {
 
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
 
-/** A plain-text email as Gmail's API wants it (base64url RFC 2822). */
-export function buildRaw(o: { fromName?: string | null; from: string; to: string; toName?: string | null; subject: string; text: string; replyTo?: string | null; cc?: string[] }): string {
+const b64Lines = (s: string) => Buffer.from(s.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").replace(/.{76}/g, "$&\r\n");
+
+/** An email as Gmail's API wants it (base64url RFC 2822): plain text, or text plus HTML as multipart/alternative. */
+export function buildRaw(o: { fromName?: string | null; from: string; to: string; toName?: string | null; subject: string; text: string; html?: string | null; replyTo?: string | null; cc?: string[] }): string {
   const headers = [
     `From: ${nameAddr(o.fromName, oneLine(o.from))}`,
     `To: ${nameAddr(o.toName, oneLine(o.to))}`,
@@ -159,11 +161,16 @@ export function buildRaw(o: { fromName?: string | null; from: string; to: string
     ...(o.replyTo ? [`Reply-To: ${oneLine(o.replyTo)}`] : []),
     `Subject: ${encodeWord(oneLine(o.subject))}`,
     "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
   ];
-  const body = Buffer.from(o.text.replace(/\r?\n/g, "\r\n"), "utf8").toString("base64").replace(/.{76}/g, "$&\r\n");
-  return Buffer.from(`${headers.join("\r\n")}\r\n\r\n${body}`, "utf8").toString("base64url");
+  const part = (type: string, body: string) => `Content-Type: ${type}; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64Lines(body)}`;
+  let msg: string;
+  if (o.html) {
+    const boundary = `deac_${Buffer.from(o.subject + o.to).toString("hex").slice(0, 16)}_${Date.now().toString(36)}`;
+    msg = `${headers.join("\r\n")}\r\nContent-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n--${boundary}\r\n${part("text/plain", o.text)}\r\n--${boundary}\r\n${part("text/html", o.html)}\r\n--${boundary}--\r\n`;
+  } else {
+    msg = `${headers.join("\r\n")}\r\n${part("text/plain", o.text)}`;
+  }
+  return Buffer.from(msg, "utf8").toString("base64url");
 }
 
 /** Link to the conversation in Gmail, opened in the right account. */

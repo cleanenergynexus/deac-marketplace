@@ -97,10 +97,10 @@ export const getGmailAccount = (userId: string) => db.gmailAccount.findUnique({ 
 export type GmailSent = { mailbox: string; gmailMessageId: string; gmailThreadId: string; emailMessageId: string | null };
 
 /** Sends a plain-text email from the team member's own Gmail. Null when they haven't linked one. */
-export async function sendViaGmail(userId: string, o: { to: string; toName?: string | null; cc?: string[]; subject: string; text: string }): Promise<GmailSent | null> {
+export async function sendViaGmail(userId: string, o: { to: string; toName?: string | null; cc?: string[]; subject: string; text: string; html?: string | null }): Promise<GmailSent | null> {
   const a = await db.gmailAccount.findUnique({ where: { userId }, include: { user: { select: { name: true } } } });
   if (!a) return null;
-  const raw = buildRaw({ from: a.email, fromName: a.user.name, to: o.to, toName: o.toName, cc: o.cc, subject: o.subject, text: o.text });
+  const raw = buildRaw({ from: a.email, fromName: a.user.name, to: o.to, toName: o.toName, cc: o.cc, subject: o.subject, text: o.text, html: o.html });
   const sent = await gmail<{ id: string; threadId: string }>(a, "/messages/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
   let emailMessageId: string | null = null;
   try {

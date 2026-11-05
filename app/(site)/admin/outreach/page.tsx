@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge, PageHeader, Empty, statusTone } from "@/components/ui";
 import { date } from "@/lib/format";
+import { OutreachTabs } from "@/components/OutreachTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,8 @@ export default async function Outreach() {
   const cs = await db.campaign.findMany({ include: { _count: { select: { recipients: true } } }, orderBy: { createdAt: "desc" } });
   return (
     <div>
-      <PageHeader title="Outreach" subtitle={process.env.RESEND_API_KEY ? "Emails send through Resend." : "Email provider not connected: campaigns are logged to the CRM but not sent. Add RESEND_API_KEY to send."} action={<Link href="/admin/outreach/new" className="btn">New campaign</Link>} />
+      <PageHeader title="Outreach" subtitle={process.env.RESEND_API_KEY ? "Emails send through Resend." : "Email provider not connected: campaigns are logged to the CRM but not sent. Add RESEND_API_KEY to send."} action={<Link href="/admin/outreach/new" className="btn">New Campaign</Link>} />
+      <OutreachTabs active="campaigns" />
       {cs.length ? (
         <div className="card"><table className="w-full"><thead className="border-b border-slate-200"><tr><th className="th">Campaign</th><th className="th">Subject</th><th className="th">Recipients</th><th className="th">Sent</th><th className="th">Status</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{cs.map((c) => (
