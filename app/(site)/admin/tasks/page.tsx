@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { after } from "next/server";
+import { checkSupportInboxQuietly } from "@/lib/support-db";
 import { requireAdmin } from "@/lib/auth";
 import { deleteActivity, toggleTask } from "@/app/actions/contacts";
 import { AssigneeSelect } from "@/components/AssigneeSelect";
@@ -12,6 +14,7 @@ import { TaskForm } from "@/components/TaskForm";
 import { TaskEditButton } from "@/components/TaskEditButton";
 import { Badge, PageHeader } from "@/components/ui";
 import { taskState } from "@/lib/crm";
+import { threadUrl } from "@/lib/gmail";
 import { sortTasks, staffLevel, staffLevelLabel, TASK_STATUSES, taskScope, taskScopes, taskStatus, assigneeOptions, visibleStaff, type TaskScope } from "@/lib/tasks";
 import { getTaskPickers, getTaskPeople, visibleTaskWhere } from "@/lib/tasks-db";
 
@@ -23,6 +26,7 @@ type Search = { scope?: string; status?: string; who?: string };
 export default async function Tasks({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
+  after(checkSupportInboxQuietly); // new support emails become tasks (throttled, after the page is sent)
   const level = staffLevel(me.staffLevel);
   const people = visibleStaff(me, team);
   const hasAgents = people.some((u) => u.agent);
@@ -123,7 +127,9 @@ export default async function Tasks({ searchParams }: { searchParams: Promise<Se
                     <td className="td">
                       <div className={`font-medium ${t.doneAt ? "text-slate-400 line-through" : "text-slate-900"}`}>{t.subject || "Task"}</div>
                       {t.body && <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{t.body}</div>}
-                      {t.by && <div className="mt-0.5 text-xs text-slate-400">Created by {t.by}</div>}
+                      {t.mailbox && t.gmailThreadId ? (
+                        <div className="mt-0.5 text-xs text-slate-400">Support email from {t.by} · <a href={threadUrl(t.mailbox, t.gmailThreadId)} target="_blank" rel="noreferrer" className="text-brand-600">Open in Gmail</a></div>
+                      ) : t.by && <div className="mt-0.5 text-xs text-slate-400">Created by {t.by}</div>}
                     </td>
                     <td className="td whitespace-nowrap text-xs">
                       {t.doneAt ? <span className="text-emerald-700">Done <LocalTime value={t.doneAt} time={false} /></span>

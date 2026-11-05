@@ -32,6 +32,9 @@ model User {
   company      String? // referral agents: their own firm
   emailSignature String? // team members: replaces the "— Name, DEAC" sign-off on emails the marketplace sends for them
   bookingUrl   String? // team members: meeting booking link (Calendly, HubSpot...) shown to their referral agents
+  // Team → Technical Support: this member's email is the support address, and every email to it becomes a task for them (lib/support-db.ts).
+  supportInbox Boolean  @default(false)
+  supportSince DateTime? // when they became the support inbox: earlier email isn't turned into tasks
   // Referral agents: the DEAC partner (a team login) who supports their deals and meetings.
   partnerId    String?
   partner      User?    @relation("AgentPartner", fields: [partnerId], references: [id], onDelete: SetNull)
@@ -492,6 +495,7 @@ model Activity {
   gmailMessageId String? // Gmail's id in that mailbox
   gmailThreadId  String?
   emailMessageId String? // the email's Message-ID header, the same in every mailbox (stops duplicates when two of the team were on it)
+  supportEmails  SupportEmail[] // tasks made from emails to the Technical Support inbox
   createdAt   DateTime   @default(now()) // when it happened (can be back-dated when logging)
 
   @@index([contactId])
@@ -514,8 +518,27 @@ model GmailAccount {
   lastSyncAt      DateTime?
   lastSyncError   String?
   lastSyncAdded   Int       @default(0)
+  // Technical Support inbox only (lib/support-db.ts): when its inbox was last turned into tasks.
+  supportCheckAt  DateTime? // last check started (also stops two checks running at once)
+  supportSyncAt   DateTime? // last check that finished
+  supportError    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+// An email to the Technical Support inbox and the task it became (one task per conversation while it's open).
+// No task = skipped (auto-reply, bounce, mailing list...), kept so it isn't read again.
+model SupportEmail {
+  id             String    @id @default(cuid())
+  mailbox        String
+  gmailMessageId String
+  gmailThreadId  String
+  taskId         String?
+  task           Activity? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([mailbox, gmailMessageId])
+  @@index([gmailThreadId])
 }
 
 // ---------- Outreach ----------

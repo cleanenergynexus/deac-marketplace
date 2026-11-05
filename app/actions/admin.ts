@@ -445,9 +445,10 @@ export async function sendCampaign(f: FormData) {
   const c = await db.campaign.findUniqueOrThrow({ where: { id: String(f.get("id")) } });
   if (c.status === "SENT") return;
   const recipients = await segmentInvestors(JSON.parse(c.segment));
+  const settings = await emailSettings();
   for (const inv of recipients) {
     const fill = (t: string) => t.replaceAll("{{name}}", inv.name.split(" ")[0]).replaceAll("{{firm}}", inv.firm ?? "your firm");
-    const res = await sendEmail({ to: inv.email, subject: fill(c.subject), text: fill(c.body), html: campaignHtml(fill(c.body), emailSettings()) });
+    const res = await sendEmail({ to: inv.email, subject: fill(c.subject), text: fill(c.body), html: campaignHtml(fill(c.body), settings) });
     await db.campaignRecipient.create({ data: { campaignId: c.id, investorId: inv.id, status: res.status, error: res.error } });
     await db.activity.create({ data: { investorId: inv.id, kind: "EMAIL", body: `Campaign: ${c.subject}`, by: admin.name } });
     await db.investor.update({ where: { id: inv.id }, data: { lastContactAt: new Date(), stage: inv.stage === "PROSPECT" ? "CONTACTED" : inv.stage } });

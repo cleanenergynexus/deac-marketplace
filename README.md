@@ -127,6 +127,17 @@ Each team member can link their own Gmail under **My account**. Once linked:
 - **Relationship owner Cc:** every email the app sends to an investor (invites, approvals, signature requests, NDA/LOI confirmations, Activity emails) copies the investor's relationship owner (else their company's), matched to a team login by email, full name or unique first name, unless the owner is the sender. Bulk Outreach campaigns don't copy anyone.
 - Synced emails are visible to the team on the record, never to referral agents. Tokens are stored encrypted (AES-256-GCM with `GMAIL_TOKEN_KEY`, `lib/secret-box.ts`). **Unlink Gmail** revokes the token at Google; emails already filed stay.
 
+### Technical Support inbox (Team → Technical Support)
+
+One team member can be **Technical Support**. Their address (e.g. `support@deacna.com`) becomes the **Contact Support** address in the branded emails (over `SUPPORT_EMAIL`), and every email sent to it becomes a task assigned to them:
+
+- The task title is "Support: <subject>"; the body has the sender, time, message text and attachment names, with **Open in Gmail** on the Tasks page and timelines. When the sender is an investor or developer contact in the CRM (matched by email), the task is linked to their record.
+- Replies in the same conversation are added to the open task; once that task is done, the next email starts a new one.
+- Skipped: the inbox's own mail, Promotions/Social, spam, bounces, no-reply senders, auto-replies and mailing lists. Only email received after the member was picked becomes tasks.
+- How it reads mail: the member's linked Gmail. An Admin links it from the Team page (**Link Gmail**, then sign in to Google as the support mailbox), or the member links it under My account. The support mailbox must be in your Google Workspace (Internal app).
+- When: every couple of minutes while anyone uses the admin pages, with the nightly Gmail cron, and **Check now**. `/api/cron/support-inbox` (same `CRON_SECRET`) can be scheduled more often on Vercel Pro, e.g. `{ "path": "/api/cron/support-inbox", "schedule": "*/5 * * * *" }` in `vercel.json` (Hobby only allows daily crons).
+- Code: `lib/support.ts` (rules), `lib/support-db.ts` (reading the inbox, creating tasks).
+
 Google Cloud setup (once, by a Google Workspace admin):
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → create a project (e.g. "DEAC Marketplace").

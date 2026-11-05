@@ -20,7 +20,7 @@ export default async function EditEmailTemplate({ params }: { params: Promise<{ 
     <div className="space-y-4">
       <Link href="/admin/outreach/templates" className="text-sm text-brand-600">← Email Templates</Link>
       <PageHeader title={info.name} subtitle={<>{info.when} {row ? `Last edited ${date(row.updatedAt)}${row.updatedBy ? ` by ${row.updatedBy}` : ""}.` : "Using the default wording."}</>} />
-      <EmailTemplateEditor key={row?.updatedAt.toISOString() ?? "default"} templateKey={key} initial={mergeTemplate(key, row)} defaults={info.defaults} edited={!!row} settings={emailSettings()} sender={me.name} />
+      <EmailTemplateEditor key={row?.updatedAt.toISOString() ?? "default"} templateKey={key} initial={mergeTemplate(key, row)} defaults={info.defaults} edited={!!row} settings={await emailSettings()} sender={me.name} />
     </div>
   );
 }

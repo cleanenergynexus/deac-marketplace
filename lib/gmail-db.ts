@@ -80,7 +80,7 @@ async function accessToken(a: GmailAccount): Promise<string> {
   }
 }
 
-async function gmail<T>(a: GmailAccount, path: string, init?: RequestInit): Promise<T> {
+export async function gmail<T>(a: GmailAccount, path: string, init?: RequestInit): Promise<T> {
   const token = await accessToken(a);
   const r = await fetch(`${API}${path}`, { ...init, headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` } });
   if (!r.ok) {
@@ -209,7 +209,7 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<number>) {
   return total;
 }
 
-async function listIds(a: GmailAccount, q: string, max: number) {
+export async function listIds(a: GmailAccount, q: string, max: number) {
   const ids: string[] = [];
   let pageToken: string | undefined;
   do {
