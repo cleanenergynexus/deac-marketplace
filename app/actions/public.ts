@@ -15,6 +15,8 @@ export async function login(_: unknown, f: FormData) {
   const email = s(f, "email")?.toLowerCase();
   const user = email ? await db.user.findUnique({ where: { email } }) : null;
   if (user?.inviteTokenHash) return { error: "You haven't set a password yet. Open the invite link DEAC sent you, or ask the team for a new one." };
+  if (!user && email && (await db.agentApplication.count({ where: { email, status: "PENDING" } })))
+    return { error: "Thanks for applying to be a referral agent. The DEAC team is reviewing your application and will email you once your login is ready." };
   if (!user || !(await checkPassword(String(f.get("password") ?? ""), user.passwordHash))) return { error: "Email or password is incorrect." };
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: user.role as "ADMIN" | "AGENT", status: user.status, name: user.name });
@@ -64,6 +66,31 @@ export async function applyForAccess(_: unknown, f: FormData) {
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: "INVESTOR", status: "PENDING", name: user.name });
   redirect("/pending");
+}
+
+/** "Become a Referral Agent" application. Saved for the team to review under Access Requests; approving it creates the agent login. */
+export async function applyAsAgent(_: unknown, f: FormData) {
+  const email = s(f, "email")?.toLowerCase();
+  const name = s(f, "name");
+  const password = String(f.get("password") ?? "");
+  if (!email || !name || password.length < 10) return { error: "Name, email and a password of at least 10 characters are required." };
+  if (await db.user.findUnique({ where: { email } })) return { error: "An account with this email already exists. Please sign in, or use a different email." };
+  if (await db.agentApplication.count({ where: { email, status: "PENDING" } })) return { error: "We already have an application from this email. The DEAC team will be in touch soon." };
+  await db.agentApplication.create({
+    data: {
+      email,
+      name,
+      company: s(f, "company"),
+      title: s(f, "title"),
+      phone: phoneFromForm(f, "phone"),
+      location: s(f, "location"),
+      focus: list(f, "focus"),
+      experience: s(f, "experience"),
+      source: s(f, "source"),
+      passwordHash: await hashPassword(password),
+    },
+  });
+  redirect("/referral-agents/thanks");
 }
 
 /** Developer project submission → Developer CRM lead + draft listing for the team to score. */

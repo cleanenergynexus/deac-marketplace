@@ -24,6 +24,7 @@ export default async function AdminHome() {
     db.investorInterest.findMany({ select: { stage: true, project: { select: { dealType: true } } } }),
     getInvestorPipeline(),
   ]);
+  const pendingAgents = await db.agentApplication.count({ where: { status: "PENDING" } });
   const recentlySigned = await db.signatureRequest.findMany({ where: { status: { in: ["SIGNED", "DECLINED"] }, source: "ESIGN", updatedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, select: { id: true, title: true, status: true, signerName: true }, orderBy: { updatedAt: "desc" }, take: 5 });
   const myTasks = await db.activity.findMany({ where: { kind: "TASK", assigneeId: me.id, doneAt: null }, select: { dueAt: true, doneAt: true } });
   const myOverdue = myTasks.filter((t) => taskState(t) === "overdue").length;
@@ -42,9 +43,13 @@ export default async function AdminHome() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" />
-      {pendingAccess > 0 && (
+      {pendingAccess + pendingAgents > 0 && (
         <Link href="/admin/access" className="flex items-center justify-between rounded-lg bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
-          <span><b>{pendingAccess}</b> investor{pendingAccess === 1 ? "" : "s"} waiting for access approval</span>
+          <span>
+            {pendingAccess > 0 && <><b>{pendingAccess}</b> investor{pendingAccess === 1 ? "" : "s"} waiting for access approval</>}
+            {pendingAccess > 0 && pendingAgents > 0 && " · "}
+            {pendingAgents > 0 && <><b>{pendingAgents}</b> referral agent application{pendingAgents === 1 ? "" : "s"} to review</>}
+          </span>
           <span className="font-semibold">Review →</span>
         </Link>
       )}

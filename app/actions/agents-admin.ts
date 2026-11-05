@@ -97,3 +97,31 @@ export async function updateMyProfile(_: State, f: FormData): Promise<State> {
   revalidatePath("/admin/account");
   return { ok: true };
 }
+
+/** Approves a "Become a Referral Agent" application: creates their agent login with the password they chose and emails them. */
+export async function approveAgentApplication(_: State, f: FormData): Promise<State> {
+  const admin = await requireTeamAdmin();
+  const app = await db.agentApplication.findFirst({ where: { id: String(f.get("id")), status: "PENDING" } });
+  if (!app) return { error: "That application was already reviewed." };
+  if (await db.user.findUnique({ where: { email: app.email } })) return { error: "That email already has a login (team, investor or agent). Decline this application, or remove the other login first." };
+  const partner = await partnerFrom(f);
+  if (partner === "bad") return { error: "Pick a DEAC partner from the team." };
+  await db.$transaction([
+    db.user.create({ data: { email: app.email, name: app.name, passwordHash: app.passwordHash, role: "AGENT", status: "APPROVED", company: app.company, phone: app.phone, partnerId: partner?.id ?? null } }),
+    db.agentApplication.update({ where: { id: app.id }, data: { status: "APPROVED", reviewedById: admin.id, reviewedAt: new Date() } }),
+  ]);
+  const url = process.env.PUBLIC_APP_URL ?? "";
+  await sendEmail({ to: app.email, toName: app.name, fromUserId: admin.id, subject: "Welcome to DEAC: your referral agent login is ready", text: `Hi ${app.name.split(" ")[0]},\n\nYour application is approved. Sign in at ${url}/login with this email and the password you chose when you applied; you'll land on your referral agent portal.${partner ? `\n\nYour DEAC partner is ${partner.name} (${partner.email}). They support your transactions and schedule your meetings.` : ""}\n\n— ${admin.name}, DEAC` });
+  if (partner && partner.id !== admin.id) await sendEmail({ to: partner.email, subject: `You're now DEAC partner for referral agent ${app.name}`, text: `${admin.name} approved ${app.name} (${app.email}) as a referral agent and assigned you as their DEAC partner. Their referrals and meeting requests will show up in your tasks.\n\n${url}/admin/agents` });
+  refresh();
+  revalidatePath("/admin/access");
+  return { ok: true };
+}
+
+/** Declines a referral agent application. Nothing is emailed; the application stays on file. */
+export async function declineAgentApplication(f: FormData) {
+  const admin = await requireTeamAdmin();
+  await db.agentApplication.updateMany({ where: { id: String(f.get("id")), status: "PENDING" }, data: { status: "DECLINED", reviewedById: admin.id, reviewedAt: new Date() } });
+  revalidatePath("/admin/access");
+  revalidatePath("/admin", "layout");
+}

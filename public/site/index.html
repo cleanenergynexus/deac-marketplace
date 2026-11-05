@@ -71,6 +71,7 @@ nav.main { display: flex; align-items: center; gap: 26px; }
 nav.main a.link { color: var(--on-navy-muted); text-decoration: none; font-size: 15px; font-weight: 500; }
 nav.main a.link:hover { color: #fff; }
 nav.main .btn { padding: 9px 16px; font-size: 14px; }
+@media (max-width: 1100px) { nav.main a.agent { display: none; } }
 @media (max-width: 900px) { nav.main a.link { display: none; } }
 @media (max-width: 420px) { nav.main a.signin { display: none; } }
 
@@ -180,6 +181,9 @@ h2 { font-size: clamp(30px, 3.6vw, 44px); font-weight: 700; margin-top: 12px; }
 .path b { font-family: var(--font-display); font-weight: 600; font-size: 17px; display: block; }
 .path span { font-size: 14.5px; color: var(--on-navy-muted); }
 .path .arr { font-size: 22px; color: var(--blue); }
+.path.member:hover { border-color: rgba(255,255,255,.18); background: none; }
+.path.member a { display: block; margin-top: 6px; font-size: 14.5px; color: var(--on-navy-muted); text-decoration: none; }
+.path.member a:hover { color: #fff; }
 @media (max-width: 900px) { .join .wrap { grid-template-columns: 1fr; padding-block: 64px; } }
 
 footer { background: var(--navy); color: var(--on-navy-muted); border-top: 1px solid rgba(255,255,255,.08); font-size: 14px; }
@@ -203,6 +207,7 @@ footer a:hover { color: #fff; }
       <a class="link" href="#deac">Energy + Compute</a>
       <a class="link" href="#investors">Investors</a>
       <a class="link" href="https://marketplace.deacna.com/">Marketplace</a>
+      <a class="link agent" href="https://marketplace.deacna.com/referral-agents/apply">Become a Referral Agent</a>
       <a class="link signin" href="https://marketplace.deacna.com/login">Sign in</a>
       <a class="btn btn-primary" href="https://marketplace.deacna.com/apply">Request access</a>
     </nav>
@@ -314,6 +319,7 @@ footer a:hover { color: #fff; }
       <div class="market-ctas">
         <a class="btn btn-primary" href="https://marketplace.deacna.com/">View all opportunities →</a>
         <a class="btn btn-ink" href="https://marketplace.deacna.com/apply">Request investor access</a>
+        <a class="btn btn-ink" href="https://marketplace.deacna.com/referral-agents/apply">Become a Referral Agent</a>
         <span>Already a member? <a href="https://marketplace.deacna.com/login" style="color:var(--blue)">Sign in</a></span>
       </div>
     </div>
@@ -347,7 +353,9 @@ footer a:hover { color: #fff; }
       <div class="paths">
         <a class="path" href="https://marketplace.deacna.com/apply"><div><b>I'm an investor</b><span>Request access to the marketplace</span></div><span class="arr">→</span></a>
         <a class="path" href="https://marketplace.deacna.com/developers/submit"><div><b>I have a project</b><span>Submit a site for qualification</span></div><span class="arr">→</span></a>
-        <a class="path" href="https://marketplace.deacna.com/login"><div><b>I'm a member</b><span>Sign in to the marketplace</span></div><span class="arr">→</span></a>
+        <div class="path member">
+          <div><b>I'm a member</b><a href="https://marketplace.deacna.com/login">Sign in to the marketplace →</a><a href="https://marketplace.deacna.com/referral-agents/apply">Become a Referral Agent →</a></div>
+        </div>
       </div>
     </div>
   </section>
@@ -357,7 +365,7 @@ footer a:hover { color: #fff; }
   <div class="wrap">
     <img src="/brand/deac-logo-white.png" alt="DEAC">
     <nav aria-label="Footer">
-      <a href="#about">About</a><a href="#approach">Approach</a><a href="#deac">Energy + Compute</a><a href="#investors">Investors</a><a href="https://marketplace.deacna.com/">Marketplace</a><a href="https://marketplace.deacna.com/login">Sign in</a>
+      <a href="#about">About</a><a href="#approach">Approach</a><a href="#deac">Energy + Compute</a><a href="#investors">Investors</a><a href="https://marketplace.deacna.com/">Marketplace</a><a href="https://marketplace.deacna.com/referral-agents/apply">Become a Referral Agent</a><a href="https://marketplace.deacna.com/login">Sign in</a>
     </nav>
     <span>© 2026 DEAC. Distributed Energy and Compute.</span>
   </div>

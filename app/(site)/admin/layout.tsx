@@ -4,18 +4,19 @@ import { db } from "@/lib/db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
-  const [pendingLois, pendingSteps, openReqs, applied, myTasks, awaitingSignature] = await Promise.all([
+  const [pendingLois, pendingSteps, openReqs, applied, agentApplied, myTasks, awaitingSignature] = await Promise.all([
     db.loi.count({ where: { status: "PENDING" } }),
     db.dealStep.count({ where: { status: "PENDING" } }),
     db.analysisRequest.count({ where: { status: { not: "DELIVERED" } } }),
     db.user.count({ where: { role: "INVESTOR", status: "PENDING" } }),
+    db.agentApplication.count({ where: { status: "PENDING" } }),
     db.activity.count({ where: { kind: "TASK", assigneeId: me.id, doneAt: null } }),
     db.signatureRequest.count({ where: { status: { in: ["SENT", "VIEWED"] } } }),
   ]);
   const items: NavItem[] = [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/tasks", label: "Tasks", count: myTasks },
-    { href: "/admin/access", label: "Access Requests", count: applied },
+    { href: "/admin/access", label: "Access Requests", count: applied + agentApplied },
     {
       href: "/admin/investors",
       label: "Investor CRM",
