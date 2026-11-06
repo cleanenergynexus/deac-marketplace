@@ -4,7 +4,7 @@ import "server-only";
 import { db } from "./db";
 import { attachmentNames, header, messageText, type GmailMessage } from "./gmail";
 import { gmail, listIds } from "./gmail-db";
-import { appendReply, CHECK_EVERY_MS, emailBlock, skipReason, supportQuery, supportSender, supportSince, supportTaskTitle } from "./support";
+import { appendReply, CHECK_EVERY_MS, emailBlock, skipReason, supportAlias, supportQuery, supportSender, supportSince, supportTaskTitle } from "./support";
 
 /** The team member who is the support inbox, with their linked Gmail. Null when nobody is. */
 export async function getSupportMember() {
@@ -15,10 +15,13 @@ export async function getSupportMember() {
   });
 }
 
-/** The support address shown in emails: the Technical Support member's Gmail (or login email), else SUPPORT_EMAIL, else the default. */
+/**
+ * The support address shown in emails: the Technical Support member's own email (their login), even when the Gmail that
+ * reads it is another mailbox it's an alias of. Null when nobody is Technical Support.
+ */
 export async function supportAddress(): Promise<string | null> {
   const m = await getSupportMember();
-  return m ? (m.gmail?.email ?? m.email) : null;
+  return m?.email ?? null;
 }
 
 /** Makes this team member the support inbox (null turns it off). Email from now on becomes tasks. */
@@ -39,10 +42,10 @@ async function findSender(email: string) {
 }
 
 /** Turns one email into a task, or adds it to the open task for the same conversation. Returns 1 when a task was created. */
-async function fileEmail(mailbox: string, assigneeId: string, m: GmailMessage): Promise<number> {
+async function fileEmail(mailbox: string, alias: string | null, assigneeId: string, m: GmailMessage): Promise<number> {
   if (await db.supportEmail.findUnique({ where: { mailbox_gmailMessageId: { mailbox, gmailMessageId: m.id } }, select: { id: true } })) return 0;
   const link = { mailbox, gmailMessageId: m.id, gmailThreadId: m.threadId };
-  if (skipReason(m, mailbox)) {
+  if (skipReason(m, mailbox, alias)) {
     await db.supportEmail.create({ data: link });
     return 0;
   }
@@ -106,13 +109,14 @@ export async function checkSupportInbox(force = false): Promise<SupportCheck> {
   if (!claimed.count) return { created: 0, scanned: 0, skipped: "Checked a moment ago." };
   try {
     const since = supportSince({ supportSince: member.supportSince, lastSync: a.supportSyncAt, now });
-    const ids = await listIds(a, supportQuery(since), 500);
+    const alias = supportAlias(member.email, a.email);
+    const ids = await listIds(a, supportQuery(since, alias), 500);
     const known = new Set((await db.supportEmail.findMany({ where: { mailbox: a.email, gmailMessageId: { in: ids } }, select: { gmailMessageId: true } })).map((x) => x.gmailMessageId));
     // Oldest first, so replies land on the task their first email made.
     const waiting = ids.filter((id) => !known.has(id)).reverse();
     const todo = waiting.slice(0, MAX_PER_CHECK);
     let created = 0;
-    for (const id of todo) created += await fileEmail(a.email, member.id, await gmail<GmailMessage>(a, `/messages/${id}?format=full`));
+    for (const id of todo) created += await fileEmail(a.email, alias, member.id, await gmail<GmailMessage>(a, `/messages/${id}?format=full`));
     // Only move the starting point on once everything waiting was read.
     await db.gmailAccount.update({ where: { id: a.id }, data: { ...(waiting.length <= MAX_PER_CHECK ? { supportSyncAt: now } : {}), supportError: null } });
     return { created, scanned: ids.length };

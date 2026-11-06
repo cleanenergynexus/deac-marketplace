@@ -98,9 +98,12 @@ export type GmailSent = { mailbox: string; gmailMessageId: string; gmailThreadId
 
 /** Sends a plain-text email from the team member's own Gmail. Null when they haven't linked one. */
 export async function sendViaGmail(userId: string, o: { to: string; toName?: string | null; cc?: string[]; subject: string; text: string; html?: string | null }): Promise<GmailSent | null> {
-  const a = await db.gmailAccount.findUnique({ where: { userId }, include: { user: { select: { name: true } } } });
+  const a = await db.gmailAccount.findUnique({ where: { userId }, include: { user: { select: { name: true, email: true, supportInbox: true } } } });
   if (!a) return null;
-  const raw = buildRaw({ from: a.email, fromName: a.user.name, to: o.to, toName: o.toName, cc: o.cc, subject: o.subject, text: o.text, html: o.html });
+  // Technical Support reading an alias (support@ delivered into someone's own Gmail) sends as the alias.
+  // Gmail keeps that From only when the alias is set up under "Send mail as"; otherwise it uses the mailbox's own address.
+  const from = a.user.supportInbox ? a.user.email : a.email;
+  const raw = buildRaw({ from, fromName: a.user.name, to: o.to, toName: o.toName, cc: o.cc, subject: o.subject, text: o.text, html: o.html });
   const sent = await gmail<{ id: string; threadId: string }>(a, "/messages/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
   let emailMessageId: string | null = null;
   try {

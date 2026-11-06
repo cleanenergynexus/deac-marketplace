@@ -16,7 +16,8 @@ type Props = {
 export function SupportInboxPanel({ team, member, gmail, openTasks, setupMissing, canEdit }: Props) {
   const [saved, save, saving] = useActionState(saveSupportMember, undefined);
   const [checked, check, checking] = useActionState(checkSupportNow, undefined);
-  const address = gmail?.email ?? member?.email;
+  const address = member?.email;
+  const alias = !!gmail && !!member && gmail.email.toLowerCase() !== member.email.toLowerCase();
   return (
     <div className="space-y-4 text-sm">
       <p className="text-slate-600">
@@ -64,7 +65,12 @@ export function SupportInboxPanel({ team, member, gmail, openTasks, setupMissing
             {gmail.supportSyncAt ? <>Last checked <LocalTime value={gmail.supportSyncAt} />.</> : "Not checked yet."} The inbox is checked every few minutes while the team is using the admin pages, and every night.
             {member.since && <> Email from <LocalTime value={member.since} /> on becomes tasks.</>}
           </p>
-          {gmail.supportError && <p className="rounded bg-red-50 p-3 text-red-700">{gmail.supportError}{canEdit && <> <a href="/api/google/connect?for=support" className="font-medium underline">Link again</a></>}</p>}
+          {alias && (
+            <p className="rounded bg-slate-50 p-3 text-slate-600">
+              Read from the <b>{gmail.email}</b> Gmail, where {address} is an alias. Only emails sent to <b>{address}</b> become tasks; the rest of that inbox is ignored.
+            </p>
+          )}
+                    {gmail.supportError && <p className="rounded bg-red-50 p-3 text-red-700">{gmail.supportError}{canEdit && <> <a href="/api/google/connect?for=support" className="font-medium underline">Link again</a></>}</p>}
           {checked?.error && <p className="rounded bg-red-50 p-3 text-red-700">{checked.error}</p>}
           {checked?.ok && <p className="rounded bg-emerald-50 p-3 text-emerald-800">{checked.ok}</p>}
           <form action={check}><button className="btn" disabled={checking}>{checking ? "Checking…" : "Check now"}</button></form>
