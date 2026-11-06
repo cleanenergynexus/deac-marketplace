@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { addAgent, removeAgent, viewAsAgent } from "@/app/actions/agents-admin";
 import { ActionForm } from "@/components/ActionForm";
 import { AgentEditForm } from "@/components/AgentEditForm";
+import { AgentLoginEmailButton } from "@/components/AgentLoginEmailButton";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Badge, Empty, Field, PageHeader, Section } from "@/components/ui";
@@ -62,10 +63,14 @@ export default async function Agents() {
                   <div className="mt-1 text-xs text-slate-500">
                     Referred {a._count.referredDevelopers} compan{a._count.referredDevelopers === 1 ? "y" : "ies"}, {a._count.referredContacts} developer contact{a._count.referredContacts === 1 ? "" : "s"}, {a._count.referredInvestors} investor{a._count.referredInvestors === 1 ? "" : "s"} · Added {date(a.createdAt)}
                   </div>
-                  <form action={viewAsAgent} className="mt-3">
-                    <input type="hidden" name="id" value={a.id} />
-                    <button className="btn-ghost py-1.5">View as agent</button>
-                  </form>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <form action={viewAsAgent} className="mt-3">
+                      <input type="hidden" name="id" value={a.id} />
+                      <button className="btn-ghost py-1.5">View as agent</button>
+                    </form>
+                    {isAdmin && a.status === "APPROVED" && <AgentLoginEmailButton id={a.id} name={a.name} />}
+                  </div>
+                  {a.inviteTokenHash && a.inviteExpiresAt && a.inviteExpiresAt > new Date() && <div className="mt-1 text-xs text-slate-500">Login email sent; set-password link open until {date(a.inviteExpiresAt)}.</div>}
                   <details className="mt-3 rounded-md border border-slate-200 p-2" id={`signatures-${a.id}`}>
                     <summary className="cursor-pointer text-xs font-semibold text-slate-700">NDAs &amp; Agreements</summary>
                     <div className="mt-2"><SignatureList signer={`AGENT:${a.id}`} /></div>
@@ -91,7 +96,7 @@ export default async function Agents() {
       </Section>
       {isAdmin && (
         <Section title="Add a Referral Agent">
-          <ActionForm action={addAgent} submitLabel="Add agent" success="Agent added. Share the temporary password with them privately; they sign in at /login and land on their agent portal." className="grid gap-4 sm:grid-cols-3">
+          <ActionForm action={addAgent} submitLabel="Add agent" success="Agent added. We emailed them the Referral Agent Login email with a link to set their own password. The temporary password also works; share it privately if they need it." className="grid gap-4 sm:grid-cols-3">
             <Field label="Name"><input name="name" required className="input" /></Field>
             <Field label="Email"><input name="email" type="email" required className="input" /></Field>
             <Field label="Temporary password (10+ characters)"><input name="password" type="text" minLength={10} required className="input" autoComplete="off" /></Field>

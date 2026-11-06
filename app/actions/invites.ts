@@ -8,7 +8,7 @@ import { hashPassword, requireAdmin, startSession } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { appUrl, welcomeEmail } from "@/lib/email-templates-db";
 import { recordSentEmail } from "@/lib/gmail-db";
-import { hashInviteToken, inviteExpired, inviteUrl, INVITE_DAYS, loginState, newInvite, stageAfterInvite } from "@/lib/invites";
+import { hashInviteToken, INVITE_ROLES, inviteExpired, inviteUrl, INVITE_DAYS, loginState, newInvite, stageAfterInvite } from "@/lib/invites";
 
 export type InviteState = { error?: string; link?: string; emailed?: boolean; from?: string; name?: string } | undefined;
 
@@ -61,9 +61,14 @@ export async function acceptInvite(_: { error?: string } | undefined, f: FormDat
   if (password.length < 8) return { error: "Choose a password of at least 8 characters." };
   if (password !== String(f.get("confirm") ?? "")) return { error: "The two passwords don't match." };
   const user = token ? await db.user.findFirst({ where: { inviteTokenHash: hashInviteToken(token) } }) : null;
-  if (!user || user.role !== "INVESTOR" || inviteExpired(user.inviteExpiresAt)) return { error: "This invite link has expired or was already used. Ask the DEAC team for a new one." };
+  if (!user || !INVITE_ROLES.includes(user.role) || inviteExpired(user.inviteExpiresAt)) return { error: "This invite link has expired or was already used. Ask the DEAC team for a new one." };
+  if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), inviteTokenHash: null, inviteExpiresAt: null } });
   if (user.investorId) await db.activity.create({ data: { investorId: user.investorId, kind: "SYSTEM", by: user.name, body: "Accepted the marketplace invite and set a password." } });
+  if (user.role === "AGENT") {
+    await startSession({ uid: user.id, role: "AGENT", status: user.status, name: user.name });
+    redirect("/agent");
+  }
   await startSession({ uid: user.id, role: "INVESTOR", status: user.status, name: user.name });
   redirect("/marketplace");
 }

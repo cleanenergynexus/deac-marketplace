@@ -2,7 +2,7 @@ import Link from "next/link";
 import { acceptInvite } from "@/app/actions/invites";
 import { ActionForm } from "@/components/ActionForm";
 import { db } from "@/lib/db";
-import { hashInviteToken, inviteExpired } from "@/lib/invites";
+import { hashInviteToken, INVITE_ROLES, inviteExpired } from "@/lib/invites";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AcceptInvite({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const user = await db.user.findFirst({ where: { inviteTokenHash: hashInviteToken(token) }, select: { name: true, email: true, role: true, inviteExpiresAt: true } });
-  if (!user || user.role !== "INVESTOR" || inviteExpired(user.inviteExpiresAt)) {
+  if (!user || !INVITE_ROLES.includes(user.role) || inviteExpired(user.inviteExpiresAt)) {
     return (
       <div className="mx-auto max-w-sm card p-6">
         <h1 className="text-xl font-bold">This Invite Link Has Expired</h1>
@@ -21,7 +21,7 @@ export default async function AcceptInvite({ params }: { params: Promise<{ token
   return (
     <div className="mx-auto max-w-sm card p-6">
       <h1 className="text-xl font-bold">Welcome, {user.name.split(" ")[0]}</h1>
-      <p className="mt-1 text-sm text-slate-600">You&apos;re invited to the DEAC private investor marketplace and your membership is approved. Choose a password to sign in.</p>
+      <p className="mt-1 text-sm text-slate-600">{user.role === "AGENT" ? "Your DEAC referral agent account is ready. Choose a password to sign in to your agent portal." : "You're invited to the DEAC private investor marketplace and your membership is approved. Choose a password to sign in."}</p>
       <ActionForm action={acceptInvite} submitLabel="Set password and sign in" className="mt-5 space-y-3">
         <input type="hidden" name="token" value={token} />
         <input value={user.email} readOnly aria-label="Email" className="input bg-slate-50 text-slate-600" />
