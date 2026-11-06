@@ -11,6 +11,9 @@ export function newInvite(now = new Date()) {
   return { token, hash: hashInviteToken(token), expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000) };
 }
 
+/** Who can accept a one-time invite link: investors (Investor CRM invite) and referral agents (Send Login Email). */
+export const INVITE_ROLES = ["INVESTOR", "AGENT"];
+
 export const inviteUrl = (base: string, token: string) => `${base.replace(/\/+$/, "")}/invite/${token}`;
 
 export const inviteExpired = (expiresAt: Date | null, now = new Date()) => !expiresAt || expiresAt.getTime() <= now.getTime();

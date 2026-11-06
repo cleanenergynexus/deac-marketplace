@@ -9,7 +9,9 @@ import { hashPassword, requireAdmin, requireTeamAdmin } from "@/lib/auth";
 import { isAgentStatus } from "@/lib/agents";
 import { phoneFromForm } from "@/lib/phone";
 import { sendEmail } from "@/lib/email";
-import { welcomeEmail } from "@/lib/email-templates-db";
+import { appUrl, welcomeEmail } from "@/lib/email-templates-db";
+import { recordSentEmail } from "@/lib/gmail-db";
+import { INVITE_DAYS, inviteUrl, newInvite } from "@/lib/invites";
 
 type State = { error?: string; ok?: boolean } | undefined;
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
@@ -35,12 +37,40 @@ export async function addAgent(_: State, f: FormData): Promise<State> {
   if (await db.user.findUnique({ where: { email } })) return { error: "That email already has a login (team, investor or agent). Use a different email." };
   const partner = await partnerFrom(f);
   if (partner === "bad") return { error: "Pick a DEAC partner from the team." };
-  await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "AGENT", status: "APPROVED", company: s(f, "company"), phone: phoneFromForm(f, "phone"), partnerId: partner?.id ?? null } });
+  // The temporary password works right away; the email's one-time link lets them pick their own instead.
+  const invite = newInvite();
+  const agent = await db.user.create({ data: { email, name, passwordHash: await hashPassword(password), role: "AGENT", status: "APPROVED", company: s(f, "company"), phone: phoneFromForm(f, "phone"), partnerId: partner?.id ?? null, inviteTokenHash: invite.hash, inviteExpiresAt: invite.expiresAt } });
   const url = process.env.PUBLIC_APP_URL ?? "";
-  await sendEmail({ to: email, toName: name, ...(await welcomeEmail("AGENT_LOGIN", { firstName: name.split(" ")[0], email, sender: admin.name, partner })) });
+  await emailAgentLogin(agent, invite.token, admin, partner);
   if (partner) await sendEmail({ to: partner.email, subject: `You're now DEAC partner for referral agent ${name}`, text: `${admin.name} assigned you as the DEAC partner for referral agent ${name} (${email}). Their referrals and meeting requests will show up in your tasks.\n\n${url}/admin/agents` });
   refresh();
   return { ok: true };
+}
+
+/** Sends the branded Referral Agent Login email (Outreach → Email Templates) with a one-time set-password link, from the sender's Gmail when linked. */
+async function emailAgentLogin(agent: { id: string; name: string; email: string }, token: string, admin: { id: string; name: string }, partner: { name: string; email: string } | null) {
+  const link = inviteUrl(appUrl(), token);
+  const mail = await welcomeEmail("AGENT_LOGIN", { firstName: agent.name.split(" ")[0], email: agent.email, sender: admin.name, partner, link, days: INVITE_DAYS });
+  const res = await sendEmail({ to: agent.email, toName: agent.name, fromUserId: admin.id, ...mail });
+  // The agent's Emails list keeps the message without the one-time link.
+  if (res.status === "SENT") await recordSentEmail({ agentId: agent.id }, { subject: mail.subject, text: mail.text.replaceAll(link, "[set-password link]"), by: admin.name, gmail: res.gmail });
+  return { res, link };
+}
+
+export type LoginEmailState = { error?: string; link?: string; emailed?: boolean; from?: string } | undefined;
+
+/** "Send Login Email" on an agent: emails a new one-time link to set a password. Their current password keeps working until they use it. */
+export async function sendAgentLoginEmail(_: LoginEmailState, f: FormData): Promise<LoginEmailState> {
+  const admin = await requireTeamAdmin();
+  const agent = await db.user.findFirst({ where: { id: String(f.get("id")), role: "AGENT" }, include: { partner: { select: { name: true, email: true } } } });
+  if (!agent) return { error: "That referral agent no longer exists." };
+  if (agent.status !== "APPROVED") return { error: `${agent.name} is suspended. Set their status to Active first.` };
+  const invite = newInvite();
+  await db.user.update({ where: { id: agent.id }, data: { inviteTokenHash: invite.hash, inviteExpiresAt: invite.expiresAt } });
+  const { res, link } = await emailAgentLogin(agent, invite.token, admin, agent.partner);
+  refresh();
+  if (res.status === "FAILED") return { error: `The email didn't send (${res.error ?? "unknown error"}). Copy this link and send it yourself: ${link}`, link };
+  return { link, emailed: res.status === "SENT", from: res.via === "GMAIL" ? res.gmail?.mailbox : undefined };
 }
 
 /** Partner, company, phone, status, and optionally a new temporary password. */
