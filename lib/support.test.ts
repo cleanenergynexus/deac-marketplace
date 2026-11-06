@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { GmailMessage } from "./gmail";
-import { appendReply, emailBlock, MAX_TASK_BODY, skipReason, supportQuery, supportSender, supportSince, supportTaskTitle } from "./support";
+import { appendReply, emailBlock, MAX_TASK_BODY, skipReason, supportAlias, supportQuery, supportSender, supportSince, supportTaskTitle } from "./support";
 
 const msg = (headers: Record<string, string>, labelIds = ["INBOX"]): GmailMessage => ({
   id: "m1",
@@ -51,4 +51,18 @@ test("replies are added to the open task, keeping the newest text", () => {
   const long = appendReply("x".repeat(MAX_TASK_BODY), "latest reply");
   assert.equal(long.length, MAX_TASK_BODY);
   assert.ok(long.startsWith("…") && long.endsWith("latest reply"));
+});
+
+test("when support@ is an alias on someone's own Gmail, only email sent to the alias becomes a task", () => {
+  const MINE = "joaquin@deacna.com";
+  const alias = supportAlias("Support@deacna.com", MINE);
+  assert.equal(alias, "support@deacna.com");
+  assert.equal(supportAlias("support@deacna.com", "SUPPORT@deacna.com"), null, "own mailbox: no alias");
+  assert.equal(skipReason(msg({ From: "jane@acme.com", To: "Support <support@deacna.com>" }), MINE, alias), null);
+  assert.equal(skipReason(msg({ From: "jane@acme.com", To: "bob@x.com", Cc: "support@deacna.com" }), MINE, alias), null);
+  assert.equal(skipReason(msg({ From: "jane@acme.com", To: MINE, "Delivered-To": "support@deacna.com" }), MINE, alias), null);
+  assert.match(skipReason(msg({ From: "jane@acme.com", To: MINE }), MINE, alias)!, /not sent to the support address/);
+  assert.match(skipReason(msg({ From: "support@deacna.com", To: "jane@acme.com" }), MINE, alias)!, /support inbox/);
+  assert.match(supportQuery(new Date(0), alias), / \{to:support@deacna\.com cc:support@deacna\.com deliveredto:support@deacna\.com\}$/);
+  assert.doesNotMatch(supportQuery(new Date(0), null), /to:/);
 });

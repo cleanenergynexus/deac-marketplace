@@ -7,16 +7,24 @@ const SKIP_LABELS = new Set(["SENT", "DRAFT", "SPAM", "TRASH", "CHAT", "CATEGORY
 /** Senders that are machines, not people (bounces, no-reply addresses). */
 const MACHINE_SENDER = /^(mailer-daemon|postmaster|no-?reply|do-?not-?reply|bounces?)([+.@-]|$)/i;
 
+/** Every address an email was sent or delivered to (To, Cc, Delivered-To, X-Original-To). */
+export function recipients(m: GmailMessage): string[] {
+  const all = (m.payload?.headers ?? []).filter((h) => /^(to|cc|delivered-to|x-original-to)$/i.test(h.name)).flatMap((h) => addresses(h.value));
+  return [...new Set(all)];
+}
+
 /**
  * Why an email to the support inbox should not become a task, or null when it should.
  * Skips the support mailbox's own mail, Promotions/Social/spam, bounces, auto-replies and mailing lists.
+ * `alias`: the support address is an alias on someone's own Gmail, so only email sent to that alias counts.
  */
-export function skipReason(m: GmailMessage, mailbox: string): string | null {
+export function skipReason(m: GmailMessage, mailbox: string, alias?: string | null): string | null {
   const label = m.labelIds?.find((l) => SKIP_LABELS.has(l));
   if (label) return `label ${label}`;
   const from = addresses(header(m, "From"))[0];
   if (!from) return "no sender";
-  if (from === mailbox.toLowerCase()) return "sent by the support inbox";
+  if (from === mailbox.toLowerCase() || from === alias?.toLowerCase()) return "sent by the support inbox";
+  if (alias && !recipients(m).includes(alias.toLowerCase())) return "not sent to the support address";
   if (MACHINE_SENDER.test(from)) return "automated sender";
   const auto = header(m, "Auto-Submitted");
   if (auto && auto.trim().toLowerCase() !== "no") return "auto-reply";
@@ -25,8 +33,18 @@ export function skipReason(m: GmailMessage, mailbox: string): string | null {
   return null;
 }
 
-/** Gmail search for new inbox mail since a time (Gmail `after:` takes seconds). */
-export const supportQuery = (since: Date) => `in:inbox after:${Math.floor(since.getTime() / 1000)} -category:promotions -category:social`;
+/**
+ * Gmail search for new inbox mail since a time (Gmail `after:` takes seconds).
+ * With `alias` (the support address is an alias on a personal Gmail), only mail addressed to it.
+ */
+export const supportQuery = (since: Date, alias?: string | null) => {
+  const q = `in:inbox after:${Math.floor(since.getTime() / 1000)} -category:promotions -category:social`;
+  const a = alias?.trim().toLowerCase();
+  return a && /^[^\s@{}()"]+@[^\s@{}()"]+$/.test(a) ? `${q} {to:${a} cc:${a} deliveredto:${a}}` : q;
+};
+
+/** The support address is an alias when the linked Gmail is a different mailbox (e.g. support@ delivered into joaquin@). */
+export const supportAlias = (memberEmail: string, gmailEmail: string) => (memberEmail.trim().toLowerCase() !== gmailEmail.trim().toLowerCase() ? memberEmail.trim().toLowerCase() : null);
 
 /** Where the next check starts: a little before the last finished check (mail can arrive with an earlier date), never before the inbox was turned on. */
 export function supportSince(o: { supportSince: Date | null; lastSync: Date | null; now?: Date }): Date {
