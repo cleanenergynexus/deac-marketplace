@@ -1,9 +1,13 @@
 import { AdminNav, type NavItem } from "@/components/AdminNav";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { after } from "next/server";
+import { checkSupportInboxQuietly } from "@/lib/support-db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const me = await requireAdmin();
+  // Turns new emails to the Technical Support inbox into tasks (at most every couple of minutes, after the page is sent).
+  after(checkSupportInboxQuietly);
   const [pendingLois, pendingSteps, openReqs, applied, agentApplied, myTasks, awaitingSignature] = await Promise.all([
     db.loi.count({ where: { status: "PENDING" } }),
     db.dealStep.count({ where: { status: "PENDING" } }),

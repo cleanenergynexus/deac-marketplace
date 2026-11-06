@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { after } from "next/server";
+import { checkSupportInboxQuietly } from "@/lib/support-db";
 import { PageHeader, Stat, Section, Badge, statusTone } from "@/components/ui";
 import { DEAL_TYPES, INVESTOR_STAGES } from "@/lib/constants";
 import { funnelKey, funnelStages, placeStage, projectStage } from "@/lib/pipeline";
@@ -13,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
   const [me, team] = await Promise.all([requireAdmin(), getTaskPeople()]);
+  after(checkSupportInboxQuietly); // new support emails become tasks (throttled, after the page is sent)
   const [investors, developers, projects, lois, activity, pendingAccess, pipeline, interests, investorPipeline] = await Promise.all([
     db.investor.groupBy({ by: ["stage"], _count: true }),
     db.developer.findMany({ select: { stage: true, projects: { select: { dealType: true, pipelineStage: true } } } }),

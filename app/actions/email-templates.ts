@@ -45,7 +45,7 @@ export async function sendTestEmail(_: State, f: FormData): Promise<State> {
   if (!isTemplateKey(key)) return { error: "Unknown template." };
   const tpl = mergeTemplate(key, fromForm(f));
   const link = TEMPLATE_INFO[key].screen === "SET_PASSWORD" ? `${appUrl()}/invite/test-link` : `${appUrl()}/login`;
-  const mail = renderTemplate(key, tpl, { firstName: admin.name.split(" ")[0], email: admin.email, sender: admin.name, link, days: 14 }, emailSettings());
+  const mail = renderTemplate(key, tpl, { firstName: admin.name.split(" ")[0], email: admin.email, sender: admin.name, link, days: 14 }, await emailSettings());
   const res = await sendEmail({ to: admin.email, toName: admin.name, subject: `[Test] ${mail.subject}`, text: mail.text, html: mail.html, fromUserId: admin.id });
   if (res.status === "FAILED") return { error: `The test email failed: ${res.error ?? "unknown error"}` };
   if (res.status === "LOGGED") return { error: "No email provider is connected (link Gmail under My Account, or add RESEND_API_KEY), so the test was only logged." };
