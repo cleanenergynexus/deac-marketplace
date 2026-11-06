@@ -73,3 +73,10 @@ test("Gmail message carries both text and HTML", () => {
   assert.ok(raw.includes(Buffer.from("<p>Rich</p>").toString("base64")));
   assert.ok(raw.includes('Content-Type: text/plain; charset="UTF-8"'));
 });
+
+test("agent login email carries the one-time link and its lifetime", () => {
+  const m = renderTemplate("AGENT_LOGIN", mergeTemplate("AGENT_LOGIN"), V, S);
+  assert.ok(m.html.includes("/brand/email/set-password.png"));
+  assert.match(m.text, /Set Your Password: https:\/\/marketplace\.deacna\.com\/invite\/abc/);
+  assert.match(m.text, /for 14 days/);
+});
