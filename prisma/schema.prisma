@@ -312,6 +312,8 @@ model Project {
   interests        InvestorInterest[]
   favorites        Favorite[]
   signatures       SignatureRequest[]
+  comments         ListingComment[]
+  agentEdits       ListingEdit[]
 
   @@index([linkedToId])
 }
@@ -747,4 +749,33 @@ model EmailTemplate {
   footerNote  String   @default("")
   updatedBy   String?
   updatedAt   DateTime @updatedAt
+}
+
+// Listing collaboration with the referral agent(s) who brought the project in (lib/listing-collab.ts).
+// A discussion thread the agent and the DEAC team share on the listing. Investors never see it.
+model ListingComment {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId   String? // the login that wrote it (team member or referral agent)
+  authorName String
+  fromAgent  Boolean  @default(false) // written by a referral agent
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// Edits a referral agent saved on a listing they brought in: an audit trail the DEAC team sees on the listing.
+model ListingEdit {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentId   String? // the referral agent who saved it
+  agentName String
+  changes   String // JSON Change[]: [{ field, from, to }]
+  note      String? // why, in the agent's words
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
 }

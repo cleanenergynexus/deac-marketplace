@@ -12,16 +12,19 @@ export const dynamic = "force-dynamic";
 
 const VIS: Record<string, string> = { DRAFT: "Draft (DEAC review)", PRIVATE: "Live to investors", TEASER: "Live + public teaser" };
 
+/** Linked Sale / Lease / Financing listings share their original listing's data room. */
+const fileCount = (p: { _count: { dataRoomFiles: number }; linkedTo: { _count: { dataRoomFiles: number } } | null }) => (p.linkedTo ?? p)._count.dataRoomFiles;
+
 export default async function AgentListings() {
   const me = await requireAgent();
   const [projects, pipeline] = await Promise.all([
-    db.project.findMany({ where: { AND: [agentProjectWhere(me.id), { linkedToId: null }] }, // linked Lease / Financing copies share the original's data room
-      include: { developer: { select: { company: true, stage: true } }, _count: { select: { dataRoomFiles: true } } }, orderBy: { createdAt: "desc" } }),
+    db.project.findMany({ where: agentProjectWhere(me.id),
+      include: { developer: { select: { company: true, stage: true } }, _count: { select: { dataRoomFiles: true } }, linkedTo: { select: { code: true, _count: { select: { dataRoomFiles: true } } } } }, orderBy: { createdAt: "desc" } }),
     getPipeline(),
   ]);
   return (
     <div className="space-y-6">
-      <PageHeader title="Listings & Data Rooms" subtitle="Projects of the developers you referred. Add documents to a project's data room, or import a new listing." action={<Link href="/agent/import" className="btn">Import a listing</Link>} />
+      <PageHeader title="Listings & Data Rooms" subtitle="Projects of the developers you referred. Open one to see its pipeline and activity, work its tasks and data room, edit its details and talk it through with the DEAC team." action={<Link href="/agent/import" className="btn">Import a listing</Link>} />
       <Section title={`Listings (${projects.length})`}>
         {projects.length ? (
           <div className="overflow-x-auto">
@@ -35,7 +38,7 @@ export default async function AgentListings() {
                     <td className="td text-sm">{num(p.mw)} MW · {placeShort(p)}<div className="text-xs text-slate-500">{usd(p.fundingNeeded)}</div></td>
                     <td className="td text-sm">{projectStageLabel(pipeline, p, p.developer.stage)}</td>
                     <td className="td"><Badge tone={statusTone(p.visibility)}>{VIS[p.visibility] ?? p.visibility}</Badge></td>
-                    <td className="td"><Link href={`/agent/listings/${p.id}#data-room`} className="btn-ghost">{p._count.dataRoomFiles} file{p._count.dataRoomFiles === 1 ? "" : "s"} · Upload</Link></td>
+                    <td className="td"><Link href={`/agent/listings/${p.id}?tab=data-room`} className="btn-ghost">{fileCount(p)} file{fileCount(p) === 1 ? "" : "s"} · Open</Link>{p.linkedTo && <div className="mt-1 text-xs text-slate-500">Shared with {p.linkedTo.code}</div>}</td>
                   </tr>
                 ))}
               </tbody>
