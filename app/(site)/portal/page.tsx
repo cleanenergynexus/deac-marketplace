@@ -80,7 +80,7 @@ export default async function Portal() {
                 <tr key={d.project.id}><td className="td"><Link href={`/marketplace/${d.project.id}`} className="font-medium text-brand-600">{d.project.title}</Link><div className="text-xs text-slate-500">{d.project.code}</div></td><td className="td">{usd(d.amount)}</td>
                   <td className="td"><Badge tone={stage === "TEASER" ? "slate" : "green"}>{STAGE_INFO[stage].label}</Badge></td>
                   <td className="td text-sm">{next.step ? <>{STAGE_INFO[next.step].step}{next.status !== "NONE" && <> · <Badge tone={statusTone(next.status)}>{next.status}</Badge></>}</> : "—"}</td>
-                  <td className="td text-right"><Link href={`/marketplace/${d.project.id}?tab=documents`} className="btn-ghost">Data room</Link></td></tr>
+                  <td className="td text-right"><Link href={`/marketplace/${d.project.id}?tab=dataroom`} className="btn-ghost">Data room</Link></td></tr>
               );
             })}</tbody></table>
         ) : <Empty>Nothing yet. <Link href="/marketplace" className="text-brand-600">Browse opportunities</Link> and sign an NDA to see more.</Empty>}

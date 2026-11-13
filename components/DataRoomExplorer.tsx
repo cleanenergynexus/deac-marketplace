@@ -6,6 +6,7 @@ import { createFolder, createStandardFolders, deleteItems, ensureFolders, moveIt
 import { canMoveFolder, cleanName, descendantIds, fileKind, fileUrl, folderPath, formatBytes, storagePath, uploadDirs } from "@/lib/dataroom";
 import { STAGES, TIER_LABEL, type Stage } from "@/lib/disclosure";
 import { FileIcon, FolderIcon } from "@/components/DataRoomIcons";
+import { DataRoomCheckTree } from "@/components/DataRoomCheckTree";
 
 export type ExFolder = { id: string; parentId: string | null; name: string; updatedAt: string };
 export type ExFile = { id: string; folderId: string | null; name: string; size: number; contentType: string; updatedAt: string; uploadedBy: string | null; shared: Stage | null };
@@ -345,7 +346,7 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
         <ToolButton onClick={() => download(selFileIds)} disabled={!selFileIds.length}>Download</ToolButton>
         <ToolButton onClick={remove} disabled={!sel.length} danger>Delete</ToolButton>
         <Divider />
-        <ToolButton onClick={() => setDialog("share")} disabled={!sel.length} icon="↗">Share on listing</ToolButton>
+        <ToolButton onClick={() => setDialog("share")} disabled={!files.length} icon="↗">Share on listing</ToolButton>
         <div className="ml-auto flex items-center gap-1">
           <ToolButton onClick={() => setView(view === "details" ? "tiles" : "details")}>{view === "details" ? "▦ Icons" : "☰ Details"}</ToolButton>
         </div>
@@ -502,10 +503,11 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
       )}
 
       {dialog === "share" && (
-        <ShareDialog
-          count={selFileIds.length + selFolderIds.reduce((n, id) => n + sizeOf(id).length, 0)}
+        <ShareDialog rootLabel={rootLabel} folders={folders} files={files}
+          initial={[...selFileIds, ...selFolderIds.flatMap((id) => sizeOf(id).map((f) => f.id))]}
           onClose={() => setDialog(null)}
-          onShare={(access) => { setDialog(null); run(() => shareOnListing(projectId, [...selFileIds, ...selFolderIds.flatMap((id) => sizeOf(id).map((f) => f.id))], access, listingId)); }} />
+          onShare={(ids, access) => { setDialog(null); run(() => shareOnListing(projectId, ids, access, listingId)); }}
+          onRemove={(ids) => { setDialog(null); run(() => unshareFromListing(projectId, ids, listingId)); }} />
       )}
       {dialog === "move" && (
         <MoveDialog folders={folders} childFolders={childFolders} rootLabel={rootLabel} moving={selFolderIds}
@@ -613,7 +615,7 @@ function EmptyState({ searching, isRoot, hasAny, canUpload, onStandard, onUpload
   );
 }
 
-function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+function Modal({ title, children, onClose, wide = false }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
@@ -621,7 +623,7 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
-      <div role="dialog" aria-label={title} className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-label={title} className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl bg-white p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 text-lg font-semibold">{title}</h3>
         {children}
       </div>
@@ -629,25 +631,41 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
   );
 }
 
-function ShareDialog({ count, onClose, onShare }: { count: number; onClose: () => void; onShare: (s: Stage) => void }) {
+const TIER_NOTE: Record<Stage, string> = { TEASER: "every approved member", NDA: "after NDA is confirmed", LOI: "after LOI is accepted", DILIGENCE: "after full diligence access" };
+
+/** Pick what to share in one go: the entire data room, whole folders or single files, then one access tier. */
+function ShareDialog({ rootLabel, folders, files, initial, onClose, onShare, onRemove }: {
+  rootLabel: string; folders: ExFolder[]; files: ExFile[]; initial: string[];
+  onClose: () => void; onShare: (ids: string[], s: Stage) => void; onRemove: (ids: string[]) => void;
+}) {
   const [access, setAccess] = useState<Stage>("NDA");
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(initial));
+  const [query, setQuery] = useState("");
+  const ids = files.filter((f) => checked.has(f.id)).map((f) => f.id);
+  const shared = files.filter((f) => checked.has(f.id) && f.shared).map((f) => f.id);
+  const n = ids.length;
   return (
-    <Modal title="Share on Listing" onClose={onClose}>
-      {count ? (
-        <>
-          <p className="mb-3 text-sm text-slate-600">Adds {count} file{count > 1 ? "s" : ""} to the listing&apos;s Documents tab. Investors can open {count > 1 ? "them" : "it"} once they reach this tier. Files already on the listing move to this tier.</p>
-          <div className="space-y-1">
-            {STAGES.map((s) => (
-              <label key={s} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50">
-                <input type="radio" name="tier" checked={access === s} onChange={() => setAccess(s)} />
-                <TierBadge stage={s} />
-                <span className="text-slate-500">{s === "TEASER" ? "every approved member" : s === "NDA" ? "after NDA is confirmed" : s === "LOI" ? "after LOI is accepted" : "after full diligence access"}</span>
-              </label>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost">Cancel</button><button type="button" onClick={() => onShare(access)} className="btn">Share {count} file{count > 1 ? "s" : ""}</button></div>
-        </>
-      ) : <><p className="text-sm text-slate-600">The selected folders have no files yet.</p><div className="mt-4 flex justify-end"><button type="button" onClick={onClose} className="btn-ghost">Close</button></div></>}
+    <Modal title="Share on Listing" onClose={onClose} wide>
+      <p className="mb-3 text-sm text-slate-600">Tick the entire data room, whole folders or single files. They go on the listing&apos;s Documents and Data Room tabs, and investors can open them once they reach the tier you pick. Files already shared move to that tier.</p>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files" className="input mb-2" />
+      <div className="max-h-[45vh] min-h-[180px] overflow-y-auto rounded border border-slate-200 p-1">
+        <DataRoomCheckTree rootLabel={rootLabel} folders={folders} files={files} checked={checked} onChange={setChecked} query={query}
+          note={(f) => f.shared && <TierBadge stage={f.shared} />} />
+      </div>
+      <div className="mt-3 grid gap-1 sm:grid-cols-2">
+        {STAGES.map((s) => (
+          <label key={s} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50">
+            <input type="radio" name="tier" checked={access === s} onChange={() => setAccess(s)} />
+            <TierBadge stage={s} />
+            <span className="text-xs text-slate-500">{TIER_NOTE[s]}</span>
+          </label>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        {shared.length > 0 && <button type="button" onClick={() => onRemove(shared)} className="btn-ghost mr-auto text-red-700 hover:bg-red-50">Remove {shared.length} from listing</button>}
+        <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
+        <button type="button" disabled={!n} onClick={() => onShare(ids, access)} className="btn">Share {n || ""} file{n === 1 ? "" : "s"}</button>
+      </div>
     </Modal>
   );
 }
