@@ -36,7 +36,7 @@ export default async function ProjectDataRoom({ params, searchParams }: { params
   return (
     <div className="space-y-4">
       <Link href={`/admin/projects/${listing.id}`} className="text-sm text-brand-600">← {listing.title}</Link>
-      <PageHeader title="Data Room" subtitle={<>{p.code} · Every file for this project, organized in folders. Only the DEAC team opens these files (referral agents can add files but not open them). Use <b>Share on listing</b> to release files to investors by tier.</>}
+      <PageHeader title="Data Room" subtitle={<>{p.code} · Every file for this project, organized in folders. Only the DEAC team opens these files (referral agents can add files but not open them). Use <b>Share on listing</b> to release the entire data room, whole folders or single files to investors by tier.</>}
         action={<div className="flex flex-wrap gap-2"><Link href={`/admin/projects/${p.id}/data-room/wizard`} className="btn">✨ Document Wizard</Link><Link href={`/admin/projects/${listing.id}#documents`} className="btn-ghost">Listing documents</Link></div>} />
       {group.length > 1 && (
         <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm">

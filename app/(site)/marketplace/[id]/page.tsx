@@ -16,6 +16,7 @@ import { atLeast, docStage, isStage, nextStep, parseDisclosure, STAGES, STAGE_IN
 import { usd, num, date } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { ListingDataRoom, TierPill } from "@/components/ListingDataRoom";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +25,12 @@ const TABS = [
   { key: "sponsor", label: "Sponsor" },
   { key: "economics", label: "Economics" },
   { key: "documents", label: "Documents" },
-  { key: "loi", label: "Letter of Interest" },
+  { key: "dataroom", label: "Data Room" },
+  { key: "loi", label: "Your Status" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 // Links from before the tabs were renamed.
-const OLD_TABS: Record<string, TabKey> = { site: "economics", financials: "economics", intake: "documents" };
-
-const DOC_BADGE: Record<Stage, { label: string; cls: string }> = {
-  TEASER: { label: "Open", cls: "border-emerald-500 text-emerald-700" },
-  NDA: { label: "After NDA", cls: "border-amber-500 text-amber-700" },
-  LOI: { label: "After LOI", cls: "border-red-400 text-red-600" },
-  DILIGENCE: { label: "Full data room", cls: "border-violet-400 text-violet-700" },
-};
+const OLD_TABS: Record<string, TabKey> = { site: "economics", financials: "economics", intake: "documents", status: "loi", "data-room": "dataroom" };
 
 const minStage = (...s: Stage[]) => s.reduce((a, b) => (stageRank(b) < stageRank(a) ? b : a));
 
@@ -70,7 +65,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const can = (need: Stage) => atLeast(stage, need);
   const show = parseDisclosure(p.disclosure);
   const tab: TabKey = TABS.some((t) => t.key === sp.tab) ? (sp.tab as TabKey) : OLD_TABS[sp.tab ?? ""] ?? "overview";
-  const tabNeeds: Record<TabKey, Stage> = { overview: "TEASER", sponsor: show.sponsor, economics: minStage(show.power, show.returns, show.capital), documents: "TEASER", loi: "TEASER" };
+  const tabNeeds: Record<TabKey, Stage> = { overview: "TEASER", sponsor: show.sponsor, economics: minStage(show.power, show.returns, show.capital), documents: "TEASER", dataroom: "TEASER", loi: "TEASER" };
   const href = (t: TabKey) => `/marketplace/${p.id}?tab=${t}${asStage ? `&as=${asStage}` : ""}`;
   const unlockHref = href("loi");
 
@@ -168,6 +163,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         ) : <Blurred need={show.capital} what="The capital stack" labels={["Senior debt", "Equity / mezzanine", "Sponsor equity", "Notes"]} href={unlockHref} />}
       </div>
     );
+  } else if (tab === "dataroom") {
+    // Linked listings (Sale / Lease / Financing) share the original listing's data room; each shares its own files.
+    const shared = docs.filter((d) => d.fileId);
+    const [folders, files] = await Promise.all([
+      db.dataRoomFolder.findMany({ where: { projectId: p.linkedToId ?? p.id }, select: { id: true, parentId: true, name: true } }),
+      db.dataRoomFile.findMany({ where: { id: { in: shared.map((d) => d.fileId!) } }, select: { id: true, folderId: true, name: true, size: true } }),
+    ]);
+    const stageOf = new Map(shared.map((d) => [d.fileId!, d.stage]));
+    body = <ListingDataRoom folders={folders} files={files.map((f) => ({ ...f, stage: stageOf.get(f.id)! }))} stage={stage} />;
   } else if (tab === "documents") {
     body = (
       <div className="space-y-8">
@@ -182,7 +186,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     <span>{open && d.url && d.url !== "#" ? <a href={d.url} target="_blank" rel="noreferrer" className="font-medium text-brand-600 hover:underline">{d.name}</a> : <span className="text-slate-700">{d.name}</span>}{d.category !== "Other" && <span className="ml-2 text-xs text-slate-400">{d.category}</span>}{open && (!d.url || d.url === "#") && <span className="ml-2 text-xs text-slate-400">· being uploaded</span>}</span>
                     <span className="flex items-center gap-3">
                       {open && d.stage !== "TEASER" && <span className="text-xs text-emerald-600">Unlocked</span>}
-                      <span className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${DOC_BADGE[d.stage].cls}`}>{open ? "" : "🔒 "}{DOC_BADGE[d.stage].label}</span>
+                      <TierPill stage={d.stage} open={open} />
                     </span>
                   </li>
                 );
