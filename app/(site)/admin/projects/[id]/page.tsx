@@ -20,6 +20,9 @@ import { assigneeOptions, staffLevel } from "@/lib/tasks";
 import { getTaskEditing, getTaskPeople, getTaskPickers, visibleTaskWhere } from "@/lib/tasks-db";
 import { TaskForm } from "@/components/TaskForm";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { Discussion, EditLog } from "@/components/ListingCollab";
+import { CommentForm } from "@/components/ListingCollabForms";
+import { listingAgents, listingCollab } from "@/lib/listing-collab-db";
 import { docStage, investorStage, parseDisclosure, SECTIONS, STAGES, STAGE_INFO, type StepStatus } from "@/lib/disclosure";
 
 const stageOptions = STAGES.map((s) => ({ value: s, label: `${STAGE_INFO[s].step}${s === "TEASER" ? " (all members)" : ""}` }));
@@ -45,7 +48,7 @@ export default async function ProjectAdmin({ params, searchParams }: { params: P
     : await db.project.findUniqueOrThrow({ where: { id: root }, select: { dataRoomFolders: { select: { id: true, parentId: true, name: true } }, dataRoomFiles: { select: { id: true, folderId: true, name: true } } } }).then((r) => ({ folders: r.dataRoomFolders, files: r.dataRoomFiles }));
   // Tasks about this project, limited to the ones this team member may see.
   const [me, people] = await Promise.all([requireAdmin(), getTaskPeople()]);
-  const [tasks, pickers, editing] = await Promise.all([
+  const [tasks, pickers, editing, agents, collab] = await Promise.all([
     db.activity.findMany({
       where: { AND: [visibleTaskWhere(me, people), { projectId: id }] },
       include: { contact: { select: { id: true, name: true } }, investor: { select: { id: true, name: true } }, project: { select: { id: true, code: true, title: true } }, assignee: { select: { id: true, name: true } } },
@@ -54,6 +57,8 @@ export default async function ProjectAdmin({ params, searchParams }: { params: P
     }),
     getTaskPickers(),
     getTaskEditing(me, people),
+    listingAgents(p.developerId),
+    listingCollab(id),
   ]);
   const assignees = assigneeOptions(me, people);
   const allowUnassigned = staffLevel(me.staffLevel) === "ADMIN";
@@ -160,6 +165,28 @@ export default async function ProjectAdmin({ params, searchParams }: { params: P
           <ActivityFeed items={tasks} showContact assigning={{ options: assignees, allowUnassigned }} editing={editing} empty="No tasks on this project yet. Assign one to a team member or a referral agent above." />
         </Section>
       </div>
+
+      {(agents.length > 0 || collab.comments.length > 0 || collab.edits.length > 0) && (
+        <div id="collaboration" className="scroll-mt-4">
+          <Section title="Referral Agent Collaboration">
+            <p className="mb-4 text-sm text-slate-600">
+              {agents.length ? <>Brought in by {agents.map((a) => a.name).join(", ")}. </> : null}
+              Referral agents see this listing&apos;s CRM stages, investor pipeline and activity, its tasks and its whole data room. They can edit its details (logged below), add tasks for themselves or the team, and talk it through here. Investors never see this discussion.
+            </p>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Discussion</h3>
+                <Discussion comments={collab.comments} meId={me.id} empty="No messages yet." />
+                <div className="mt-3"><CommentForm projectId={p.id} team placeholder={agents.length ? `Message ${agents.map((a) => a.name.split(" ")[0]).join(" and ")}…` : "Write a message…"} /></div>
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">Edits by Referral Agents</h3>
+                <EditLog edits={collab.edits} empty="No edits by referral agents yet." />
+              </div>
+            </div>
+          </Section>
+        </div>
+      )}
 
       <div id="valuation">
         <Section title="Valuation & Lead Score (Internal Only)">

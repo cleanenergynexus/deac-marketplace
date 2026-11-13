@@ -15,6 +15,11 @@ import { allStages, funnelStages, placeStage } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
 import { importedValuation, projectData } from "@/lib/project-form";
 import { sendEmail } from "@/lib/email";
+import { parseWhen } from "@/lib/crm";
+import { notifyTaskAssignee } from "@/lib/task-mail";
+import { AGENT_EDIT_FIELDS, agentAssigneeOptions, changesToData, diffListingEdit, editLabel, showValue } from "@/lib/listing-collab";
+import { taskTeam } from "@/lib/listing-collab-db";
+import { syncLinkedListings } from "@/lib/listing-links-db";
 
 type State = { error?: string; ok?: boolean } | undefined;
 type Agent = Awaited<ReturnType<typeof requireAgentToAct>>;
@@ -230,4 +235,91 @@ export async function toggleAgentTask(f: FormData) {
   }
   revalidatePath("/agent", "layout");
   revalidatePath("/admin", "layout");
+}
+
+// ---------- Collaborating on a listing the agent brought in ----------
+
+const revalidateListing = (projectId: string) => {
+  revalidatePath(`/agent/listings/${projectId}`);
+  revalidatePath("/agent", "layout");
+  revalidatePath(`/admin/projects/${projectId}`);
+};
+
+/** A task on the agent's listing, for themselves or anyone on the DEAC team. The assignee gets an email. */
+export async function agentCreateTask(_: State, f: FormData): Promise<State> {
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
+  const p = await agentProject(agent.id, String(f.get("projectId") ?? ""));
+  if (!p) return { error: "That listing isn't one of yours." };
+  const subject = s(f, "subject");
+  if (!subject) return { error: "Give the task a title." };
+  const options = agentAssigneeOptions(agent, await taskTeam());
+  const assigneeId = s(f, "assigneeId") ?? agent.id;
+  if (!options.some((o) => o.id === assigneeId)) return { error: "Pick yourself or someone on the DEAC team." };
+  const task = await db.activity.create({
+    data: { kind: "TASK", subject: subject.slice(0, 200), body: (s(f, "body") ?? "").slice(0, 5000), dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)), assigneeId, by: agent.name, developerId: p.developerId, projectId: p.id },
+  });
+  await notifyTaskAssignee(task, agent);
+  revalidateListing(p.id);
+  revalidatePath("/admin", "layout");
+  return { ok: true };
+}
+
+/** Ticks off (or reopens) a task on the agent's listing that is theirs, or that they created. */
+export async function toggleListingTask(f: FormData) {
+  const agent = await actor();
+  if (!agent) return;
+  const t = await db.activity.findFirst({ where: { id: String(f.get("id")), kind: "TASK", projectId: { not: null } } });
+  if (!t?.projectId || !(await agentProject(agent.id, t.projectId))) throw new Error("That task isn't on one of your listings.");
+  if (t.assigneeId !== agent.id && t.by !== agent.name) throw new Error("You can tick off tasks assigned to you or that you created.");
+  await db.activity.update({ where: { id: t.id }, data: { doneAt: t.doneAt ? null : new Date() } });
+  revalidateListing(t.projectId);
+  revalidatePath("/admin", "layout");
+}
+
+/** A message in the listing's discussion with the DEAC team. The agent's partner gets an email. */
+export async function agentPostComment(_: State, f: FormData): Promise<State> {
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
+  const p = await agentProject(agent.id, String(f.get("projectId") ?? ""));
+  if (!p) return { error: "That listing isn't one of yours." };
+  const body = s(f, "body")?.slice(0, 5000);
+  if (!body) return { error: "Write a message first." };
+  await db.listingComment.create({ data: { projectId: p.id, authorId: agent.id, authorName: agent.name, fromAgent: true, body } });
+  const partner = await partnerOf(agent);
+  if (partner) {
+    await sendEmail({ to: partner.email, toName: partner.name, subject: `${agent.name} commented on ${p.code}`, text: `${agent.name} wrote on ${p.code} · ${p.title}:\n\n${body}\n\nReply on the listing: ${appUrl()}/admin/projects/${p.id}#collaboration\n\n— DEAC Marketplace` }).catch((e) => console.error("[agent] couldn't email the partner", e));
+  }
+  revalidateListing(p.id);
+  return { ok: true };
+}
+
+/**
+ * Saves the agent's edits to their listing's details. Only the fields in AGENT_EDIT_FIELDS can change; each save is
+ * logged (old → new) on the listing and the project timeline, and the agent's partner gets an email.
+ */
+export async function agentEditListing(_: State, f: FormData): Promise<State> {
+  const agent = await actor();
+  if (!agent) return { error: PREVIEW_MESSAGE };
+  const p = await agentProject(agent.id, String(f.get("projectId") ?? ""));
+  if (!p) return { error: "That listing isn't one of yours." };
+  const submitted = Object.fromEntries(AGENT_EDIT_FIELDS.filter((x) => f.has(x.key)).map((x) => [x.key, f.get(x.key)]));
+  const { changes, invalid } = diffListingEdit(p, submitted);
+  if (invalid.length) return { error: `Check ${invalid.join(", ")}.` };
+  if (!changes.length) return { error: "Nothing changed." };
+  const note = s(f, "note")?.slice(0, 1000) ?? null;
+  const data = changesToData(changes);
+  await db.project.update({ where: { id: p.id }, data });
+  // Project facts (MW, location, status, power...) stay the same on linked Sale / Lease / Financing listings.
+  for (const other of await syncLinkedListings(p.id, data)) revalidateListing(other);
+  await db.listingEdit.create({ data: { projectId: p.id, agentId: agent.id, agentName: agent.name, changes: JSON.stringify(changes), note } });
+  const lines = changes.map((c) => `${editLabel(c.field)}: ${showValue(c.field, c.from)} → ${showValue(c.field, c.to)}`);
+  await db.activity.create({ data: { developerId: p.developerId, projectId: p.id, kind: "SYSTEM", by: agent.name, body: `${agent.name} edited the ${p.code} listing: ${changes.map((c) => editLabel(c.field)).join(", ")}.${note ? ` Note: ${note}` : ""}` } });
+  const partner = await partnerOf(agent);
+  if (partner) {
+    await sendEmail({ to: partner.email, toName: partner.name, subject: `${agent.name} edited ${p.code}`, text: `${agent.name} changed ${p.code} · ${p.title}:\n\n${lines.map((l) => `• ${l}`).join("\n")}${note ? `\n\nNote: ${note}` : ""}\n\nReview it: ${appUrl()}/admin/projects/${p.id}#collaboration\n\n— DEAC Marketplace` }).catch((e) => console.error("[agent] couldn't email the partner", e));
+  }
+  revalidateListing(p.id);
+  revalidatePath("/marketplace", "layout");
+  return { ok: true };
 }

@@ -44,9 +44,9 @@ export default async function Agents() {
         </Link>
       )}
       <div className="grid gap-3 text-sm sm:grid-cols-3">
-        <div className="card p-4"><b>Sees</b><p className="mt-1 text-slate-600">Only the contacts marked &quot;Referred by&quot; them (and, for a developer company they referred, its contacts and projects), plus the activity logged on them. View only.</p></div>
-        <div className="card p-4"><b>Can do</b><p className="mt-1 text-slate-600">Refer new contacts, import a listing (saved as a draft for review), upload documents to their projects&apos; data rooms, and request meetings.</p></div>
-        <div className="card p-4"><b>Can&apos;t do</b><p className="mt-1 text-slate-600">Open or download data room files, see other contacts or listings, or change anything in the CRM.</p></div>
+        <div className="card p-4"><b>Sees</b><p className="mt-1 text-slate-600">Only the contacts marked &quot;Referred by&quot; them (and, for a developer company they referred, its contacts and projects), plus the activity logged on them. On listings they brought in: the CRM stage, investor pipeline, activity, tasks and the whole data room.</p></div>
+        <div className="card p-4"><b>Can do</b><p className="mt-1 text-slate-600">Refer new contacts, import a listing (saved as a draft for review), request meetings. On listings they brought in: edit the details (logged for you), add tasks for themselves or the team, open, download and upload data room files, and message the team.</p></div>
+        <div className="card p-4"><b>Can&apos;t do</b><p className="mt-1 text-slate-600">See other contacts or listings, change a listing&apos;s deal type, stage, visibility or investor documents, or change anything else in the CRM.</p></div>
       </div>
       <Section title={`Agents (${agents.length})`}>
         {agents.length ? (

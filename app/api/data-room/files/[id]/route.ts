@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { currentUser, listingAccess } from "@/lib/auth";
+import { currentUser, isOriginator, listingAccess } from "@/lib/auth";
 import { atLeast, docStage } from "@/lib/disclosure";
 import { inlineSafe } from "@/lib/dataroom";
 import { openStored } from "@/lib/storage";
@@ -8,8 +8,9 @@ import { openStored } from "@/lib/storage";
 export const dynamic = "force-dynamic";
 
 /**
- * Opens a data room file. The DEAC team can open anything; an investor only a file shared on a
- * listing they can see, once they've reached that document's access tier.
+ * Opens a data room file. The DEAC team can open anything, and a referral agent anything in the data room of a
+ * listing they brought in; an investor only a file shared on a listing they can see, once they've reached that
+ * document's access tier.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,10 +20,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // and each listing decides its own access tier. The investor needs access through at least one of them.
   const file = await db.dataRoomFile.findUnique({ where: { id }, include: { documents: { select: { access: true, projectId: true, project: { select: { visibility: true } } } } } });
   if (!file) return new NextResponse("Not found", { status: 404 });
-  // Referral agents never open the internal data room. Like investors, they open only files shared on a live listing,
-  // at their level: Teaser everywhere, everything on listings they originated (see listingAccess).
+  // Referral agents open the whole data room of a listing they brought in (lib/agents.ts agentProjectWhere), drafts
+  // included. Elsewhere, like investors, they open only files shared on a live listing at the Teaser level.
+  const agentsOwn = u.role === "AGENT" && u.status === "APPROVED" && (await isOriginator(u.id, file.projectId));
 
-  if (u.role !== "ADMIN") {
+  if (u.role !== "ADMIN" && !agentsOwn) {
     const member = (u.role === "INVESTOR" || u.role === "AGENT") && u.status === "APPROVED";
     const live = file.documents.filter((d) => d.project.visibility !== "DRAFT");
     if (!member || !live.length) return new NextResponse("Not found", { status: 404 });

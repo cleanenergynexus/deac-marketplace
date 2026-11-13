@@ -11,7 +11,7 @@ type Job = { id: number; name: string; size: number; pct: number; status: "uploa
 const MULTIPART_OVER = 50 * 1024 * 1024;
 let seq = 0;
 
-/** Upload-only data room box for referral agents: pick a folder, add files. Nothing here opens or downloads a file. */
+/** Data room upload box for referral agents: pick a folder, add files. (Opening and downloading is on the listing page.) */
 export function AgentUploader({ projectId, folders, storage, uploadMethod }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();

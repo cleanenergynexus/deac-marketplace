@@ -29,7 +29,7 @@ export async function notifyTaskAssignee(task: MailTask, by: { id: string; name:
       ...(project ? [`Project: ${project.code} · ${project.title}`] : []),
     ];
     // Referral agents work from their portal, so their link goes to their task list there.
-    const link = assignee.role === "AGENT" ? `${appUrl()}/agent/tasks` : `${appUrl()}${task.contactId ? `/admin/developers/contacts/${task.contactId}?tab=tasks` : task.investorId ? `/admin/investors/${task.investorId}?tab=tasks` : "/admin/tasks"}`;
+    const link = assignee.role === "AGENT" ? `${appUrl()}/agent/tasks` : `${appUrl()}${task.contactId ? `/admin/developers/contacts/${task.contactId}?tab=tasks` : task.investorId ? `/admin/investors/${task.investorId}?tab=tasks` : task.projectId ? `/admin/projects/${task.projectId}#tasks` : "/admin/tasks"}`;
     const mail = taskAssignedEmail({ assigneeName: assignee.name, byName: by.name, title: task.subject || "Task", body: task.body, due: task.dueAt, about, link });
     const res = await sendEmail({ to: assignee.email, toName: assignee.name, fromUserId: by.id, ...mail });
     if (res.status === "FAILED") console.error("[task-mail] couldn't email the assignee", res.error);
