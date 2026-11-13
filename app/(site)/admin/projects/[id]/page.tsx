@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { deleteProject, grantStage, reviewDealStep, reviewLoi, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
+import { deleteProject, duplicateListing, grantStage, reviewDealStep, reviewLoi, saveDisclosure, saveValuation, updateProject } from "@/app/actions/admin";
+import { listingGroup } from "@/lib/listing-links-db";
+import { dealShort, groupRootId } from "@/lib/listing-links";
+import { DuplicateListingForm } from "@/components/DuplicateListingForm";
+import { DEAL_STAGES, dealTypeLabel } from "@/lib/constants";
 import { ProjectForm } from "@/components/ProjectForm";
 import { StageSelect } from "@/components/StageSelect";
 import { funnelStages, projectStage } from "@/lib/pipeline";
@@ -22,8 +26,9 @@ const stageOptions = STAGES.map((s) => ({ value: s, label: `${STAGE_INFO[s].step
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectAdmin({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectAdmin({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ duplicated?: string }> }) {
   const { id } = await params;
+  const { duplicated } = await searchParams;
   const [p, developers, investors, scoring, pipeline] = await Promise.all([
     db.project.findUnique({ where: { id }, include: { documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] }, dataRoomFolders: { select: { id: true, parentId: true, name: true } }, dataRoomFiles: { select: { id: true, folderId: true, name: true } }, lois: { include: { investor: true } }, dealSteps: { include: { investor: true } }, developer: true } }),
     db.developer.findMany({ select: { id: true, company: true }, orderBy: { company: "asc" } }),
@@ -32,6 +37,12 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
     getPipeline(),
   ]);
   if (!p) notFound();
+  // Linked listings: the same project for Sale / Lease / Financing. They share the original listing's data room.
+  const group = await listingGroup(p.id);
+  const root = groupRootId(p);
+  const room = root === p.id
+    ? { folders: p.dataRoomFolders, files: p.dataRoomFiles }
+    : await db.project.findUniqueOrThrow({ where: { id: root }, select: { dataRoomFolders: { select: { id: true, parentId: true, name: true } }, dataRoomFiles: { select: { id: true, folderId: true, name: true } } } }).then((r) => ({ folders: r.dataRoomFolders, files: r.dataRoomFiles }));
   // Tasks about this project, limited to the ones this team member may see.
   const [me, people] = await Promise.all([requireAdmin(), getTaskPeople()]);
   const [tasks, pickers, editing] = await Promise.all([
@@ -72,10 +83,34 @@ export default async function ProjectAdmin({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <Link href="/admin/projects" className="text-sm text-brand-600">← Listings</Link>
       <PageHeader title={p.title} subtitle={<>{p.code} · <Link href={`/admin/developers/${p.developerId}`} className="text-brand-600">{p.developer.company}</Link> · <Badge tone={statusTone(p.visibility)}>{p.visibility}</Badge></>}
-        action={<div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">CRM stage</span><StageSelect projectId={p.id} stage={projectStage(pipeline, p, p.developer.stage)} stages={funnelStages(pipeline, p.dealType)} className="w-44" /><Link href={`/admin/projects/${p.id}/screening`} className="btn-ghost">🔎 Screening</Link><Link href={`/admin/projects/${p.id}/data-room`} className="btn-ghost">📁 Data room{p.dataRoomFiles.length ? ` (${p.dataRoomFiles.length})` : ""}</Link><Link href={`/admin/investors?listing=${p.id}`} className="btn-ghost">Investors</Link><Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link></div>} />
-      <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} deleteAction={deleteProject}
+        action={<div className="flex flex-wrap items-center gap-2"><span className="text-sm text-slate-500">CRM stage</span><StageSelect projectId={p.id} stage={projectStage(pipeline, p, p.developer.stage)} stages={funnelStages(pipeline, p.dealType)} className="w-44" /><Link href={`/admin/projects/${p.id}/screening`} className="btn-ghost">🔎 Screening</Link><Link href={`/admin/projects/${p.id}/data-room`} className="btn-ghost">📁 Data room{room.files.length ? ` (${room.files.length})` : ""}</Link><a href="#linked" className="btn-ghost">⧉ Duplicate</a><Link href={`/admin/investors?listing=${p.id}`} className="btn-ghost">Investors</Link><Link href={`/marketplace/${p.id}`} className="btn-ghost">Preview as investor</Link></div>} />
+      {duplicated && (
+        <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-900">
+          <b>Linked listing created as a draft.</b> It shares the data room and project facts with {group.filter((g) => g.id !== p.id).map((g) => `${g.code} (${dealShort(g.dealType)})`).join(", ")}. Set its pricing, terms and documents below, then change Visibility to publish it.
+        </div>
+      )}
+      <Section title="Listing"><ProjectForm p={p} developers={developers} action={updateProject} deleteAction={deleteProject} linkedCount={group.length - 1}
         documents={p.documents.map((d) => ({ id: d.id, name: d.name, url: d.url === "#" ? "" : d.url, access: docStage(d.access), ...(d.fileId && { fileId: d.fileId }) }))}
-        dataRoom={{ projectId: p.id, folders: p.dataRoomFolders, files: p.dataRoomFiles }} /></Section>
+        dataRoom={{ projectId: root, folders: room.folders, files: room.files }} /></Section>
+
+      <div id="linked" className="scroll-mt-4">
+        <Section title="Linked Listings (Sale, Lease, Financing)">
+          <p className="mb-4 text-sm text-slate-600">Market this same project under another deal type. A duplicate is a linked listing: it shares this project&apos;s data room, screening and valuation, and the project facts marked 🔗 above stay in sync when you save any of them. Title, summary, highlights, pricing, terms, deal stage, visibility, disclosure, the documents investors see, investor access and LOIs stay separate for each listing.</p>
+          {group.length > 1 && (
+            <table className="mb-4 w-full"><thead><tr><th className="th">Listing</th><th className="th">Deal type</th><th className="th">Deal stage</th><th className="th">Visibility</th><th className="th"></th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{group.map((g) => (
+                <tr key={g.id} className={g.id === p.id ? "bg-slate-50" : ""}>
+                  <td className="td"><span className="font-mono text-xs">{g.code}</span> {g.id === p.id ? <span className="font-medium">{g.title}</span> : <Link href={`/admin/projects/${g.id}`} className="font-medium text-brand-600">{g.title}</Link>}{!g.linkedToId && <span className="ml-2 text-xs text-slate-500">original · owns the data room</span>}</td>
+                  <td className="td text-sm">{dealTypeLabel(g.dealType)}</td>
+                  <td className="td text-sm">{DEAL_STAGES.find((x) => x.value === g.dealStage)?.label ?? g.dealStage}</td>
+                  <td className="td"><Badge tone={statusTone(g.visibility)}>{g.visibility}</Badge></td>
+                  <td className="td text-right">{g.id === p.id ? <span className="text-xs text-slate-400">this listing</span> : <Link href={`/admin/investors?listing=${g.id}`} className="text-xs text-brand-600">Investors</Link>}</td>
+                </tr>
+              ))}</tbody></table>
+          )}
+          <DuplicateListingForm id={p.id} title={p.title} dealType={p.dealType} fundingNeeded={p.fundingNeeded} used={group.map((g) => g.dealType)} action={duplicateListing} />
+        </Section>
+      </div>
 
       <div id="disclosure">
         <Section title="Investor Disclosure" action={<Link href={`/marketplace/${p.id}?as=TEASER`} className="text-sm text-brand-600">Preview by stage</Link>}>

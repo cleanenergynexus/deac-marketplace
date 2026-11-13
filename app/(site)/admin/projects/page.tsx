@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function Projects({ searchParams }: { searchParams: Promise<{ sort?: string }> }) {
   const sp = await searchParams;
   const scoring = await getScoring();
-  const ps = await db.project.findMany({ include: { developer: true, _count: { select: { lois: true } } }, orderBy: sp.sort === "score" ? { valueScore: "desc" } : { updatedAt: "desc" } });
+  const ps = await db.project.findMany({ include: { developer: true, linkedTo: { select: { code: true } }, _count: { select: { lois: true, linked: true } } }, orderBy: sp.sort === "score" ? { valueScore: "desc" } : { updatedAt: "desc" } });
   return (
     <div>
       <PageHeader title="Listings & Leads" subtitle="Every project, from scored lead to live listing." action={<div className="flex gap-2"><Link href="/admin/projects/import" className="btn-ghost">Import from web page or document</Link><Link href="/admin/projects/new" className="btn">New listing</Link></div>} />
@@ -23,7 +23,7 @@ export default async function Projects({ searchParams }: { searchParams: Promise
             <tbody className="divide-y divide-slate-100">{ps.map((p) => (
               <tr key={p.id} className="hover:bg-slate-50">
                 <td className="td font-mono text-xs">{p.code}</td>
-                <td className="td"><Link href={`/admin/projects/${p.id}`} className="font-medium text-brand-600">{p.title}</Link><div className="text-xs text-slate-500">{dealTypeLabel(p.dealType)} · {placeShort(p)}</div></td>
+                <td className="td"><Link href={`/admin/projects/${p.id}`} className="font-medium text-brand-600">{p.title}</Link><div className="text-xs text-slate-500">{dealTypeLabel(p.dealType)} · {placeShort(p)}{p.linkedTo ? <> · 🔗 linked to {p.linkedTo.code}</> : p._count.linked ? <> · 🔗 {p._count.linked} linked listing{p._count.linked > 1 ? "s" : ""}</> : null}</div></td>
                 <td className="td text-sm">{p.developer.company}</td>
                 <td className="td">{num(p.mw, 1)}</td>
                 <td className="td text-xs">{p.facilityType}</td>

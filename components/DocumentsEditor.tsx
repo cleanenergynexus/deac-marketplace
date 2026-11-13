@@ -80,10 +80,12 @@ export function DocumentsEditor({ initial, dataRoom }: { initial: DocRow[]; data
 }
 
 /** Deletes the listing (submits the surrounding form to `action`) after a confirmation. */
-export function DeleteListingButton({ action, title }: { action: (f: FormData) => Promise<void>; title: string }) {
+export function DeleteListingButton({ action, title, linked = false }: { action: (f: FormData) => Promise<void>; title: string; linked?: boolean }) {
   return (
     <button type="submit" formAction={action} formNoValidate className="btn-ghost text-red-700 hover:bg-red-50"
-      onClick={(e) => { if (!confirm(`Delete "${title}"? This removes the listing, its documents and data room files, NDAs, LOIs and analysis requests. It can't be undone.`)) e.preventDefault(); }}>
+      onClick={(e) => { if (!confirm(linked
+        ? `Delete "${title}"? This removes the listing, its documents, NDAs, LOIs and analysis requests. The shared data room stays with the linked listings. It can't be undone.`
+        : `Delete "${title}"? This removes the listing, its documents and data room files, NDAs, LOIs and analysis requests. It can't be undone.`)) e.preventDefault(); }}>
       Delete Listing
     </button>
   );

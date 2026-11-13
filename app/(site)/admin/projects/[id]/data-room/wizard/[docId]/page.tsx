@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { dataRoomProjectId } from "@/lib/listing-links-db";
 import { db } from "@/lib/db";
 import { fileUrl } from "@/lib/dataroom";
 import { storageMode } from "@/lib/storage";
@@ -12,6 +13,9 @@ export const maxDuration = 300; // "Write again" runs Claude after the action re
 
 export default async function WizardDocPage({ params }: { params: Promise<{ id: string; docId: string }> }) {
   const { id, docId } = await params;
+  // Linked listings (Sale / Lease / Financing of one project) share the original listing's data room.
+  const root = await dataRoomProjectId(id);
+  if (root !== id) redirect(`/admin/projects/${root}/data-room/wizard/${docId}`);
   const d = await db.wizardDocument.findFirst({ where: { id: docId, projectId: id }, include: { project: { select: { code: true, title: true } } } });
   if (!d) notFound();
   const saved = await db.dataRoomFile.findMany({ where: { projectId: id, id: { in: [d.fileId, d.pptxFileId].filter((x): x is string => !!x) } }, select: { id: true, name: true, folderId: true } });

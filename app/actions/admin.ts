@@ -24,6 +24,9 @@ import { addressFromForm } from "@/lib/address";
 import { firmIdFor, touchInterest } from "@/lib/investor-crm-db";
 import { importedValuation, projectData } from "@/lib/project-form";
 import { referrerFromForm } from "@/lib/agents-db";
+import { dataRoomProjectId, syncLinkedListings } from "@/lib/listing-links-db";
+import { dealShort, groupRootId } from "@/lib/listing-links";
+import { DEAL_TYPES } from "@/lib/constants";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -282,12 +285,15 @@ export async function updateProject(f: FormData) {
   // A new deal type means a different funnel: keep the column if that funnel has it, otherwise start at its first column.
   const pipelineStage = before.dealType === data.dealType ? undefined : projectStage(await getPipeline(), { dealType: data.dealType, pipelineStage: before.pipelineStage }, before.developer.stage);
   await db.project.update({ where: { id }, data: { ...data, pipelineStage, monthsToPower: data.monthsToPower ?? undefined } });
+  // Linked listings (same project for Sale / Lease / Financing) get the project facts too.
+  const synced = await syncLinkedListings(id, { ...data, monthsToPower: data.monthsToPower ?? undefined });
   // The editor sends the whole document list; make the project's documents match it.
   const rows = parseDocRows(f.get("documents"));
   if (rows) {
     const plan = planDocChanges(await db.document.findMany({ where: { projectId: id } }), rows);
-    // Data room picks must be files of this project; their link points at the access-checked download route.
-    const ownFiles = new Set((await db.dataRoomFile.findMany({ where: { projectId: id, id: { in: plan.create.flatMap((r) => r.fileId ?? []) } }, select: { id: true } })).map((f) => f.id));
+    // Data room picks must be files of this project's data room (shared by linked listings); their link points at the access-checked download route.
+    const room = await dataRoomProjectId(id);
+    const ownFiles = new Set((await db.dataRoomFile.findMany({ where: { projectId: room, id: { in: plan.create.flatMap((r) => r.fileId ?? []) } }, select: { id: true } })).map((f) => f.id));
     const creates = plan.create.filter((r) => !r.fileId || ownFiles.has(r.fileId));
     await db.$transaction([
       db.document.deleteMany({ where: { projectId: id, id: { in: plan.remove } } }),
@@ -295,16 +301,71 @@ export async function updateProject(f: FormData) {
       ...creates.map((r) => db.document.create({ data: { projectId: id, name: r.name, url: r.fileId ? fileUrl(r.fileId) : r.url, access: r.access, category: "Other", fileId: r.fileId ?? null } })),
     ]);
   }
-  revalidatePath(`/admin/projects/${id}`);
-  revalidatePath(`/marketplace/${id}`);
+  for (const x of [id, ...synced]) {
+    revalidatePath(`/admin/projects/${x}`);
+    revalidatePath(`/marketplace/${x}`);
+  }
   revalidatePath("/marketplace");
+}
+
+/**
+ * Duplicates a listing as a linked listing with another deal type (e.g. the Sale listing re-marketed for Lease).
+ * The copy shares the original's data room, screening and valuation, and project facts stay in sync; pricing,
+ * terms, deal stage, visibility, documents shown to investors and investor access are its own from here on.
+ */
+export async function duplicateListing(f: FormData) {
+  const admin = await requireAdmin();
+  const id = String(f.get("id"));
+  const dealType = String(f.get("dealType") ?? "");
+  if (!DEAL_TYPES.some((t) => t.value === dealType)) throw new Error("Pick a deal type for the new listing.");
+  const src = await db.project.findUniqueOrThrow({ where: { id }, include: { documents: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } } });
+  const root = groupRootId(src);
+  const {
+    id: _id, code: _code, createdAt: _c, updatedAt: _u, linkedToId: _l, documents,
+    ...copy
+  } = src;
+  const count = await db.project.count();
+  const p = await db.project.create({
+    data: {
+      ...copy,
+      title: s(f, "title") ?? src.title,
+      dealType,
+      fundingNeeded: n(f, "fundingNeeded") ?? src.fundingNeeded,
+      term: dealType === src.dealType ? src.term : null,
+      dealStage: "MARKETING",
+      visibility: "DRAFT",
+      pipelineStage: placeStage(funnelStages(await getPipeline(), dealType), null),
+      code: `DEAC-${codeRegion(src)}-${String(count + 1).padStart(3, "0")}`,
+      linkedToId: root,
+      // Start from the same documents; from here on each listing chooses what its investors see.
+      documents: { create: documents.map((d) => ({ name: d.name, category: d.category, url: d.url, access: d.access, fileId: d.fileId })) },
+    },
+  });
+  await db.activity.create({ data: { developerId: src.developerId, projectId: p.id, kind: "SYSTEM", by: admin.name, body: `${p.code} (${dealShort(dealType)}) duplicated from ${src.code} (${dealShort(src.dealType)}). Project facts and the data room stay in sync between them.` } });
+  revalidatePath("/admin/projects");
+  revalidatePath(`/admin/projects/${id}`);
+  redirect(`/admin/projects/${p.id}?duplicated=1`);
 }
 /** Deletes a listing and everything attached to it. */
 export async function deleteProject(f: FormData) {
   const admin = await requireAdmin();
   const id = String(f.get("id"));
-  const p = await db.project.findUnique({ where: { id } });
+  const p = await db.project.findUnique({ where: { id }, include: { linked: { select: { id: true }, orderBy: { createdAt: "asc" } } } });
   if (!p) redirect("/admin/projects");
+  // Deleting an original that has linked listings: the oldest linked listing takes over the shared data room,
+  // screening and wizard drafts, and becomes the group's original.
+  if (p.linked.length) {
+    const [heir, ...rest] = p.linked.map((x) => x.id);
+    await db.$transaction([
+      db.project.update({ where: { id: heir }, data: { linkedToId: null } }),
+      db.project.updateMany({ where: { id: { in: rest } }, data: { linkedToId: heir } }),
+      db.dataRoomFolder.updateMany({ where: { projectId: id }, data: { projectId: heir } }),
+      db.dataRoomFile.updateMany({ where: { projectId: id }, data: { projectId: heir } }),
+      db.wizardDocument.updateMany({ where: { projectId: id }, data: { projectId: heir } }),
+      db.screening.deleteMany({ where: { projectId: heir } }),
+      db.screening.updateMany({ where: { projectId: id }, data: { projectId: heir } }),
+    ]);
+  }
   const stored = await db.dataRoomFile.findMany({ where: { projectId: id }, select: { storageKey: true } });
   await db.$transaction([
     db.loi.deleteMany({ where: { projectId: id } }),
@@ -359,7 +420,9 @@ export async function grantStage(f: FormData) {
 export async function saveValuation(projectId: string, inputs: ValuationInputs) {
   await requireAdmin();
   const r = evaluate(inputs, await getScoring());
-  const p = await db.project.update({ where: { id: projectId }, data: { valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw } });
+  const scored = { valuationInputs: JSON.stringify(inputs), valueScore: r.score, adjustedValueMw: r.adjustedValueMw };
+  const p = await db.project.update({ where: { id: projectId }, data: scored });
+  for (const x of await syncLinkedListings(projectId, scored)) revalidatePath(`/admin/projects/${x}`);
   const dev = await db.developer.findUnique({ where: { id: p.developerId } });
   if (dev && ["LEAD", "SCREENING"].includes(dev.stage) && allStages(await getPipeline()).some((s) => s.value === "SCORED")) await db.developer.update({ where: { id: dev.id }, data: { stage: "SCORED" } });
   await db.activity.create({ data: { developerId: p.developerId, kind: "SYSTEM", body: `${p.code} scored ${r.score} (${r.recommendation.label}); market value $${Math.round(r.adjustedValueMw).toLocaleString()}/MW.` } });

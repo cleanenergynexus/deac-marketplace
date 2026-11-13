@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { placeShort } from "@/lib/location";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { agentView } from "@/lib/auth";
 import { agentContactWhere, agentProjectWhere, PUBLIC_TO_AGENTS } from "@/lib/agents";
@@ -35,6 +35,8 @@ export default async function AgentListing({ params, searchParams }: { params: P
     },
   });
   if (!p) notFound();
+  // A linked listing (same project re-marketed for Lease / Financing) uploads into its original's data room.
+  if (p.linkedToId) redirect(`/agent/listings/${p.linkedToId}`);
   const [pipeline, activity, mine] = await Promise.all([
     getPipeline(),
     db.activity.findMany({

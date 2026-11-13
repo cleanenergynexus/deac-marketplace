@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { syncLinkedListings } from "@/lib/listing-links-db";
 import { requireAdmin } from "@/lib/auth";
 import { syncPrimaryContact } from "@/lib/contacts-db";
 import { isLogKind, parseWhen } from "@/lib/crm";
@@ -102,6 +103,7 @@ export async function setProjectContact(f: FormData) {
   const p = await db.project.findUniqueOrThrow({ where: { id: projectId } });
   if (contactId && !(await db.contact.count({ where: { id: contactId, developerId: p.developerId } }))) throw new Error("That contact is not at this project's company.");
   await db.project.update({ where: { id: projectId }, data: { contactId } });
+  await syncLinkedListings(projectId, { contactId }); // linked listings (Sale / Lease / Financing) share the contact
   revalidateCrm(p.developerId, contactId);
 }
 
