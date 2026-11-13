@@ -15,16 +15,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const u = await currentUser();
   if (!u) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(req.nextUrl.pathname)}`, req.url));
-  const file = await db.dataRoomFile.findUnique({ where: { id }, include: { documents: { select: { access: true } }, project: { select: { visibility: true } } } });
+  // A file can be shared on several listings: linked listings (Sale / Lease / Financing) share one data room,
+  // and each listing decides its own access tier. The investor needs access through at least one of them.
+  const file = await db.dataRoomFile.findUnique({ where: { id }, include: { documents: { select: { access: true, projectId: true, project: { select: { visibility: true } } } } } });
   if (!file) return new NextResponse("Not found", { status: 404 });
   // Referral agents never open the internal data room. Like investors, they open only files shared on a live listing,
   // at their level: Teaser everywhere, everything on listings they originated (see listingAccess).
 
   if (u.role !== "ADMIN") {
     const member = (u.role === "INVESTOR" || u.role === "AGENT") && u.status === "APPROVED";
-    if (!member || file.project.visibility === "DRAFT" || !file.documents.length) return new NextResponse("Not found", { status: 404 });
-    const { stage } = await listingAccess(file.projectId, u);
-    if (!file.documents.some((d) => atLeast(stage, docStage(d.access)))) return new NextResponse("This document unlocks at a later stage of the deal.", { status: 403 });
+    const live = file.documents.filter((d) => d.project.visibility !== "DRAFT");
+    if (!member || !live.length) return new NextResponse("Not found", { status: 404 });
+    let allowed = false;
+    for (const projectId of new Set(live.map((d) => d.projectId))) {
+      const { stage } = await listingAccess(projectId, u);
+      if (live.some((d) => d.projectId === projectId && atLeast(stage, docStage(d.access)))) { allowed = true; break; }
+    }
+    if (!allowed) return new NextResponse("This document unlocks at a later stage of the deal.", { status: 403 });
   }
 
   const stream = await openStored(file.storageKey);

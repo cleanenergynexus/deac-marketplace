@@ -174,24 +174,41 @@ export async function deleteItems(projectId: string, items: { folderIds: string[
   return {};
 }
 
-/** Shares data room files on the listing's Documents tab at an access tier (or changes the tier of ones already shared). */
-export async function shareOnListing(projectId: string, fileIds: string[], access: Stage): Promise<Result> {
+/** A listing that may share files from `projectId`'s data room: the project itself or one of its linked listings. */
+async function shareTarget(projectId: string, listingId?: string) {
+  if (!listingId || listingId === projectId) return projectId;
+  const ok = await db.project.count({ where: { id: listingId, linkedToId: projectId } });
+  return ok ? listingId : null;
+}
+
+/**
+ * Shares data room files on a listing's Documents tab at an access tier (or changes the tier of ones already shared).
+ * Linked listings (Sale / Lease / Financing) share one data room; `listingId` picks which of them the files go on.
+ */
+export async function shareOnListing(projectId: string, fileIds: string[], access: Stage, listingId?: string): Promise<Result> {
   await requireAdmin();
   if (!isStage(access)) return { error: "Pick an access tier." };
-  const files = await db.dataRoomFile.findMany({ where: { projectId, id: { in: fileIds } }, include: { documents: { select: { id: true } } } });
+  const target = await shareTarget(projectId, listingId);
+  if (!target) return { error: "That listing isn't linked to this data room." };
+  const files = await db.dataRoomFile.findMany({ where: { projectId, id: { in: fileIds } }, include: { documents: { where: { projectId: target }, select: { id: true } } } });
   await db.$transaction(files.map((f) => f.documents.length
-    ? db.document.updateMany({ where: { fileId: f.id }, data: { access } })
-    : db.document.create({ data: { projectId, fileId: f.id, name: docNameFromFile(f.name), url: fileUrl(f.id), access, category: "Other" } })));
+    ? db.document.updateMany({ where: { fileId: f.id, projectId: target }, data: { access } })
+    : db.document.create({ data: { projectId: target, fileId: f.id, name: docNameFromFile(f.name), url: fileUrl(f.id), access, category: "Other" } })));
   refresh(projectId);
+  if (target !== projectId) refresh(target);
   revalidatePath("/marketplace");
   return {};
 }
 
-/** Takes files off the listing. They stay in the data room. */
-export async function unshareFromListing(projectId: string, fileIds: string[]): Promise<Result> {
+/** Takes files off a listing. They stay in the data room. */
+export async function unshareFromListing(projectId: string, fileIds: string[], listingId?: string): Promise<Result> {
   await requireAdmin();
-  await db.document.deleteMany({ where: { projectId, fileId: { in: fileIds } } });
+  const target = await shareTarget(projectId, listingId);
+  if (!target) return { error: "That listing isn't linked to this data room." };
+  const own = await db.dataRoomFile.findMany({ where: { projectId, id: { in: fileIds } }, select: { id: true } });
+  await db.document.deleteMany({ where: { projectId: target, fileId: { in: own.map((f) => f.id) } } });
   refresh(projectId);
+  if (target !== projectId) refresh(target);
   return {};
 }
 

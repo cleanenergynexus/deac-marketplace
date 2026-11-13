@@ -9,7 +9,7 @@ import { FileIcon, FolderIcon } from "@/components/DataRoomIcons";
 
 export type ExFolder = { id: string; parentId: string | null; name: string; updatedAt: string };
 export type ExFile = { id: string; folderId: string | null; name: string; size: number; contentType: string; updatedAt: string; uploadedBy: string | null; shared: Stage | null };
-type Props = { projectId: string; rootLabel: string; folders: ExFolder[]; files: ExFile[]; storage: "blob" | "local" | "missing"; uploadMethod: "token" | "presigned" };
+type Props = { projectId: string; rootLabel: string; folders: ExFolder[]; files: ExFile[]; storage: "blob" | "local" | "missing"; uploadMethod: "token" | "presigned"; /** Linked listings share one data room: the listing that Share / Remove act on (default: this project). */ listingId?: string };
 
 type Item = { key: string; kind: "folder"; id: string; name: string; updatedAt: string; folder: ExFolder } | { key: string; kind: "file"; id: string; name: string; updatedAt: string; file: ExFile };
 type Upload = { id: number; name: string; pct: number; status: "uploading" | "done" | "error"; error?: string };
@@ -22,7 +22,7 @@ const MULTIPART_OVER = 50 * 1024 * 1024;
 let uploadSeq = 0;
 
 /** Windows Explorer-style file manager for one project's data room. */
-export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage, uploadMethod }: Props) {
+export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage, uploadMethod, listingId }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [cwd, setCwd] = useState<string | null>(null);
@@ -484,7 +484,7 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
               <MenuItem onClick={() => { setMenu(null); remove(); }} danger>Delete</MenuItem>
               <MenuSep />
               <MenuItem onClick={() => { setMenu(null); setDialog("share"); }}>Share on listing…</MenuItem>
-              {sharedSel.length > 0 && <MenuItem onClick={() => { setMenu(null); run(() => unshareFromListing(projectId, sharedSel.map((i) => i.id))); }}>Remove from listing</MenuItem>}
+              {sharedSel.length > 0 && <MenuItem onClick={() => { setMenu(null); run(() => unshareFromListing(projectId, sharedSel.map((i) => i.id), listingId)); }}>Remove from listing</MenuItem>}
             </>
           ) : (
             <>
@@ -505,7 +505,7 @@ export function DataRoomExplorer({ projectId, rootLabel, folders, files, storage
         <ShareDialog
           count={selFileIds.length + selFolderIds.reduce((n, id) => n + sizeOf(id).length, 0)}
           onClose={() => setDialog(null)}
-          onShare={(access) => { setDialog(null); run(() => shareOnListing(projectId, [...selFileIds, ...selFolderIds.flatMap((id) => sizeOf(id).map((f) => f.id))], access)); }} />
+          onShare={(access) => { setDialog(null); run(() => shareOnListing(projectId, [...selFileIds, ...selFolderIds.flatMap((id) => sizeOf(id).map((f) => f.id))], access, listingId)); }} />
       )}
       {dialog === "move" && (
         <MoveDialog folders={folders} childFolders={childFolders} rootLabel={rootLabel} moving={selFolderIds}

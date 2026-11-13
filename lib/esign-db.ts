@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "./db";
+import { dataRoomProjectId } from "./listing-links-db";
 import { currentUser } from "./auth";
 import { sendEmail } from "./email";
 import { recordSentEmail } from "./gmail-db";
@@ -170,7 +171,8 @@ export async function logOnRecord(r: { investorId: string | null; contactId: str
 }
 
 /** Saves a copy of the signed file into the listing's data room, under "Signed Documents". Returns the file id. */
-export async function fileInDataRoom(projectId: string, name: string, bytes: Uint8Array, contentType: string, by: string) {
+export async function fileInDataRoom(listingId: string, name: string, bytes: Uint8Array, contentType: string, by: string) {
+  const projectId = await dataRoomProjectId(listingId); // linked listings file into their original's shared data room
   let folder = await db.dataRoomFolder.findFirst({ where: { projectId, parentId: null, name: SIGNED_FOLDER } });
   if (!folder) folder = await db.dataRoomFolder.create({ data: { projectId, parentId: null, name: SIGNED_FOLDER } });
   const taken = await db.dataRoomFile.findMany({ where: { projectId, folderId: folder.id }, select: { name: true } });

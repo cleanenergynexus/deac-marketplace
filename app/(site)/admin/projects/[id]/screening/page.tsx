@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { dataRoomProjectId } from "@/lib/listing-links-db";
 import { db } from "@/lib/db";
 import { importerEnabled } from "@/lib/extract";
 import { storageMode } from "@/lib/storage";
@@ -15,6 +16,9 @@ export const maxDuration = 300;
 
 export default async function ProjectScreeningPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Linked listings (Sale / Lease / Financing of one project) share the original listing's data room.
+  const root = await dataRoomProjectId(id);
+  if (root !== id) redirect(`/admin/projects/${root}/screening`);
   const [p, template] = await Promise.all([
     db.project.findUnique({
       where: { id },

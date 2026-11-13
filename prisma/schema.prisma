@@ -293,6 +293,13 @@ model Project {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  // Linked listings (lib/listing-links.ts): the same project marketed under another deal type, e.g. a Lease
+  // listing duplicated from the Sale listing. Null = an original listing. A linked listing shares the original's
+  // data room, screening and valuation, and project facts (SYNCED_FIELDS) stay in sync across the group.
+  linkedToId String?
+  linkedTo   Project?  @relation("ListingLinks", fields: [linkedToId], references: [id], onDelete: SetNull)
+  linked     Project[] @relation("ListingLinks")
+
   documents        Document[]
   dataRoomFolders  DataRoomFolder[]
   dataRoomFiles    DataRoomFile[]
@@ -305,6 +312,8 @@ model Project {
   interests        InvestorInterest[]
   favorites        Favorite[]
   signatures       SignatureRequest[]
+
+  @@index([linkedToId])
 }
 
 model Document {

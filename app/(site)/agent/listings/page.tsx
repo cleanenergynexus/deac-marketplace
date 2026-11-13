@@ -15,7 +15,8 @@ const VIS: Record<string, string> = { DRAFT: "Draft (DEAC review)", PRIVATE: "Li
 export default async function AgentListings() {
   const me = await requireAgent();
   const [projects, pipeline] = await Promise.all([
-    db.project.findMany({ where: agentProjectWhere(me.id), include: { developer: { select: { company: true, stage: true } }, _count: { select: { dataRoomFiles: true } } }, orderBy: { createdAt: "desc" } }),
+    db.project.findMany({ where: { AND: [agentProjectWhere(me.id), { linkedToId: null }] }, // linked Lease / Financing copies share the original's data room
+      include: { developer: { select: { company: true, stage: true } }, _count: { select: { dataRoomFiles: true } } }, orderBy: { createdAt: "desc" } }),
     getPipeline(),
   ]);
   return (
