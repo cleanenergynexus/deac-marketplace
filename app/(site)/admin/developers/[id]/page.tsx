@@ -22,6 +22,7 @@ import { getScoring } from "@/lib/scoring-db";
 import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
 import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
+import { EngagementPanel } from "@/components/EngagementPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,12 @@ export default async function DeveloperDetail({ params }: { params: Promise<{ id
               <div><button className="btn-ghost">Add team member</button></div>
             </form>
           </Section>
+          {(await db.trackEvent.count({ where: { developerId: id } })) > 0 && (
+            <Section title="Website Activity Before Submitting">
+              <p className="-mt-2 mb-3 text-xs text-slate-500">What {dev.contactName || dev.company} looked at on the marketplace in the browser session they submitted a project from.</p>
+              <EngagementPanel where={{ developerId: id }} name={dev.contactName?.split(" ")[0] || dev.company} />
+            </Section>
+          )}
         </div>
         <Section title="Activity">
           <p className="mb-3 text-xs text-slate-500">Everything logged with {dev.company}&apos;s contacts. Open a contact to log a note, email, call, meeting or task.</p>

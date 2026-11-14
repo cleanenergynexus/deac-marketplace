@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth";
 import { hashSignToken } from "@/lib/esign-db";
 import { isOpen } from "@/lib/esign";
 import { openStored } from "@/lib/storage";
+import { trackServer } from "@/lib/activity-db";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const name = which === "signed" ? (r.signedName ?? `${r.title} - signed.pdf`) : r.sourceName;
   const type = which === "signed" ? (r.signedType ?? "application/pdf") : "application/pdf";
   const inline = type === "application/pdf" && req.nextUrl.searchParams.get("download") === null;
+  await trackServer(u, { kind: inline ? "OPEN" : "DOWNLOAD", path: req.nextUrl.pathname + (which === "signed" ? "?file=signed" : ""), label: name, target: r.id, projectId: r.projectId });
   const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return new NextResponse(stream, {
     headers: {

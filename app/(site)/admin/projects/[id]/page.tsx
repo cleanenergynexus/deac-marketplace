@@ -19,6 +19,7 @@ import { requireAdmin } from "@/lib/auth";
 import { assigneeOptions, staffLevel } from "@/lib/tasks";
 import { getTaskEditing, getTaskPeople, getTaskPickers, visibleTaskWhere } from "@/lib/tasks-db";
 import { TaskForm } from "@/components/TaskForm";
+import { ListingEngagement } from "@/components/ListingEngagement";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Discussion, EditLog } from "@/components/ListingCollab";
 import { CommentForm } from "@/components/ListingCollabForms";
@@ -155,6 +156,8 @@ export default async function ProjectAdmin({ params, searchParams }: { params: P
           <p className="text-xs text-slate-500 sm:col-span-4">Use this when an NDA or LOI was signed outside the portal. Choosing a lower stage revokes the later steps. An investor with a master NDA on their CRM record always has at least NDA access.</p>
         </form>
       </Section>
+
+      <ListingEngagement projectId={p.id} />
 
       <div id="tasks">
         <Section title="Tasks" action={<Link href="/admin/tasks" className="text-sm text-brand-600">All tasks</Link>}>
