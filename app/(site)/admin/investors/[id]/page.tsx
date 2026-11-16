@@ -32,6 +32,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getAgents } from "@/lib/agents-db";
 import { assigneeOptions, staffLevel } from "@/lib/tasks";
 import { getTaskEditing, getTaskPeople, visibleTimelineWhere } from "@/lib/tasks-db";
+import { EngagementPanel, EngagementSummary } from "@/components/EngagementPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function InvestorRecord({ params, searchParams }: { params:
   const { id } = await params;
   const { tab: rawTab, emailError } = await searchParams;
   const profile = rawTab === "profile";
+  const platform = rawTab === "platform";
   const tab = contactTab(rawTab);
   await ensureFirms();
   await ensureInterests();
@@ -137,6 +139,12 @@ export default async function InvestorRecord({ params, searchParams }: { params:
             {inv.linkedin && <a href={inv.linkedin.startsWith("http") ? inv.linkedin : `https://${inv.linkedin}`} target="_blank" rel="noreferrer" className="block truncate text-brand-600">LinkedIn</a>}
           </div>
         </div>
+        {inv.user && (
+          <section className="card space-y-2 p-4 text-sm">
+            <h2 className="font-semibold">Platform Activity</h2>
+            <EngagementSummary where={{ userId: inv.user.id }} href="?tab=platform" />
+          </section>
+        )}
         <section className="card space-y-2 p-4 text-sm">
           <h2 className="font-semibold">Mandate</h2>
           <dl className="space-y-1 text-xs">
@@ -183,13 +191,16 @@ export default async function InvestorRecord({ params, searchParams }: { params:
         )}
         <nav className="flex gap-1 overflow-x-auto border-b border-slate-200">
           {CONTACT_TABS.map((t) => (
-            <Link key={t.value} href={`?tab=${t.value}`} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${!profile && t.value === tab.value ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+            <Link key={t.value} href={`?tab=${t.value}`} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${!profile && !platform && t.value === tab.value ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
               {t.label} <span className="text-xs text-slate-400">{count(t.kinds)}</span>
             </Link>
           ))}
+          <Link href="?tab=platform" className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${platform ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Platform</Link>
           <Link href="?tab=profile" className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${profile ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>Profile</Link>
         </nav>
-        {profile ? (
+        {platform ? (
+          inv.user ? <EngagementPanel where={{ userId: inv.user.id }} name={firstName} /> : <p className="card p-5 text-sm text-slate-500">{firstName} has no marketplace login yet, so there&apos;s no platform activity. Invite them from Membership on the left.</p>
+        ) : profile ? (
           <div className="card p-5">
             {emailError && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{EMAIL_ERRORS[emailError] ?? EMAIL_ERRORS.invalid} Nothing was saved.</p>}
             {(login === "INVITED" || login === "INVITE_EXPIRED") && <p className="mb-4 rounded bg-amber-50 p-3 text-sm text-amber-900">{firstName} has an unused invite. If you correct the email, create a new invite link afterwards and send it to the new address.</p>}

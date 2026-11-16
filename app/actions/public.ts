@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { checkPassword, endSession, hashPassword, startSession } from "@/lib/auth";
 import { funnelStages } from "@/lib/pipeline";
 import { getPipeline } from "@/lib/pipeline-db";
+import { claimVisitorEvents, claimVisitorEventsForDeveloper, trackServer } from "@/lib/activity-db";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 const n = (f: FormData, k: string) => { const v = s(f, k); return v ? Number(v.replace(/[$,]/g, "")) : null; };
@@ -23,6 +24,8 @@ export async function login(_: unknown, f: FormData) {
   }
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: user.role as "ADMIN" | "AGENT", status: user.status, name: user.name });
+  await claimVisitorEvents(user);
+  await trackServer(user, { kind: "LOGIN", path: "/login" });
   const next = s(f, "next");
   if (user.role === "ADMIN") redirect(next?.startsWith("/") ? next : "/admin");
   if (user.role === "AGENT") {
@@ -68,6 +71,7 @@ export async function applyForAccess(_: unknown, f: FormData) {
   await db.activity.create({ data: { investorId: investor.id, kind: "SYSTEM", body: "Submitted membership application via website." } });
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await startSession({ uid: user.id, role: "INVESTOR", status: "PENDING", name: user.name });
+  await claimVisitorEvents(user);
   redirect("/pending");
 }
 
@@ -128,6 +132,7 @@ export async function submitProject(_: unknown, f: FormData) {
       pipelineStage: funnelStages(await getPipeline(), s(f, "dealType") ?? "FINANCING")[0].value,
     },
   });
+  await claimVisitorEventsForDeveloper(dev.id);
   await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? where}" via website.` } });
   redirect("/developers/thanks");
 }

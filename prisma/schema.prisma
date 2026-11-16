@@ -49,6 +49,7 @@ model User {
   signatures   SignatureRequest[] @relation("AgentSignatures")
   gmail        GmailAccount?
   agentActivities Activity[] @relation("AgentActivities")
+  trackEvents  TrackEvent[]
   createdAt    DateTime @default(now())
 
   @@index([inviteTokenHash])
@@ -311,6 +312,7 @@ model Project {
   activities       Activity[]
   interests        InvestorInterest[]
   favorites        Favorite[]
+  trackEvents      TrackEvent[]
   signatures       SignatureRequest[]
   comments         ListingComment[]
   agentEdits       ListingEdit[]
@@ -778,4 +780,35 @@ model ListingEdit {
   createdAt DateTime @default(now())
 
   @@index([projectId])
+}
+
+// ---------- Platform activity (lib/activity.ts) ----------
+// What signed-in investors and referral agents do on the marketplace: page views (with active time on page and how
+// far they scrolled), clicks, selections, file opens/downloads, uploads and sign-ins. The DEAC team is never tracked.
+// Visitors who aren't signed in get a browser-session id (visitorId); their earlier events are attached to them when
+// they sign in, apply or submit a project (developerId), so the team sees what they read first.
+model TrackEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visitorId   String? // browser-session id (cookie deac_vid)
+  developerId String? // developer who submitted a project from this browser session
+  role        String? // INVESTOR | AGENT | null (visitor)
+  kind        String // VIEW | CLICK | SELECT | LINK_OUT | OPEN | DOWNLOAD | UPLOAD | LOGIN
+  path        String // page it happened on, with its query string (e.g. /marketplace/abc?tab=economics)
+  label       String? // what was clicked / selected / opened (button text, file name...)
+  target      String? // link target, or a data room file id
+  projectId   String? // listing it was about, if any
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  clientId    String? // page views: id the browser uses to report time on page
+  durationMs  Int? // page views: active time on the page (tab visible, not idle)
+  scrollPct   Int? // page views: furthest the page was scrolled, 0-100
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([visitorId])
+  @@index([developerId])
+  @@index([clientId])
+  @@index([createdAt])
 }

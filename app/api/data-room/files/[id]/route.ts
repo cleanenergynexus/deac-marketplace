@@ -4,6 +4,7 @@ import { currentUser, isOriginator, listingAccess } from "@/lib/auth";
 import { atLeast, docStage } from "@/lib/disclosure";
 import { inlineSafe } from "@/lib/dataroom";
 import { openStored } from "@/lib/storage";
+import { trackServer } from "@/lib/activity-db";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const stream = await openStored(file.storageKey);
   if (!stream) return new NextResponse("File is missing from storage", { status: 404 });
   const inline = inlineSafe(file.contentType) && req.nextUrl.searchParams.get("download") === null;
+  // Platform activity: which listing they opened it from (the page's referrer), else the first listing it's shared on.
+  const from = req.headers.get("referer")?.match(/\/(?:marketplace|agent\/listings)\/([a-z0-9]{20,40})/)?.[1];
+  const listing = file.documents.some((d) => d.projectId === from) ? from : file.documents[0]?.projectId ?? file.projectId;
+  await trackServer(u, { kind: inline ? "OPEN" : "DOWNLOAD", path: req.nextUrl.pathname + req.nextUrl.search, label: file.name, target: file.id, projectId: listing });
   const ascii = file.name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   return new NextResponse(stream, {
     headers: {

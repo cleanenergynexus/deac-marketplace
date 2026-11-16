@@ -20,6 +20,7 @@ import { notifyTaskAssignee } from "@/lib/task-mail";
 import { AGENT_EDIT_FIELDS, agentAssigneeOptions, changesToData, diffListingEdit, editLabel, showValue } from "@/lib/listing-collab";
 import { taskTeam } from "@/lib/listing-collab-db";
 import { syncLinkedListings } from "@/lib/listing-links-db";
+import { trackServer } from "@/lib/activity-db";
 
 type State = { error?: string; ok?: boolean } | undefined;
 type Agent = Awaited<ReturnType<typeof requireAgentToAct>>;
@@ -152,7 +153,8 @@ export async function agentRegisterFile(input: { projectId: string; folderId: st
   ]);
   const name = uniqueName(cleanName(input.name) || "Untitled", [...folders, ...files].map((x) => x.name));
   const contentType = (stored.contentType || input.contentType || "application/octet-stream").slice(0, 200);
-  await db.dataRoomFile.create({ data: { projectId, folderId, name, size: stored.size, contentType, storageKey: input.storageKey, uploadedBy: `${agent.name} (referral agent)`, uploadedById: agent.id } });
+  const file = await db.dataRoomFile.create({ data: { projectId, folderId, name, size: stored.size, contentType, storageKey: input.storageKey, uploadedBy: `${agent.name} (referral agent)`, uploadedById: agent.id } });
+  await trackServer(agent, { kind: "UPLOAD", path: `/agent/listings/${projectId}`, label: name, target: file.id, projectId });
   revalidatePath(`/agent/listings/${projectId}`);
   revalidatePath(`/admin/projects/${projectId}/data-room`);
   return {};

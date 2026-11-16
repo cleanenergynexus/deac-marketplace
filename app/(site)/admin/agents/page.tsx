@@ -68,6 +68,7 @@ export default async function Agents() {
                       <input type="hidden" name="id" value={a.id} />
                       <button className="btn-ghost py-1.5">View as agent</button>
                     </form>
+                    <Link href={`/admin/activity?user=${a.id}`} className="btn-ghost mt-3 py-1.5">Platform activity</Link>
                     {isAdmin && a.status === "APPROVED" && <AgentLoginEmailButton id={a.id} name={a.name} />}
                   </div>
                   {a.inviteTokenHash && a.inviteExpiresAt && a.inviteExpiresAt > new Date() && <div className="mt-1 text-xs text-slate-500">Login email sent; set-password link open until {date(a.inviteExpiresAt)}.</div>}

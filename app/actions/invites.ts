@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { appUrl, welcomeEmail } from "@/lib/email-templates-db";
 import { recordSentEmail } from "@/lib/gmail-db";
 import { hashInviteToken, INVITE_ROLES, inviteExpired, inviteUrl, INVITE_DAYS, loginState, newInvite, stageAfterInvite } from "@/lib/invites";
+import { claimVisitorEvents, trackServer } from "@/lib/activity-db";
 
 export type InviteState = { error?: string; link?: string; emailed?: boolean; from?: string; name?: string } | undefined;
 
@@ -65,6 +66,8 @@ export async function acceptInvite(_: { error?: string } | undefined, f: FormDat
   if (user.role === "AGENT" && user.status !== "APPROVED") return { error: "This referral agent account is suspended. Contact your DEAC partner." };
   await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), inviteTokenHash: null, inviteExpiresAt: null } });
   if (user.investorId) await db.activity.create({ data: { investorId: user.investorId, kind: "SYSTEM", by: user.name, body: "Accepted the marketplace invite and set a password." } });
+  await claimVisitorEvents(user);
+  await trackServer(user, { kind: "LOGIN", path: "/invite" });
   if (user.role === "AGENT") {
     await startSession({ uid: user.id, role: "AGENT", status: user.status, name: user.name });
     redirect("/agent");
