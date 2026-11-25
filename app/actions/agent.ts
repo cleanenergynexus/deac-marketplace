@@ -1,5 +1,7 @@
 "use server";
 // Actions a referral agent can take from their portal (/agent). Every action checks the agent may see what it touches.
+import { workStateData } from "@/lib/tasks";
+import { startSprint } from "@/lib/sprints-db";
 import { codeRegion } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -201,6 +203,7 @@ export async function createAgentListing(f: FormData) {
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
   await db.activity.create({ data: { developerId, projectId: p.id, kind: "SYSTEM", by: agent.name, body: `${p.code} imported by referral agent ${agent.name} from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });
+  await startSprint(p.id, agent);
   await taskForPartner(agent, { subject: `Review new listing from ${agent.name}: ${p.code}`, body: `${agent.name} imported ${p.code} · ${p.title} as a draft listing. Review it, score it and decide when to publish.`, developerId, projectId: p.id });
   revalidatePath("/admin/projects");
   revalidatePath("/agent", "layout");
@@ -274,7 +277,7 @@ export async function toggleListingTask(f: FormData) {
   const t = await db.activity.findFirst({ where: { id: String(f.get("id")), kind: "TASK", projectId: { not: null } } });
   if (!t?.projectId || !(await agentProject(agent.id, t.projectId))) throw new Error("That task isn't on one of your listings.");
   if (t.assigneeId !== agent.id && t.by !== agent.name) throw new Error("You can tick off tasks assigned to you or that you created.");
-  await db.activity.update({ where: { id: t.id }, data: { doneAt: t.doneAt ? null : new Date() } });
+  await db.activity.update({ where: { id: t.id }, data: workStateData(t.doneAt ? "NOT_STARTED" : "DONE", t) });
   revalidateListing(t.projectId);
   revalidatePath("/admin", "layout");
 }

@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const items: NavItem[] = [
     { href: "/admin", label: "Dashboard" },
     { href: "/admin/tasks", label: "Tasks", count: myTasks },
+    { href: "/admin/sprints", label: "Sprints", children: [{ href: "/admin/sprints/templates", label: "Sprint Templates" }] },
     { href: "/admin/access", label: "Access Requests", count: applied + agentApplied },
     { href: "/admin/activity", label: "Platform Activity" },
     {

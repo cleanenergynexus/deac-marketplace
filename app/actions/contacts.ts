@@ -11,6 +11,7 @@ import { addressFromForm } from "@/lib/address";
 import { findVisibleTask, getTaskPeople, pickAssignee } from "@/lib/tasks-db";
 import { referrerFromForm } from "@/lib/agents-db";
 import { notifyTaskAssignee } from "@/lib/task-mail";
+import { isPriority, isWorkState, priorityOf, workStateData } from "@/lib/tasks";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
 
@@ -146,8 +147,29 @@ export async function toggleTask(f: FormData) {
   const admin = await requireAdmin();
   const { task: a } = await findVisibleTask(admin, String(f.get("id")));
   if (a.kind !== "TASK") return;
-  await db.activity.update({ where: { id: a.id }, data: { doneAt: a.doneAt ? null : new Date() } });
+  await db.activity.update({ where: { id: a.id }, data: workStateData(a.doneAt ? "NOT_STARTED" : "DONE", a) });
   revalidateEntry(a);
+  revalidatePath("/admin", "layout");
+}
+
+/** Status cell on the Sprints board: Not started, Working on it, Stuck or Done. */
+export async function setTaskWorkState(f: FormData) {
+  const admin = await requireAdmin();
+  const { task: a } = await findVisibleTask(admin, String(f.get("id")));
+  const next = f.get("state");
+  if (a.kind !== "TASK" || !isWorkState(next)) return;
+  await db.activity.update({ where: { id: a.id }, data: workStateData(next, a) });
+  revalidateEntry(a);
+  revalidatePath("/admin", "layout");
+}
+
+/** Priority cell on the Sprints board. "" clears it. */
+export async function setTaskPriority(f: FormData) {
+  const admin = await requireAdmin();
+  const { task: a } = await findVisibleTask(admin, String(f.get("id")));
+  const raw = f.get("priority");
+  if (a.kind !== "TASK" || (raw !== "" && !isPriority(raw))) return;
+  await db.activity.update({ where: { id: a.id }, data: { priority: priorityOf(raw as string) } });
   revalidatePath("/admin", "layout");
 }
 
@@ -233,9 +255,15 @@ export async function updateTask(f: FormData) {
   // Keeping the current assignee is always fine, even if this person couldn't pick them.
   const assigneeId = picked === (a.assigneeId ?? "") ? a.assigneeId : pickAssignee(admin, team, picked);
   const links = await taskLinks(f);
+  // A sprint task belongs to its sprint's project (lib/sprints.ts), so it can't be moved to another one.
+  if (a.sprintId && links.projectId !== a.projectId) throw new Error("This task is part of a project sprint and stays on that project.");
+  const tz = Number(f.get("tz") ?? 0);
+  const dueAt = parseWhen(s(f, "dueAt"), tz);
+  const startAt = f.has("startAt") ? parseWhen(s(f, "startAt"), tz) : a.startAt;
+  if (startAt && dueAt && startAt > dueAt) throw new Error("The start date is after the due date.");
   const updated = await db.activity.update({
     where: { id: a.id },
-    data: { subject, body: s(f, "body") ?? "", dueAt: parseWhen(s(f, "dueAt"), Number(f.get("tz") ?? 0)), assigneeId, ...links },
+    data: { subject, body: s(f, "body") ?? "", startAt, dueAt, assigneeId, ...links },
   });
   await notifyTaskAssignee(updated, admin, a.assigneeId); // only when it's now someone else's
   revalidateEntry(a); // the timeline it was on

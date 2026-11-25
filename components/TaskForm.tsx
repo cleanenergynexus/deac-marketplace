@@ -16,6 +16,9 @@ export type EditableTask = {
   contactId: string | null;
   investorId: string | null;
   projectId: string | null;
+  /** Sprint tasks: their timeline start. They stay on their sprint's project. */
+  sprintId?: string | null;
+  startAt?: Date | null;
 };
 
 type Props = TaskPickers & {
@@ -78,6 +81,11 @@ export function TaskForm({ assignees, me, allowUnassigned, contacts, investors =
       <label className="text-xs text-slate-500 sm:col-span-2">Task
         <input name="subject" required defaultValue={task?.subject ?? ""} className="input mt-1" placeholder="e.g. Send NDA to Maria" />
       </label>
+      {task?.sprintId && (
+        <label className="text-xs text-slate-500">Start date
+          <input type="date" name="startAt" defaultValue={dayInput(task.startAt ?? null)} className="input mt-1" />
+        </label>
+      )}
       <label className="text-xs text-slate-500">Due date
         <input type="date" name="dueAt" defaultValue={dayInput(task?.dueAt ?? null)} className="input mt-1" />
       </label>
@@ -99,7 +107,8 @@ export function TaskForm({ assignees, me, allowUnassigned, contacts, investors =
         </select>
       </label>
       <label className="text-xs text-slate-500">Project
-        <select name="projectId" value={projectId} onChange={(e) => setProjectId(e.target.value)} className="input mt-1">
+        {task?.sprintId && <input type="hidden" name="projectId" value={projectId} />}
+        <select name={task?.sprintId ? undefined : "projectId"} value={projectId} onChange={(e) => setProjectId(e.target.value)} disabled={!!task?.sprintId} title={task?.sprintId ? "Sprint tasks stay on their project" : undefined} className="input mt-1">
           <option value="">—</option>
           {shown.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>

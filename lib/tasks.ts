@@ -127,3 +127,53 @@ export function taskAssignedEmail(o: { assigneeName: string; byName: string; tit
   ];
   return { subject: `New task assigned to you: ${o.title}`, text: lines.join("\n") };
 }
+
+// ---------- Work status and priority (Sprints board, lib/sprints.ts) ----------
+// A task's status is one value worked out from two columns: Activity.doneAt (done, as everywhere else) and
+// Activity.workState (how an open task is going). workStateData() is the only way to write them, so a done task
+// never keeps a "Stuck" or "Working on it" behind it.
+
+export const WORK_STATES = [
+  { value: "NOT_STARTED", label: "Not started" },
+  { value: "WORKING", label: "Working on it" },
+  { value: "STUCK", label: "Stuck" },
+  { value: "DONE", label: "Done" },
+] as const;
+export type WorkState = (typeof WORK_STATES)[number]["value"];
+export const isWorkState = (v: unknown): v is WorkState => WORK_STATES.some((s) => s.value === v);
+export const workStateLabel = (v: WorkState) => WORK_STATES.find((s) => s.value === v)!.label;
+
+/** A task's status. Done wins; an open task is Working on it, Stuck, or (no workState) Not started. */
+export function taskWorkState(t: { doneAt: Date | null; workState?: string | null }): WorkState {
+  if (t.doneAt) return "DONE";
+  return t.workState === "WORKING" || t.workState === "STUCK" ? t.workState : "NOT_STARTED";
+}
+
+/** The columns to write for a new status. Keeps the completion date when a done task is set to Done again. */
+export function workStateData(next: WorkState, current: { doneAt: Date | null }, now = new Date()): { doneAt: Date | null; workState: string | null } {
+  switch (next) {
+    case "DONE": return { doneAt: current.doneAt ?? now, workState: null };
+    case "NOT_STARTED": return { doneAt: null, workState: null };
+    case "WORKING":
+    case "STUCK": return { doneAt: null, workState: next };
+    default: return assertNever(next);
+  }
+}
+
+/** Priorities, lowest first. Compare with priorityRank, never by label. */
+export const PRIORITIES = [
+  { value: "LOW", label: "Low" },
+  { value: "MEDIUM", label: "Medium" },
+  { value: "HIGH", label: "High" },
+  { value: "CRITICAL", label: "Critical" },
+] as const;
+export type Priority = (typeof PRIORITIES)[number]["value"];
+export const isPriority = (v: unknown): v is Priority => PRIORITIES.some((p) => p.value === v);
+/** 0 for no priority, then 1 (Low) to 4 (Critical). */
+export const priorityRank = (v: string | null | undefined) => PRIORITIES.findIndex((p) => p.value === v) + 1;
+export const priorityOf = (v: string | null | undefined): Priority | null => (isPriority(v) ? v : null);
+
+/** Default branch of a switch over a union: adding a value makes every switch that forgot it fail to compile. */
+export function assertNever(x: never): never {
+  throw new Error(`Unexpected value: ${JSON.stringify(x)}`);
+}

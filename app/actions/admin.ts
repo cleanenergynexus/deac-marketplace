@@ -27,6 +27,7 @@ import { referrerFromForm } from "@/lib/agents-db";
 import { dataRoomProjectId, syncLinkedListings } from "@/lib/listing-links-db";
 import { dealShort, groupRootId } from "@/lib/listing-links";
 import { DEAL_TYPES } from "@/lib/constants";
+import { startSprint } from "@/lib/sprints-db";
 
 const csvList = (v: string) => v.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -222,8 +223,8 @@ export async function setProjectPipelineStage(f: FormData) {
   const p = await db.project.update({ where: { id }, data: { pipelineStage: stage } });
   const contactId = p.contactId ?? (await db.contact.findFirst({ where: { developerId: p.developerId, isPrimary: true }, select: { id: true } }))?.id ?? null;
   await db.activity.create({ data: { developerId: p.developerId, contactId, projectId: p.id, kind: "STAGE", body: `${p.code} (${p.title}) stage → ${pipelineLabel(stages, stage)}`, by: admin.name } });
-  revalidatePath("/admin/developers", "layout");
-  revalidatePath(`/admin/projects/${id}`);
+  await startSprint(p.id, admin);
+  revalidatePath("/admin", "layout");
 }
 export async function addTeamMember(f: FormData) {
   await requireAdmin();
@@ -244,10 +245,11 @@ async function pipelineStageFrom(f: FormData, dealType: string) {
   return placeStage(stages, s(f, "pipelineStage"));
 }
 export async function createProject(f: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const data = projectData(f);
   const count = await db.project.count();
   const p = await db.project.create({ data: { ...data, monthsToPower: data.monthsToPower ?? undefined, pipelineStage: await pipelineStageFrom(f, data.dealType), code: s(f, "code") ?? `DEAC-${codeRegion(data)}-${String(count + 1).padStart(3, "0")}` } });
+  await startSprint(p.id, admin);
   redirect(`/admin/projects/${p.id}`);
 }
 /** Last step of the import wizard: saves the reviewed listing, creating the developer if it's new. */
@@ -273,6 +275,7 @@ export async function createImportedProject(f: FormData) {
   const p = await db.project.create({ data: { ...data, developerId, valuationInputs, pipelineStage: await pipelineStageFrom(f, data.dealType), monthsToPower: data.monthsToPower ?? undefined, code: `DEAC-${codeRegion(data)}-${String(count + 1).padStart(3, "0")}` } });
   const source = s(f, "sourceName");
   const contacts = s(f, "contactsNote");
+  await startSprint(p.id, admin);
   await db.activity.create({ data: { developerId, kind: "SYSTEM", by: admin.name, body: `${p.code} imported from ${source ?? "a document"}.${contacts ? ` Contacts in the document: ${contacts}` : ""}` } });
   revalidatePath("/admin/projects");
   redirect(`/admin/projects/${p.id}`);
@@ -341,6 +344,7 @@ export async function duplicateListing(f: FormData) {
       documents: { create: documents.map((d) => ({ name: d.name, category: d.category, url: d.url, access: d.access, fileId: d.fileId })) },
     },
   });
+  await startSprint(p.id, admin);
   await db.activity.create({ data: { developerId: src.developerId, projectId: p.id, kind: "SYSTEM", by: admin.name, body: `${p.code} (${dealShort(dealType)}) duplicated from ${src.code} (${dealShort(src.dealType)}). Project facts and the data room stay in sync between them.` } });
   revalidatePath("/admin/projects");
   revalidatePath(`/admin/projects/${id}`);
