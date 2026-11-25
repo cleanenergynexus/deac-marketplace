@@ -1,4 +1,5 @@
 "use server";
+import { startSprint } from "@/lib/sprints-db";
 import { codeRegion, locationFromForm, placeShort } from "@/lib/location";
 import { redirect } from "next/navigation";
 import { phoneFromForm } from "@/lib/phone";
@@ -113,7 +114,7 @@ export async function submitProject(_: unknown, f: FormData) {
 
   const count = await db.project.count();
   const where = placeShort(place);
-  await db.project.create({
+  const project = await db.project.create({
     data: {
       code: `DEAC-${codeRegion(place)}-${String(count + 1).padStart(3, "0")}`,
       title: s(f, "title") ?? `${n(f, "mw")} MW ${s(f, "facilityType") ?? "Data Center"} – ${where}`,
@@ -132,6 +133,7 @@ export async function submitProject(_: unknown, f: FormData) {
       pipelineStage: funnelStages(await getPipeline(), s(f, "dealType") ?? "FINANCING")[0].value,
     },
   });
+  await startSprint(project.id, null);
   await claimVisitorEventsForDeveloper(dev.id);
   await db.activity.create({ data: { developerId: dev.id, kind: "SYSTEM", body: `Submitted project "${s(f, "title") ?? where}" via website.` } });
   redirect("/developers/thanks");

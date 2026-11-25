@@ -316,6 +316,7 @@ model Project {
   signatures       SignatureRequest[]
   comments         ListingComment[]
   agentEdits       ListingEdit[]
+  sprints          Sprint[]
 
   @@index([linkedToId])
 }
@@ -496,8 +497,11 @@ model Activity {
   subject     String? // email subject / task title / meeting title
   body        String
   outcome     String? // calls: CONNECTED, VOICEMAIL... emails: SENT | RECEIVED
+  startAt     DateTime? // tasks: when work should start (the start of the timeline that ends at dueAt)
   dueAt       DateTime? // tasks
-  doneAt      DateTime? // tasks: completed
+  doneAt      DateTime? // tasks: completed. Done is doneAt alone; workState only describes an open task (lib/tasks.ts taskWorkState)
+  workState   String? // open tasks: WORKING | STUCK. Null = not started. Always null once done (written only through workStateData)
+  priority    String? // tasks: LOW | MEDIUM | HIGH | CRITICAL (lib/tasks.ts PRIORITIES). Null = no priority set
   assigneeId  String? // tasks: team member responsible. Null = unassigned (only Admins see these)
   assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   by          String?
@@ -509,6 +513,13 @@ model Activity {
   gmailThreadId  String?
   emailMessageId String? // the email's Message-ID header, the same in every mailbox (stops duplicates when two of the team were on it)
   supportEmails  SupportEmail[] // tasks made from emails to the Technical Support inbox
+  // Sprints (lib/sprints.ts): a task in a project's sprint for one CRM stage. Its projectId is the sprint's project.
+  sprintId    String?
+  sprint      Sprint?    @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  // Sub-task of another task in the same sprint (one level only: a sub-task has no sub-tasks).
+  parentId    String?
+  parent      Activity?  @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Activity[] @relation("Subtasks")
   createdAt   DateTime   @default(now()) // when it happened (can be back-dated when logging)
 
   @@index([contactId])
@@ -516,6 +527,32 @@ model Activity {
   @@index([agentId])
   @@index([gmailMessageId])
   @@index([emailMessageId])
+  @@index([sprintId])
+  @@index([parentId])
+}
+
+// A project's sprint for one Developer CRM stage (lib/sprints.ts): started from the stage's template when the project
+// enters the stage. Done / active / upcoming is worked out from the project's stage, never stored here.
+model Sprint {
+  id        String     @id @default(cuid())
+  projectId String
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stage     String // CRM stage value (lib/pipeline.ts)
+  goal      String     @default("")
+  startedAt DateTime   @default(now())
+  targetAt  DateTime? // planned finish, from the template's length in days
+  startedBy String?
+  tasks     Activity[]
+
+  @@unique([projectId, stage])
+}
+
+// Sprint templates by CRM stage, edited on Sprints → Sprint Templates (single row "default", JSON in lib/sprints.ts).
+model SprintTemplate {
+  id        String   @id
+  config    String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }
 
 // A team member's linked Gmail (My account → Gmail). Tokens are encrypted with GMAIL_TOKEN_KEY (lib/secret-box.ts).
