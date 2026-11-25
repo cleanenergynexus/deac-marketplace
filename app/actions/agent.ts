@@ -1,7 +1,7 @@
 "use server";
 // Actions a referral agent can take from their portal (/agent). Every action checks the agent may see what it touches.
-import { workStateData } from "@/lib/tasks";
-import { startSprint } from "@/lib/sprints-db";
+import { isPriority, isWorkState, priorityOf, workStateData } from "@/lib/tasks";
+import { createSprintTask, startSprint } from "@/lib/sprints-db";
 import { codeRegion } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -19,7 +19,7 @@ import { importedValuation, projectData } from "@/lib/project-form";
 import { sendEmail } from "@/lib/email";
 import { parseWhen } from "@/lib/crm";
 import { notifyTaskAssignee } from "@/lib/task-mail";
-import { AGENT_EDIT_FIELDS, agentAssigneeOptions, changesToData, diffListingEdit, editLabel, showValue } from "@/lib/listing-collab";
+import { AGENT_EDIT_FIELDS, agentAssigneeOptions, agentCanUpdateTask, changesToData, diffListingEdit, editLabel, showValue } from "@/lib/listing-collab";
 import { taskTeam } from "@/lib/listing-collab-db";
 import { syncLinkedListings } from "@/lib/listing-links-db";
 import { trackServer } from "@/lib/activity-db";
@@ -276,9 +276,54 @@ export async function toggleListingTask(f: FormData) {
   if (!agent) return;
   const t = await db.activity.findFirst({ where: { id: String(f.get("id")), kind: "TASK", projectId: { not: null } } });
   if (!t?.projectId || !(await agentProject(agent.id, t.projectId))) throw new Error("That task isn't on one of your listings.");
-  if (t.assigneeId !== agent.id && t.by !== agent.name) throw new Error("You can tick off tasks assigned to you or that you created.");
+  if (!agentCanUpdateTask(agent, t)) throw new Error("You can tick off tasks assigned to you or that you created.");
   await db.activity.update({ where: { id: t.id }, data: workStateData(t.doneAt ? "NOT_STARTED" : "DONE", t) });
   revalidateListing(t.projectId);
+  revalidatePath("/admin", "layout");
+}
+
+/** A task on one of the agent's listings that they may update (theirs, or one they created). */
+async function agentTask(agent: Agent, id: string) {
+  const t = await db.activity.findFirst({ where: { id, kind: "TASK", projectId: { not: null } } });
+  if (!t?.projectId || !(await agentProject(agent.id, t.projectId))) throw new Error("That task isn't on one of your listings.");
+  if (!agentCanUpdateTask(agent, t)) throw new Error("You can update tasks assigned to you or that you created.");
+  return { ...t, projectId: t.projectId };
+}
+
+/** Status cell on a listing's Sprints tab. */
+export async function agentSetTaskWorkState(f: FormData) {
+  const agent = await actor();
+  if (!agent) return;
+  const t = await agentTask(agent, String(f.get("id")));
+  const next = f.get("state");
+  if (!isWorkState(next)) return;
+  await db.activity.update({ where: { id: t.id }, data: workStateData(next, t) });
+  revalidateListing(t.projectId);
+  revalidatePath("/admin", "layout");
+}
+
+/** Priority cell on a listing's Sprints tab. "" clears it. */
+export async function agentSetTaskPriority(f: FormData) {
+  const agent = await actor();
+  if (!agent) return;
+  const t = await agentTask(agent, String(f.get("id")));
+  const raw = f.get("priority");
+  if (raw !== "" && !isPriority(raw)) return;
+  await db.activity.update({ where: { id: t.id }, data: { priority: priorityOf(raw as string) } });
+  revalidateListing(t.projectId);
+  revalidatePath("/admin", "layout");
+}
+
+/** "+ Add task" / "+ Add sub-task" on a listing's Sprints tab. The new task is the agent's own. */
+export async function agentAddSprintTask(f: FormData) {
+  const agent = await actor();
+  if (!agent) throw new Error(PREVIEW_MESSAGE);
+  const subject = s(f, "subject");
+  if (!subject) throw new Error("Give the task a title.");
+  const sprint = await db.sprint.findUnique({ where: { id: String(f.get("sprintId")) }, select: { projectId: true } });
+  if (!sprint || !(await agentProject(agent.id, sprint.projectId))) throw new Error("That sprint isn't on one of your listings.");
+  await createSprintTask({ sprintId: String(f.get("sprintId")), parentId: s(f, "parentId"), subject, assigneeId: agent.id, by: agent, projectId: sprint.projectId });
+  revalidateListing(sprint.projectId);
   revalidatePath("/admin", "layout");
 }
 

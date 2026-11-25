@@ -109,3 +109,31 @@ export async function loadRoadmap(projectId: string, taskWhere: Prisma.ActivityW
   const rows = roadmap(stages, current, sprints);
   return { project: p, stages, current, rows, templates, ...schedule(rows, templates, now) };
 }
+
+/**
+ * Adds a task (or, with `parentId`, a sub-task) to a sprint, on the sprint's project. Sub-tasks go one level deep under
+ * a task of the same sprint and start with that task's dates and person unless given others. The caller has already
+ * checked who may add tasks here and that `assigneeId` is someone they may assign to (undefined = the parent's person).
+ */
+export async function createSprintTask(o: {
+  sprintId: string; parentId: string | null; subject: string; body?: string; startAt?: Date | null; dueAt?: Date | null; priority?: string | null;
+  assigneeId: string | null | undefined; by: { id: string; name: string }; projectId?: string;
+}) {
+  const sprint = await db.sprint.findUnique({ where: { id: o.sprintId }, include: { project: { select: { id: true, developerId: true, contactId: true } } } });
+  if (!sprint || (o.projectId && sprint.projectId !== o.projectId)) throw new Error("That sprint no longer exists.");
+  const parent = o.parentId ? await db.activity.findUnique({ where: { id: o.parentId }, select: { sprintId: true, parentId: true, assigneeId: true, startAt: true, dueAt: true } }) : null;
+  if (o.parentId && (!parent || parent.sprintId !== sprint.id || parent.parentId)) throw new Error("Sub-tasks go under a task of the same sprint.");
+  const p = sprint.project;
+  const contactId = p.contactId ?? (await db.contact.findFirst({ where: { developerId: p.developerId, isPrimary: true }, select: { id: true } }))?.id ?? null;
+  const task = await db.activity.create({
+    data: {
+      kind: "TASK", subject: o.subject.slice(0, 200), body: (o.body ?? "").slice(0, 5000),
+      startAt: o.startAt ?? parent?.startAt ?? null, dueAt: o.dueAt ?? parent?.dueAt ?? null, priority: o.priority ?? null,
+      assigneeId: o.assigneeId === undefined ? (parent?.assigneeId ?? o.by.id) : o.assigneeId,
+      sprintId: sprint.id, parentId: parent ? o.parentId : null,
+      projectId: p.id, developerId: p.developerId, contactId, by: o.by.name,
+    },
+  });
+  await notifyTaskAssignee(task, o.by);
+  return task;
+}

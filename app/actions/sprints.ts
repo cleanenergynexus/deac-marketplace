@@ -4,9 +4,8 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { parseWhen } from "@/lib/crm";
 import { normalizeTemplates } from "@/lib/sprints";
-import { startSprint } from "@/lib/sprints-db";
+import { createSprintTask, startSprint } from "@/lib/sprints-db";
 import { getTaskPeople, pickAssignee } from "@/lib/tasks-db";
-import { notifyTaskAssignee } from "@/lib/task-mail";
 import { priorityOf } from "@/lib/tasks";
 
 const s = (f: FormData, k: string) => (f.get(k) as string | null)?.trim() || null;
@@ -38,27 +37,13 @@ export async function addSprintTask(f: FormData) {
   const admin = await requireAdmin();
   const subject = s(f, "subject");
   if (!subject) throw new Error("Give the task a title.");
-  const sprint = await db.sprint.findUnique({ where: { id: String(f.get("sprintId")) }, include: { project: { select: { id: true, developerId: true, contactId: true } } } });
-  if (!sprint) throw new Error("That sprint no longer exists.");
-  const parentId = s(f, "parentId");
-  const parent = parentId ? await db.activity.findUnique({ where: { id: parentId }, select: { sprintId: true, parentId: true, assigneeId: true, startAt: true, dueAt: true } }) : null;
-  if (parentId && (!parent || parent.sprintId !== sprint.id || parent.parentId)) throw new Error("Sub-tasks go under a task of the same sprint.");
-  const people = await getTaskPeople();
-  // A new sub-task starts with its task's person and dates unless the form picked others.
-  const assigneeId = f.has("assigneeId") ? pickAssignee(admin, people, f.get("assigneeId")) : parent ? parent.assigneeId : pickAssignee(admin, people, null);
   const tz = Number(f.get("tz") ?? 0);
-  const p = sprint.project;
-  const contactId = p.contactId ?? (await db.contact.findFirst({ where: { developerId: p.developerId, isPrimary: true }, select: { id: true } }))?.id ?? null;
-  const task = await db.activity.create({
-    data: {
-      kind: "TASK", subject, body: s(f, "body") ?? "",
-      startAt: parseWhen(s(f, "startAt"), tz) ?? parent?.startAt ?? null,
-      dueAt: parseWhen(s(f, "dueAt"), tz) ?? parent?.dueAt ?? null,
-      priority: priorityOf(s(f, "priority")),
-      assigneeId, sprintId: sprint.id, parentId: parent ? parentId : null,
-      projectId: p.id, developerId: p.developerId, contactId, by: admin.name,
-    },
+  // No person picked: a sub-task gets its task's person, a task the person adding it.
+  const assigneeId = f.has("assigneeId") ? pickAssignee(admin, await getTaskPeople(), f.get("assigneeId")) : undefined;
+  await createSprintTask({
+    sprintId: String(f.get("sprintId")), parentId: s(f, "parentId"), subject, body: s(f, "body") ?? "",
+    startAt: parseWhen(s(f, "startAt"), tz), dueAt: parseWhen(s(f, "dueAt"), tz), priority: priorityOf(s(f, "priority")),
+    assigneeId, by: admin,
   });
-  await notifyTaskAssignee(task, admin);
   revalidatePath("/admin", "layout");
 }

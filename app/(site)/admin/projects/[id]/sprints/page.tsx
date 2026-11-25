@@ -3,11 +3,10 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { setProjectPipelineStage } from "@/app/actions/admin";
 import { ConfirmButton } from "@/components/ConfirmButton";
-import { SprintGroup, span } from "@/components/SprintGroup";
-import { RoadmapStrip } from "@/components/RoadmapStrip";
+import { SprintRoadmap } from "@/components/SprintRoadmap";
 import { PageHeader, Stat } from "@/components/ui";
 import { loadRoadmap } from "@/lib/sprints-db";
-import { nextStage, progress, stageSprint } from "@/lib/sprints";
+import { nextStage, progress } from "@/lib/sprints";
 import { assigneeOptions, staffLevel, taskWorkState } from "@/lib/tasks";
 import { getTaskEditing, getTaskPeople, visibleTaskWhere } from "@/lib/tasks-db";
 import { date } from "@/lib/format";
@@ -21,7 +20,7 @@ export default async function ProjectSprintsPage({ params }: { params: Promise<{
   const now = new Date();
   const [r, editing] = await Promise.all([loadRoadmap(id, visibleTaskWhere(me, people), now), getTaskEditing(me, people)]);
   if (!r) notFound();
-  const { project: p, rows, dates, closeAt, templates, stages, current } = r;
+  const { project: p, rows, closeAt, stages, current } = r;
   const assigning = { options: assigneeOptions(me, people), allowUnassigned: staffLevel(me.staffLevel) === "ADMIN" };
   const active = rows.find((x) => x.position === "ACTIVE");
   const activeTasks = active?.sprint ? active.sprint.tasks.flatMap((t) => [t, ...t.subtasks]) : [];
@@ -58,13 +57,7 @@ export default async function ProjectSprintsPage({ params }: { params: Promise<{
         <Stat label="Needs Attention" value={stuck + overdue} sub={`${stuck} stuck · ${overdue} overdue`} />
       </div>
 
-      <div className="card p-4"><RoadmapStrip rows={rows.map((x, i) => ({ value: x.value, label: x.label, position: x.position, progress: x.sprint ? progress(x.sprint.tasks.flatMap((t) => [t, ...t.subtasks])) : null, dates: dates[i] ? span(dates[i]!.start, dates[i]!.end) : null, projected: dates[i]?.projected ?? false }))} /></div>
-
-      <div>
-        {rows.map((x, i) => (
-          <SprintGroup key={x.value} index={i} stage={x} dates={dates[i]} template={stageSprint(templates, x.value)} projectId={p.id} editing={editing} assigning={assigning} now={now} />
-        ))}
-      </div>
+      <SprintRoadmap roadmap={r} mode={{ kind: "TEAM", editing, assigning }} now={now} />
     </div>
   );
 }
