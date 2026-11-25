@@ -9,6 +9,7 @@ import { initials } from "@/lib/crm";
 import { POSITION_LABEL, progress, type RoadmapStage, type StageDates, type StageSprint } from "@/lib/sprints";
 import type { ProjectSprint } from "@/lib/sprints-db";
 import { NO_PRIORITY_COLOR, POSITION_TONE, PRIORITY_COLOR, WORK_STATE_COLOR, groupColor } from "@/lib/sprint-colors";
+import { agentCanUpdateTask } from "@/lib/listing-collab";
 import { PRIORITIES, WORK_STATES, priorityOf, taskWorkState, workStateLabel, type AssigneeOption } from "@/lib/tasks";
 
 type Task = ProjectSprint["tasks"][number];
@@ -64,20 +65,34 @@ function People({ people }: { people: { id: string; name: string }[] }) {
 }
 
 export type Assigning = { options: AssigneeOption[]; allowUnassigned: boolean };
+type FormAction = (f: FormData) => Promise<void>;
+
+/**
+ * Who is looking at the board. The DEAC team can edit, reassign, delete and start sprints on every task they can see.
+ * A referral agent (their own listings, in the agent portal) updates the status and priority of tasks that are theirs
+ * or that they created, and adds tasks and sub-tasks for themselves; everything else is read-only for them.
+ */
+export type SprintMode =
+  | { kind: "TEAM"; editing: TaskEditing; assigning: Assigning }
+  | { kind: "AGENT"; agent: { id: string; name: string }; actions: { state: FormAction; priority: FormAction; add: FormAction } };
+
+/** A Status or Priority cell someone can't change: the same color, no menu. */
+function StaticCell({ color, label }: { color: string; label: string }) {
+  return <div className="flex h-10 items-center justify-center px-2 text-sm font-medium text-white" style={{ backgroundColor: color }}>{label}</div>;
+}
 
 /**
  * One stage of a project's roadmap as a monday.com-style group: a colored, collapsible table of the sprint's tasks
  * (sub-tasks indented under their task) with People, Timeline, Status and Priority cells, an "+ Add Task" row, and a
  * footer that sums up the group. A stage with no sprint yet shows its template's tasks as the plan.
  */
-export function SprintGroup({ index, stage, dates, template, projectId, editing, assigning, now = new Date() }: {
+export function SprintGroup({ index, stage, dates, template, projectId, mode, now = new Date() }: {
   index: number;
   stage: RoadmapStage<ProjectSprint>;
   dates: StageDates;
   template: StageSprint;
   projectId: string;
-  editing: TaskEditing;
-  assigning: Assigning;
+  mode: SprintMode;
   now?: Date;
 }) {
   const color = groupColor(index);
@@ -92,31 +107,41 @@ export function SprintGroup({ index, stage, dates, template, projectId, editing,
   const last = ends.length ? new Date(Math.max(...ends.map(Number))) : null;
   const stateOf = (t: Row) => taskWorkState(t);
 
+  const add = mode.kind === "AGENT" ? mode.actions.add : undefined;
   const row = (t: Row, sub: boolean) => {
     const state = stateOf(t);
+    const team = mode.kind === "TEAM" ? mode : null;
+    const canUpdate = mode.kind === "TEAM" || agentCanUpdateTask(mode.agent, t);
+    const p = priorityOf(t.priority);
     return (
       <tr key={t.id} className="h-10 border-t border-slate-200 bg-white hover:bg-slate-50">
         <td className="border-r border-slate-200 px-3 text-sm" style={{ paddingLeft: sub ? 36 : undefined }}>
           <div className="flex items-center gap-2">
             {sub && <span className="text-slate-300">↳</span>}
             <span className={`min-w-0 flex-1 ${state === "DONE" ? "text-slate-400 line-through" : sub ? "text-slate-700" : "font-medium text-slate-900"}`} title={t.body || undefined}>{t.subject}</span>
-            <span className="flex shrink-0 items-center gap-2 opacity-60 hover:opacity-100">
-              <TaskEditButton task={{ ...t, sprintId: t.sprintId, startAt: t.startAt }} editing={editing} />
-              <form action={deleteActivity}><input type="hidden" name="id" value={t.id} />
-                <ConfirmButton message={`Delete "${t.subject}"${sub ? "" : " and its sub-tasks"}?`} className="text-xs text-slate-400 hover:text-red-600">×</ConfirmButton>
-              </form>
-            </span>
+            {team && (
+              <span className="flex shrink-0 items-center gap-2 opacity-60 hover:opacity-100">
+                <TaskEditButton task={{ ...t, sprintId: t.sprintId, startAt: t.startAt }} editing={team.editing} />
+                <form action={deleteActivity}><input type="hidden" name="id" value={t.id} />
+                  <ConfirmButton message={`Delete "${t.subject}"${sub ? "" : " and its sub-tasks"}?`} className="text-xs text-slate-400 hover:text-red-600">×</ConfirmButton>
+                </form>
+              </span>
+            )}
           </div>
         </td>
         <td className="relative border-r border-slate-200 text-center">
           <Avatar person={t.assignee} />
-          {(assigning.options.length > 1 || assigning.allowUnassigned) && (
-            <AssigneeSelect taskId={t.id} assigneeId={t.assigneeId} options={withCurrent(assigning.options, t.assignee)} allowUnassigned={assigning.allowUnassigned} className="!absolute inset-0 !h-full cursor-pointer opacity-0" />
+          {team && (team.assigning.options.length > 1 || team.assigning.allowUnassigned) && (
+            <AssigneeSelect taskId={t.id} assigneeId={t.assigneeId} options={withCurrent(team.assigning.options, t.assignee)} allowUnassigned={team.assigning.allowUnassigned} className="!absolute inset-0 !h-full cursor-pointer opacity-0" />
           )}
         </td>
         <td className="border-r border-slate-200 px-2 text-center"><TimelinePill start={t.startAt} end={t.dueAt} color={color} done={state === "DONE"} now={now} /></td>
-        <td className="border-r border-slate-200 p-0"><StatusCell taskId={t.id} state={state} /></td>
-        <td className="p-0"><PriorityCell taskId={t.id} priority={t.priority} /></td>
+        <td className="border-r border-slate-200 p-0">
+          {!canUpdate ? <StaticCell color={WORK_STATE_COLOR[state]} label={workStateLabel(state)} /> : mode.kind === "AGENT" ? <StatusCell taskId={t.id} state={state} action={mode.actions.state} /> : <StatusCell taskId={t.id} state={state} />}
+        </td>
+        <td className="p-0">
+          {!canUpdate ? <StaticCell color={p ? PRIORITY_COLOR[p] : NO_PRIORITY_COLOR} label={p ? `${PRIORITIES.find((x) => x.value === p)!.label}${p === "CRITICAL" ? " ⚠" : ""}` : "—"} /> : mode.kind === "AGENT" ? <PriorityCell taskId={t.id} priority={t.priority} action={mode.actions.priority} /> : <PriorityCell taskId={t.id} priority={t.priority} />}
+        </td>
       </tr>
     );
   };
@@ -128,9 +153,9 @@ export function SprintGroup({ index, stage, dates, template, projectId, editing,
         {sprint.tasks.map((t) => [
           row(t, false),
           ...t.subtasks.map((x) => row(x, true)),
-          <tr key={`${t.id}-add`} className="border-t border-slate-100 bg-white"><td colSpan={5} className="py-0 pr-3" style={{ paddingLeft: 52 }}><AddTaskRow sprintId={sprint.id} parentId={t.id} label="+ Add sub-task" /></td></tr>,
+          <tr key={`${t.id}-add`} className="border-t border-slate-100 bg-white"><td colSpan={5} className="py-0 pr-3" style={{ paddingLeft: 52 }}><AddTaskRow sprintId={sprint.id} parentId={t.id} label="+ Add sub-task" action={add} /></td></tr>,
         ])}
-        <tr className="border-t border-slate-200 bg-white"><td colSpan={5} className="px-3 py-1"><AddTaskRow sprintId={sprint.id} label="+ Add task" /></td></tr>
+        <tr className="border-t border-slate-200 bg-white"><td colSpan={5} className="px-3 py-1"><AddTaskRow sprintId={sprint.id} label="+ Add task" action={add} /></td></tr>
       </>
     );
   } else {
@@ -148,7 +173,9 @@ export function SprintGroup({ index, stage, dates, template, projectId, editing,
         ))}
         <tr className="border-t border-slate-200 bg-white">
           <td colSpan={5} className="px-3 py-2 text-sm text-slate-500">
-            {stage.position === "ACTIVE" ? (
+            {stage.position === "ACTIVE" && mode.kind === "AGENT" ? (
+              <>The project is in this stage. The DEAC team will start its sprint.</>
+            ) : stage.position === "ACTIVE" ? (
               <form action={startProjectSprint} className="flex flex-wrap items-center gap-3">
                 <input type="hidden" name="projectId" value={projectId} />
                 <span>The project is in this stage but its sprint hasn&apos;t started.</span>

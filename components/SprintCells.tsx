@@ -8,9 +8,9 @@ import { NO_PRIORITY_COLOR, PRIORITY_COLOR, WORK_STATE_COLOR } from "@/lib/sprin
 const cell = "h-full w-full cursor-pointer appearance-none border-0 px-2 py-2 text-center text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white/70";
 
 /** Colored Status cell. Saves as soon as a status is picked. */
-export function StatusCell({ taskId, state }: { taskId: string; state: WorkState }) {
+export function StatusCell({ taskId, state, action = setTaskWorkState }: { taskId: string; state: WorkState; action?: (f: FormData) => Promise<void> }) {
   return (
-    <form action={setTaskWorkState} className="h-full">
+    <form action={action} className="h-full">
       <input type="hidden" name="id" value={taskId} />
       <select name="state" defaultValue={state} key={state} aria-label="Status" onChange={(e) => e.currentTarget.form?.requestSubmit()}
         className={cell} style={{ backgroundColor: WORK_STATE_COLOR[state] }}>
@@ -21,10 +21,10 @@ export function StatusCell({ taskId, state }: { taskId: string; state: WorkState
 }
 
 /** Colored Priority cell. Saves as soon as a priority is picked. */
-export function PriorityCell({ taskId, priority }: { taskId: string; priority: string | null }) {
+export function PriorityCell({ taskId, priority, action = setTaskPriority }: { taskId: string; priority: string | null; action?: (f: FormData) => Promise<void> }) {
   const p = priorityOf(priority);
   return (
-    <form action={setTaskPriority} className="h-full">
+    <form action={action} className="h-full">
       <input type="hidden" name="id" value={taskId} />
       <select name="priority" defaultValue={p ?? ""} key={p ?? ""} aria-label="Priority" onChange={(e) => e.currentTarget.form?.requestSubmit()}
         className={cell} style={{ backgroundColor: p ? PRIORITY_COLOR[p] : NO_PRIORITY_COLOR }}>
@@ -36,7 +36,7 @@ export function PriorityCell({ taskId, priority }: { taskId: string; priority: s
 }
 
 /** "+ Add Task" (or "+ Add Sub-task") row: type a title and press Enter. Dates, priority and person can be set on the row after. */
-export function AddTaskRow({ sprintId, parentId, label }: { sprintId: string; parentId?: string; label: string }) {
+export function AddTaskRow({ sprintId, parentId, label, action = addSprintTask }: { sprintId: string; parentId?: string; label: string; action?: (f: FormData) => Promise<void> }) {
   const form = useRef<HTMLFormElement>(null);
   const tz = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function AddTaskRow({ sprintId, parentId, label }: { sprintId: string; pa
       action={async (f) => {
         setError(null);
         setBusy(true);
-        try { await addSprintTask(f); form.current?.reset(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't add the task."); } finally { setBusy(false); }
+        try { await action(f); form.current?.reset(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't add the task."); } finally { setBusy(false); }
       }}>
       <input type="hidden" name="sprintId" value={sprintId} />
       {parentId && <input type="hidden" name="parentId" value={parentId} />}

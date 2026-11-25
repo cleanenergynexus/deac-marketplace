@@ -14,7 +14,9 @@ import { AgentUploader } from "@/components/AgentUploader";
 import { LocalTime } from "@/components/LocalTime";
 import { Discussion, EditLog } from "@/components/ListingCollab";
 import { AgentEditListingForm, AgentTaskForm, CommentForm } from "@/components/ListingCollabForms";
-import { toggleListingTask } from "@/app/actions/agent";
+import { agentAddSprintTask, agentSetTaskPriority, agentSetTaskWorkState, toggleListingTask } from "@/app/actions/agent";
+import { SprintRoadmap } from "@/components/SprintRoadmap";
+import { loadRoadmap } from "@/lib/sprints-db";
 import { CrmIcon } from "@/components/CrmIcons";
 import { Badge, PageHeader, Section, statusTone } from "@/components/ui";
 import { DEAL_TYPES, stageLabel } from "@/lib/constants";
@@ -24,7 +26,7 @@ import { getInvestorPipeline, getPipeline } from "@/lib/pipeline-db";
 import { sortTasks } from "@/lib/tasks";
 import { AGENT_EDIT_FIELDS, agentAssigneeOptions, type FieldValue } from "@/lib/listing-collab";
 import { listingCollab, taskTeam } from "@/lib/listing-collab-db";
-import { num, usd } from "@/lib/format";
+import { date, num, usd } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ const TABS = [
   { value: "overview", label: "Overview" },
   { value: "pipeline", label: "Pipeline & Activity" },
   { value: "tasks", label: "Tasks" },
+  { value: "sprints", label: "Sprints" },
   { value: "data-room", label: "Data Room" },
   { value: "discussion", label: "Discussion" },
 ] as const;
@@ -109,6 +112,8 @@ export default async function AgentListing({ params, searchParams }: { params: P
         </div>
         <Section title="Edit History"><EditLog edits={collab.edits} empty="No edits by referral agents yet." /></Section>
       </>}
+
+      {tab === "sprints" && <SprintsTab projectId={p.id} agent={me} />}
 
       {tab === "pipeline" && <PipelineTab p={p} pipeline={pipeline} investorPipeline={investorPipeline} interests={interests} agentId={me.id} feed={feed} />}
 
@@ -298,4 +303,21 @@ function DataRoomTab({ p, room, folderId, agentId, preview, href }: { p: Listing
         : <AgentUploader projectId={room.projectId} folders={options} storage={storageMode()} uploadMethod={blobUploadMethod()} />}
     </Section>
   </>;
+}
+
+/** The listing's sprints: every CRM stage's tasks and sub-tasks on the way to close (the same board the DEAC team uses). */
+async function SprintsTab({ projectId, agent }: { projectId: string; agent: { id: string; name: string } }) {
+  const now = new Date();
+  // Agents see every task on their own listings (as on the Tasks tab).
+  const r = await loadRoadmap(projectId, {}, now);
+  if (!r) return null;
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-600">
+        Each DEAC stage has a sprint: the tasks and sub-tasks that move this listing to the next stage. You can change the status and priority of tasks that are yours or that you created, and add tasks and sub-tasks for yourself. The DEAC team moves the listing between stages.
+        {r.closeAt && <> Projected close: <b>{date(r.closeAt)}</b>.</>}
+      </p>
+      <SprintRoadmap roadmap={r} mode={{ kind: "AGENT", agent, actions: { state: agentSetTaskWorkState, priority: agentSetTaskPriority, add: agentAddSprintTask } }} now={now} />
+    </div>
+  );
 }

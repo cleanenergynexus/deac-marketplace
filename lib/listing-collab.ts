@@ -118,3 +118,7 @@ export function agentAssigneeOptions(agent: { id: string; name: string; partnerI
     ...rest,
   ];
 }
+
+/** A referral agent can tick off and update the tasks on their listing that are theirs or that they created. */
+export const agentCanUpdateTask = (agent: { id: string; name: string }, task: { assigneeId: string | null; by: string | null }) =>
+  task.assigneeId === agent.id || task.by === agent.name;
